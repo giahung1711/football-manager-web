@@ -10,7 +10,7 @@
 <header class="topbar">
   <a class="brand" href="{{ url_for('home') }}">⚽ FOOTBALL MANAGER</a>
   {% if current_user.is_authenticated %}
-  <nav><a href="{{ url_for('dashboard') }}">Tổng quan</a><a href="{{ url_for('squad') }}">Đội hình</a>
+  <nav><a href="{{ url_for('dashboard') }}">Tổng quan</a><a href="{{ url_for('game_tab', tab='squad') }}">Đội hình</a>
     <form method="post" action="{{ url_for('logout') }}"><button class="link-btn">Đăng xuất</button></form>
   </nav>
   {% endif %}

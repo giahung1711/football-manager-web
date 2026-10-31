@@ -9,7 +9,7 @@
 </div>
 <section class="panel"><div class="section-head"><div><p class="eyebrow">CLUB STATUS</p><h2>Mùa giải {{ data.season }} · Tuần {{ data.week }}</h2></div><span class="pill">{{ data.formation }}</span></div>
 <p>Thành tích: {{ data.wins }} thắng · {{ data.draws }} hòa · {{ data.losses }} thua</p>
-<div class="actions"><a class="button primary" href="{{ url_for('squad') }}">Quản lý đội hình</a><form method="post" action="{{ url_for('play_match') }}"><button class="button" type="submit">Trận đấu (đang phát triển)</button></form></div>
+<div class="actions"><a class="button primary" href="{{ url_for('game_tab', tab='squad') }}">Quản lý đội hình</a><form method="post" action="{{ url_for('action') }}"><input type="hidden" name="action" value="match"><button class="button" type="submit">Chơi trận đấu</button></form></div>
 </section>
 <div class="feature-grid">
   <div class="feature"><span>⇄</span><h3>Chuyển nhượng</h3><p>Thị trường cầu thủ sẽ được triển khai ở giai đoạn tiếp theo.</p></div>
