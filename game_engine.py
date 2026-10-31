@@ -1,90 +1,342 @@
-# Game logic is kept separate from Flask routes.
-# Each user's state is stored in their own GameSave row.
+import random, copy
+CLUB_OPTIONS = {'1': ('Real Madrid', 300),
+ '2': ('Barcelona', 250),
+ '3': ('Arsenal', 200),
+ '4': ('Bayern Munich', 225),
+ '5': ('Manchester United', 200)}
 
-CLUBS = {
-    "Real Madrid": {"budget": 180_000_000, "rating": 91},
-    "Barcelona": {"budget": 120_000_000, "rating": 89},
-    "Arsenal": {"budget": 110_000_000, "rating": 88},
-    "Bayern Munich": {"budget": 140_000_000, "rating": 90},
-    "Manchester United": {"budget": 100_000_000, "rating": 85},
-}
+STARTING = {'Real Madrid': ['Thibaut Courtois - GK - 89',
+                 'Marc Cucurella - LB - 90',
+                 'Dean Hujisen - CB - 88',
+                 'Ibrahima Konate - CB - 88',
+                 'Trent Alexander-Arnold - RB - 88',
+                 'Yan Diomande - CM - 89',
+                 'Federico Valverde - CM - 89',
+                 'Jude Bellingham - CAM - 91',
+                 'Rodrygo - RW - 87',
+                 'Vinicius Junior - LW - 91',
+                 'Kylian Mbappe - ST - 92'],
+ 'Barcelona': ['Joan Garcia - GK - 88',
+               'Alejandro Balde - LB - 87',
+               'Eric Garcia - CB - 88',
+               'Pau Cubarsi - CB - 89',
+               'Jules Kounde - RB - 88',
+               'Pedri - CM - 90',
+               'Fermin Lopez - CM - 89',
+               'Dani Olmo - CAM - 88',
+               'Lamine Yamal - RW - 92',
+               'Anthony Gordon - LW - 89',
+               'Raphinha - ST - 92'],
+ 'Arsenal': ['David Raya - GK - 88',
+             'Jurrien Timber - RB - 87',
+             'William Saliba - CB - 89',
+             'Grabiel Magalhaes - CB - 88',
+             'Riccardo Calafiori - LB - 87',
+             'Martin Odegaard - CM - 89',
+             'Martin Zubimendi - CM - 87',
+             'Declane Rice - CDM - 90',
+             'Bukayo Saka - RW - 91',
+             'Eberechi Eze - LW - 88',
+             'Viktor Gyokeres - ST - 88'],
+ 'Bayern Munich': ['Manuel Neuer - GK - 89',
+                   'Konrad Laimer - RB - 86',
+                   'Dayot Upamecano - CB - 88',
+                   'Jonathan Tah - CB - 87',
+                   'Alphonso Davies - LB - 89',
+                   'Joshua Kimmich - CM - 89',
+                   'Aleksandar Pavlovic - CM - 86',
+                   'Jamal Musiala - CAM - 90',
+                   'Michael Olise - RW - 91',
+                   'Luis Diaz - LW - 89',
+                   'Harry Kane - ST - 92'],
+ 'Manchester United': ['Senne Lammens - GK - 87',
+                       'Diogo Dalot - RB - 86',
+                       'Lisandro Martinez - CB - 87',
+                       'Matthijs de Ligt - CB - 88',
+                       'Patrick Dorgu - LB - 86',
+                       'Andrey Santos - CM - 87',
+                       'Carlos Baleba - CM - 88',
+                       'Bruno Fernandes - CAM - 91',
+                       'Bryan Mbeumo - RW - 88',
+                       'Matheus Cunha - LW - 88',
+                       'Benjamin Sesko - ST - 88']}
 
-STARTING_SQUADS = {
-    "Real Madrid": [
-        ("Thibaut Courtois", "GK", 89), ("Dani Carvajal", "RB", 84),
-        ("Antonio Rudiger", "CB", 88), ("Eder Militao", "CB", 86),
-        ("Ferland Mendy", "LB", 83), ("Federico Valverde", "CM", 89),
-        ("Jude Bellingham", "CAM", 91), ("Eduardo Camavinga", "CM", 86),
-        ("Rodrygo", "RW", 87), ("Kylian Mbappe", "ST", 92),
-        ("Vinicius Jr", "LW", 91),
-    ],
-    "Barcelona": [
-        ("Marc-Andre ter Stegen", "GK", 87), ("Jules Kounde", "RB", 86),
-        ("Ronald Araujo", "CB", 88), ("Pau Cubarsi", "CB", 82),
-        ("Alejandro Balde", "LB", 84), ("Pedri", "CM", 89),
-        ("Frenkie de Jong", "CM", 87), ("Gavi", "CM", 85),
-        ("Lamine Yamal", "RW", 90), ("Robert Lewandowski", "ST", 88),
-        ("Raphinha", "LW", 87),
-    ],
-    "Arsenal": [
-        ("David Raya", "GK", 86), ("Ben White", "RB", 85),
-        ("William Saliba", "CB", 89), ("Gabriel", "CB", 88),
-        ("Riccardo Calafiori", "LB", 84), ("Declan Rice", "DM", 90),
-        ("Martin Odegaard", "CAM", 89), ("Thomas Partey", "CM", 83),
-        ("Bukayo Saka", "RW", 90), ("Kai Havertz", "ST", 86),
-        ("Gabriel Martinelli", "LW", 85),
-    ],
-    "Bayern Munich": [
-        ("Manuel Neuer", "GK", 87), ("Joshua Kimmich", "RB", 88),
-        ("Dayot Upamecano", "CB", 85), ("Kim Min-jae", "CB", 86),
-        ("Alphonso Davies", "LB", 87), ("Leon Goretzka", "CM", 85),
-        ("Jamal Musiala", "CAM", 91), ("Aleksandar Pavlovic", "CM", 83),
-        ("Michael Olise", "RW", 87), ("Harry Kane", "ST", 92),
-        ("Kingsley Coman", "LW", 85),
-    ],
-    "Manchester United": [
-        ("Andre Onana", "GK", 84), ("Diogo Dalot", "RB", 83),
-        ("Matthijs de Ligt", "CB", 86), ("Lisandro Martinez", "CB", 85),
-        ("Luke Shaw", "LB", 82), ("Kobbie Mainoo", "CM", 84),
-        ("Bruno Fernandes", "CAM", 88), ("Casemiro", "DM", 84),
-        ("Amad Diallo", "RW", 83), ("Benjamin Sesko", "ST", 84),
-        ("Matheus Cunha", "LW", 85),
-    ],
-}
+BENCH = {'Real Madrid': ['Andriy Lunin - GK - 82',
+                 'Fran Garcia - LB - 81',
+                 'Raul Asencio - CB - 80',
+                 'Dani Ceballos - CM - 82',
+                 'Brahim Diaz - RW - 85'],
+ 'Barcelona': ['Wojciech Szczesny - GK - 82',
+               'Gerard Martin - LB - 78',
+               'Ronald Araujo - CB - 87',
+               'Frenkie de Jong - CM - 88',
+               'Ferran Torres - ST - 84'],
+ 'Arsenal': ['Kepa Arrizabalaga - GK - 80',
+             'Ben White - RB - 84',
+             'Jakub Kiwior - CB - 80',
+             'Mikel Merino - CM - 83',
+             'Gabriel Martinelli - LW - 86'],
+ 'Bayern Munich': ['Sven Ulreich - GK - 75',
+                   'Raphael Guerreiro - LB - 82',
+                   'Kim Min-jae - CB - 85',
+                   'Leon Goretzka - CM - 83',
+                   'Serge Gnabry - RW - 84'],
+ 'Manchester United': ['Altay Bayindir - GK - 76',
+                       'Noussair Mazraoui - RB - 84',
+                       'Harry Maguire - CB - 81',
+                       'Kobbie Mainoo - CM - 83',
+                       'Joshua Zirkzee - ST - 82']}
 
+PLAYER_PRICES = {'Kylian Mbappe': 200,
+ 'Vinicius Junior': 140,
+ 'Rodrygo': 41,
+ 'Jude Bellingham': 160,
+ 'Federico Valverde': 90,
+ 'Yan Diomande': 110,
+ 'Trent Alexander-Arnold': 62,
+ 'Dean Hujisen': 60,
+ 'Ibrahima Konate': 45,
+ 'Marc Cucurella': 50,
+ 'Thibaut Courtois': 15,
+ 'Lamine Yamal': 220,
+ 'Pedri': 150,
+ 'Fermin Lopez': 100,
+ 'Raphinha': 70,
+ 'Anthony Gordon': 65,
+ 'Dani Olmo': 60,
+ 'Alejandro Balde': 50,
+ 'Eric Garcia': 40,
+ 'Pau Cubarsi': 80,
+ 'Jules Kounde': 60,
+ 'Joan Garcia': 45,
+ 'Grabiel Magalhaes': 75,
+ 'Bukayo Saka': 110,
+ 'William Saliba': 100,
+ 'Declane Rice': 120,
+ 'Martin Odegaard': 67,
+ 'Viktor Gyokeres': 65,
+ 'Eberechi Eze': 67,
+ 'Martin Zubimendi': 75,
+ 'Jurrien Timber': 70,
+ 'Riccardo Calafiori': 53,
+ 'David Raya': 30,
+ 'Harry Kane': 65,
+ 'Jamal Musiala': 120,
+ 'Michael Olise': 140,
+ 'Luis Diaz': 70,
+ 'Joshua Kimmich': 40,
+ 'Dayot Upamecano': 70,
+ 'Alphonso Davies': 45,
+ 'Jonathan Tah': 30,
+ 'Konrad Laimer': 32,
+ 'Aleksandar Pavlovic': 75,
+ 'Manuel Neuer': 4,
+ 'Bruno Fernandes': 35,
+ 'Benjamin Sesko': 75,
+ 'Matheus Cunha': 75,
+ 'Bryan Mbeumo': 75,
+ 'Carlos Baleba': 55,
+ 'Kobbie Mainoo': 70,
+ 'Diogo Dalot': 30,
+ 'Matthijs de Ligt': 30,
+ 'Lisandro Martinez': 40,
+ 'Patrick Dorgu': 35,
+ 'Senne Lammens': 25,
+ 'Desire Doue': 130,
+ 'Antony': 50,
+ 'Mason Mount': 56,
+ 'Rasmus Hojlund': 60,
+ 'Jack Grealish': 45,
+ 'Enzo Fernandez': 120,
+ 'Bernardo Silva': 22,
+ 'Nicolas Jackson': 40,
+ 'Virgil van Dijk': 15,
+ 'Ousmane Dembele': 100,
+ 'Khvicha Kvaratskhelia': 140,
+ 'Amad Diallo': 45,
+ 'Takefusa Kubo': 30,
+ 'Jadon Sancho': 25,
+ 'Micky van de Ven': 50,
+ 'Milos Kerkez': 40,
+ 'Teun Koopmeiners': 40,
+ 'Rayan Cherki': 45,
+ 'Lautaro Martinez': 95,
+ 'Alexis Mac Allister': 100,
+ 'Victor Osimhen': 75,
+ 'James Ward-Prowse': 10,
+ 'Kiernan Dewsbury-Hall': 25,
+ 'Harvey Elliott': 25,
+ 'Cristiano Ronaldo': 250,
+ 'Lionel Messi': 250,
+ 'Neymar Junior': 250}
+
+PLAYER_RATINGS = {'Desire Doue': 91,
+ 'Antony': 86,
+ 'Mason Mount': 87,
+ 'Rasmus Hojlund': 88,
+ 'Jack Grealish': 86,
+ 'Dani Olmo': 88,
+ 'Enzo Fernandez': 89,
+ 'Bernardo Silva': 88,
+ 'Nicolas Jackson': 85,
+ 'Virgil van Dijk': 90,
+ 'Ousmane Dembele': 92,
+ 'Khvicha Kvaratskhelia': 91,
+ 'Amad Diallo': 86,
+ 'Takefusa Kubo': 81,
+ 'Jadon Sancho': 82,
+ 'Micky van de Ven': 83,
+ 'Milos Kerkez': 84,
+ 'Teun Koopmeiners': 85,
+ 'Rayan Cherki': 85,
+ 'Lautaro Martinez': 86,
+ 'Alexis Mac Allister': 87,
+ 'Victor Osimhen': 88,
+ 'James Ward-Prowse': 78,
+ 'Kiernan Dewsbury-Hall': 79,
+ 'Harvey Elliott': 80,
+ 'Cristiano Ronaldo': 95,
+ 'Lionel Messi': 95,
+ 'Neymar Junior': 95}
+
+PLAYER_POSITIONS = {'Desire Doue': 'LW',
+ 'James Ward-Prowse': 'CM',
+ 'Kiernan Dewsbury-Hall': 'CM',
+ 'Harvey Elliott': 'CAM',
+ 'Antony': 'RW',
+ 'Mason Mount': 'CAM',
+ 'Rasmus Hojlund': 'ST',
+ 'Jack Grealish': 'LW',
+ 'Enzo Fernandez': 'CM',
+ 'Bernardo Silva': 'CAM',
+ 'Nicolas Jackson': 'ST',
+ 'Virgil van Dijk': 'CB',
+ 'Ousmane Dembele': 'RW',
+ 'Khvicha Kvaratskhelia': 'LW',
+ 'Amad Diallo': 'RW',
+ 'Takefusa Kubo': 'RW',
+ 'Jadon Sancho': 'LW',
+ 'Micky van de Ven': 'CB',
+ 'Milos Kerkez': 'LB',
+ 'Teun Koopmeiners': 'CM',
+ 'Rayan Cherki': 'CAM',
+ 'Lautaro Martinez': 'ST',
+ 'Alexis Mac Allister': 'CM',
+ 'Victor Osimhen': 'ST',
+ 'Lionel Messi': 'CAM',
+ 'Cristiano Ronaldo': 'ST',
+ 'Neymar Junior': 'LW'}
+
+TRANSFER_MARKET = ['Desire Doue',
+ 'Antony',
+ 'Mason Mount',
+ 'Rasmus Hojlund',
+ 'Jack Grealish',
+ 'Enzo Fernandez',
+ 'Bernardo Silva',
+ 'Nicolas Jackson',
+ 'Virgil van Dijk',
+ 'Ousmane Dembele',
+ 'Khvicha Kvaratskhelia',
+ 'Amad Diallo',
+ 'Takefusa Kubo',
+ 'Jadon Sancho',
+ 'Micky van de Ven',
+ 'Milos Kerkez',
+ 'Teun Koopmeiners',
+ 'Rayan Cherki',
+ 'Lautaro Martinez',
+ 'Alexis Mac Allister',
+ 'Victor Osimhen',
+ 'James Ward-Prowse',
+ 'Kiernan Dewsbury-Hall',
+ 'Harvey Elliott',
+ 'Cristiano Ronaldo',
+ 'Lionel Messi',
+ 'Neymar Junior']
+
+UPGRADE_RATES = {0: 90, 1: 80, 2: 60, 3: 40, 4: 25}
+
+UPGRADE_COSTS = {1: 10, 2: 20, 3: 40, 4: 65, 5: 90}
+
+CARD_VALUE_RATES = {0: 1.0, 1: 1.1, 2: 1.3, 3: 1.55, 4: 1.85, 5: 2.25}
+
+PACKS = {'1': {'name': 'Gói Đồng',
+       'price': 20,
+       'players': ['James Ward-Prowse',
+                   'Kiernan Dewsbury-Hall',
+                   'Harvey Elliott',
+                   'Takefusa Kubo',
+                   'Jadon Sancho',
+                   'Micky van de Ven',
+                   'Milos Kerkez',
+                   'Teun Koopmeiners',
+                   'Rayan Cherki']},
+ '2': {'name': 'Gói Bạc',
+       'price': 50,
+       'players': ['Antony',
+                   'Jack Grealish',
+                   'Mason Mount',
+                   'Rasmus Hojlund',
+                   'Amad Diallo',
+                   'Nicolas Jackson',
+                   'Lautaro Martinez',
+                   'Alexis Mac Allister',
+                   'Bernardo Silva',
+                   'Enzo Fernandez',
+                   'Victor Osimhen']},
+ '3': {'name': 'Gói Vàng',
+       'price': 100,
+       'players': ['Desire Doue',
+                   'Mason Mount',
+                   'Rasmus Hojlund',
+                   'Jack Grealish',
+                   'Enzo Fernandez',
+                   'Bernardo Silva',
+                   'Virgil van Dijk',
+                   'Ousmane Dembele',
+                   'Khvicha Kvaratskhelia',
+                   'Amad Diallo',
+                   'Lautaro Martinez',
+                   'Alexis Mac Allister',
+                   'Victor Osimhen']},
+ '4': {'name': 'Gói GOAT', 'price': 500, 'players': ['Cristiano Ronaldo', 'Lionel Messi', 'Neymar Junior']}}
+
+CLUBS = {name: {"budget": budget, "rating": 0} for _, (name, budget) in CLUB_OPTIONS.items()}
+
+def player(name, default_pos="ST", default_rating=80):
+    if " - " in name:
+        a=name.split(" - "); return {"name":a[0],"position":a[1],"rating":int(a[2]),"level":int(a[3].replace("+", "")) if len(a)>3 else 0}
+    return {"name":name,"position":PLAYER_POSITIONS.get(name,default_pos),"rating":PLAYER_RATINGS.get(name,default_rating),"level":0}
+
+def pack_player(p): return f"{p['name']} - {p['position']} - {p['rating']} - +{p.get('level',0)}"
+def value(p): return round(PLAYER_PRICES.get(p['name'], max(5,(p['rating']-65)*3))*CARD_VALUE_RATES.get(p.get('level',0),1),2)
 def create_new_game(club):
-    info = CLUBS[club]
-    players = [
-        {"name": name, "position": pos, "rating": rating, "level": 0}
-        for name, pos, rating in STARTING_SQUADS[club]
-    ]
-    return {
-        "club": club,
-        "budget": info["budget"],
-        "season": 1,
-        "week": 1,
-        "points": 0,
-        "wins": 0,
-        "draws": 0,
-        "losses": 0,
-        "players": players,
-        "formation": "4-3-3",
-    }
+    if club not in STARTING: raise ValueError('CLB không hợp lệ')
+    starters=[player(x) for x in STARTING[club]]; bench=[player(x) for x in BENCH[club]]
+    return {"club":club,"budget":CLUB_OPTIONS[str(list(CLUB_OPTIONS).index(next(k for k,v in CLUB_OPTIONS.items() if v[0]==club))+1)][1],"season":1,"week":1,"points":0,"wins":0,"draws":0,"losses":0,"starting":starters,"bench":bench,"extras":[],"market":copy.deepcopy(TRANSFER_MARKET),"formation":"4-3-3","activity":[]}
 
-def get_dashboard(state):
-    return {
-        "club": state["club"],
-        "budget": state["budget"],
-        "season": state["season"],
-        "week": state["week"],
-        "points": state["points"],
-        "wins": state["wins"],
-        "draws": state["draws"],
-        "losses": state["losses"],
-        "formation": state["formation"],
-        "squad_size": len(state["players"]),
-        "average_rating": round(sum(p["rating"] + p["level"] for p in state["players"]) / max(1, len(state["players"])), 1),
-    }
+def normalize_state(st):
+    # Preserve old 11-player saves; add the original club's five substitutes without resetting progress.
+    if 'starting' not in st:
+        old=st.pop('players',[]); st['starting']=old[:11]; st['bench']=[]; st['extras']=old[11:]
+    st.setdefault('bench',[player(x) for x in BENCH.get(st.get('club'),[])])
+    st.setdefault('extras',[]); st.setdefault('market',copy.deepcopy(TRANSFER_MARKET)); st.setdefault('season',1); st.setdefault('week',1)
+    st.setdefault('points',0); st.setdefault('wins',0); st.setdefault('draws',0); st.setdefault('losses',0); st.setdefault('formation','4-3-3'); st.setdefault('activity',[])
+    return st
+def all_players(st): return st['starting']+st['bench']+st['extras']
+def get_dashboard(st):
+    arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(p['rating']+p.get('level',0) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
 
-def get_squad(state):
-    return sorted(state["players"], key=lambda p: p["rating"] + p["level"], reverse=True)
+def simulate_match(st):
+    opp= random.choice([c for c in STARTING if c!=st['club']]); opps=[player(x) for x in STARTING[opp]]
+    if len(st['starting'])!=11: raise ValueError('Cần đủ 11 cầu thủ đá chính')
+    my=sum(p['rating']+p.get('level',0) for p in st['starting'])/11; other=sum(p['rating'] for p in opps)/11
+    def goals(diff):
+        chance=max(.10,min(.55,.30+diff*.015)); return sum(random.random()<chance for _ in range(6))
+    a,b=goals(my-other),goals(other-my); result='THẮNG' if a>b else 'HÒA' if a==b else 'THUA'; reward=20 if a>b else 10 if a==b else 5
+    st['budget']+=reward; st['week']+=1
+    if a>b: st['wins']+=1; st['points']+=3
+    elif a==b: st['draws']+=1; st['points']+=1
+    else: st['losses']+=1
+    return {"opponent":opp,"score":f"{a} - {b}","result":result,"reward":reward}

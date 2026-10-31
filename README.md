@@ -1,37 +1,19 @@
-# FOOTBALL MANAGER — Web Edition (starter)
+# FOOTBALL MANAGER WEB
 
-A multi-user Flask starter for the Football Manager project.
+Flask + Flask-Login + Flask-SQLAlchemy, PostgreSQL via `DATABASE_URL`.
 
-## Included
-- Account registration and login (passwords are hashed).
-- One independent save per account.
-- Club selection and a dashboard.
-- Squad page.
-- SQLite for local development; PostgreSQL can be configured for deployment.
+## Features
+- Account registration/login; one saved career per account.
+- Five clubs with original starting XI and five substitutes.
+- Squad view and same-position substitutions.
+- Transfer market: buy players and sell substitutes/extra players.
+- Player packs: Bronze, Silver, Gold and GOAT.
+- Player card upgrades from +0 to +5 with original success rates/cost scaling.
+- Match simulation, results, rewards, points and weekly progression.
+- Formation selection and finance overview.
+- Game state persists in the user's `GameSave` JSON row in PostgreSQL.
 
-## Run locally
-1. Install Python 3.10+.
-2. Create and activate a virtual environment.
-3. Install packages:
-   `pip install -r requirements.txt`
-4. Start:
-   `python app.py`
-5. Open `http://127.0.0.1:5000`.
+## Deploy
+Keep `DATABASE_URL` configured to the existing PostgreSQL database. Do not delete/reset the database. Keep a stable random `SECRET_KEY` environment variable. Install from `requirements.txt`; start command is in `Procfile`.
 
-## Before public deployment
-- Set a long random `SECRET_KEY` environment variable.
-- Set `DATABASE_URL` to a managed PostgreSQL database.
-- Run with Gunicorn (the Procfile is included).
-- Turn off Flask debug mode in production.
-- Add CSRF protection, rate limiting, email verification, password reset, backups,
-  and database migrations before opening registration to the public.
-
-## Project structure
-- `app.py`: routes, login and save loading.
-- `models.py`: user and save database models.
-- `game_engine.py`: independent game rules and starter squad data.
-- `templates/`: HTML screens.
-- `static/style.css`: visual theme.
-
-This is the foundation, not the finished full game. Transfer market, player cards,
-packs, tactics, fixtures, leagues and multiplayer competition are planned next.
+Existing saves using the earlier `players` JSON format are normalized on first game page load: the existing 11 players and budget/progress are retained, and the five default substitutes are added. No user or save rows are deleted.
