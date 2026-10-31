@@ -250,10 +250,7 @@ TRANSFER_MARKET = ['Desire Doue',
  'Victor Osimhen',
  'James Ward-Prowse',
  'Kiernan Dewsbury-Hall',
- 'Harvey Elliott',
- 'Cristiano Ronaldo',
- 'Lionel Messi',
- 'Neymar Junior']
+ 'Harvey Elliott']
 
 UPGRADE_RATES = {0: 90, 1: 80, 2: 60, 3: 40, 4: 25}
 
@@ -321,7 +318,7 @@ def normalize_state(st):
     if 'starting' not in st:
         old=st.pop('players',[]); st['starting']=old[:11]; st['bench']=[]; st['extras']=old[11:]
     st.setdefault('bench',[player(x) for x in BENCH.get(st.get('club'),[])])
-    st.setdefault('extras',[]); st.setdefault('market',copy.deepcopy(TRANSFER_MARKET)); st.setdefault('season',1); st.setdefault('week',1)
+    st.setdefault('extras',[]); st.setdefault('market',copy.deepcopy(TRANSFER_MARKET)); st['market']=[name for name in st['market'] if name not in {'Cristiano Ronaldo','Lionel Messi','Neymar Junior'}]; st.setdefault('season',1); st.setdefault('week',1)
     st.setdefault('points',0); st.setdefault('wins',0); st.setdefault('draws',0); st.setdefault('losses',0); st.setdefault('formation','4-3-3'); st.setdefault('activity',[])
     return st
 def all_players(st): return st['starting']+st['bench']+st['extras']
