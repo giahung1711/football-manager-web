@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">SQUAD MANAGEMENT</p><h1>Đội hình chính</h1>
+<section class="panel">
+<table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>
+{% for p in players %}
+<tr><td><strong>{{ p.name }}</strong></td><td>{{ p.position }}</td><td>{{ p.rating + p.level }}</td><td>+{{ p.level }}</td></tr>
+{% endfor %}
+</tbody></table>
+</section>
+<a class="button" href="{{ url_for('dashboard') }}">← Quay lại</a>
+{% endblock %}

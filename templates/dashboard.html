@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="welcome"><div><p class="eyebrow">MANAGER DESK · SEASON {{ data.season }}</p><h1>{{ data.club }}</h1><p class="muted">Xin chào, {{ username }}. Sẵn sàng dẫn dắt đội bóng chưa?</p></div><div class="club-mark large">{{ data.club[0] }}</div></div>
+<div class="stats">
+  <div class="stat"><span>Ngân sách</span><strong>€{{ '{:,.0f}'.format(data.budget) }}</strong></div>
+  <div class="stat"><span>Điểm số</span><strong>{{ data.points }}</strong></div>
+  <div class="stat"><span>Đội hình</span><strong>{{ data.squad_size }} cầu thủ</strong></div>
+  <div class="stat"><span>OVR trung bình</span><strong>{{ data.average_rating }}</strong></div>
+</div>
+<section class="panel"><div class="section-head"><div><p class="eyebrow">CLUB STATUS</p><h2>Mùa giải {{ data.season }} · Tuần {{ data.week }}</h2></div><span class="pill">{{ data.formation }}</span></div>
+<p>Thành tích: {{ data.wins }} thắng · {{ data.draws }} hòa · {{ data.losses }} thua</p>
+<div class="actions"><a class="button primary" href="{{ url_for('squad') }}">Quản lý đội hình</a><form method="post" action="{{ url_for('play_match') }}"><button class="button" type="submit">Trận đấu (đang phát triển)</button></form></div>
+</section>
+<div class="feature-grid">
+  <div class="feature"><span>⇄</span><h3>Chuyển nhượng</h3><p>Thị trường cầu thủ sẽ được triển khai ở giai đoạn tiếp theo.</p></div>
+  <div class="feature"><span>✦</span><h3>Nâng cấp thẻ</h3><p>Phát triển cầu thủ và tăng chỉ số đội hình.</p></div>
+  <div class="feature"><span>♛</span><h3>Giải đấu</h3><p>Thi đấu với các đội bóng do người chơi khác quản lý.</p></div>
+</div>
+{% endblock %}

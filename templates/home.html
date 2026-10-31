@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">BUILD YOUR CLUB · RULE THE LEAGUE</p>
+  <h1>Đội bóng của bạn.<br><span>Triều đại của bạn.</span></h1>
+  <p>Đăng ký tài khoản, chọn câu lạc bộ và bắt đầu xây dựng đội hình của riêng mình.</p>
+  <div class="actions"><a class="button primary" href="{{ url_for('register') }}">Tạo tài khoản</a><a class="button" href="{{ url_for('login') }}">Đăng nhập</a></div>
+</section>
+{% endblock %}

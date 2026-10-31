@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Đăng ký' if mode == 'register' else 'Đăng nhập' }}{% endblock %}
+{% block content %}
+<section class="panel auth">
+  <p class="eyebrow">FOOTBALL MANAGER ACCOUNT</p>
+  <h1>{{ 'Tạo tài khoản' if mode == 'register' else 'Chào mừng trở lại' }}</h1>
+  <form method="post">
+    <label>Tên tài khoản</label><input name="username" minlength="3" maxlength="32" required autocomplete="username">
+    <label>Mật khẩu</label><input type="password" name="password" minlength="8" required autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}">
+    <button class="button primary full" type="submit">{{ 'Đăng ký' if mode == 'register' else 'Đăng nhập' }}</button>
+  </form>
+  <p class="muted">{% if mode == 'register' %}Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập</a>{% else %}Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký</a>{% endif %}</p>
+</section>
+{% endblock %}

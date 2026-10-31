@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">NEW CAREER</p><h1>Chọn câu lạc bộ</h1>
+<p class="muted">Đây sẽ là đội bóng gắn với tài khoản của bạn.</p>
+<div class="club-grid">
+{% for name, info in clubs.items() %}
+<form class="club-card" method="post">
+  <input type="hidden" name="club" value="{{ name }}">
+  <div class="club-mark">{{ name[0] }}</div><h2>{{ name }}</h2>
+  <p>Đánh giá đội: {{ info.rating }}</p><p>Ngân sách: €{{ '{:,.0f}'.format(info.budget) }}</p>
+  <button class="button primary full">Chọn đội</button>
+</form>
+{% endfor %}
+</div>
+{% endblock %}
