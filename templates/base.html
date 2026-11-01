@@ -21,6 +21,33 @@
   {% endwith %}
   {% block content %}{% endblock %}
 </main>
+<div id="result-modal" class="result-modal" hidden>
+  <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <h2 id="result-title">Thông báo</h2>
+    <div id="result-message"></div>
+    <button type="button" class="button primary" id="close-result">Đóng</button>
+  </div>
+</div>
+<script>
+// Confirm costly actions before sending them to the server.
+document.querySelectorAll('form.confirm-action').forEach(form => {
+  form.addEventListener('submit', event => {
+    if (!window.confirm(form.dataset.confirm || 'Xác nhận thao tác này?')) event.preventDefault();
+  });
+});
+// Show server-confirmed results (including balance changes) in a modal.
+const flashBox = document.querySelector('.messages');
+if (flashBox && flashBox.textContent.trim()) {
+  const modal = document.getElementById('result-modal');
+  document.getElementById('result-message').textContent = flashBox.innerText.trim();
+  modal.hidden = false;
+  document.getElementById('close-result').addEventListener('click', () => modal.hidden = true);
+}
+</script>
+<style>
+.result-modal{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}
+.result-modal[hidden]{display:none}.result-card{max-width:440px;width:100%;background:#fff;color:#172033;border-radius:16px;padding:26px;box-shadow:0 20px 70px #0005;text-align:center}.result-card h2{margin-top:0}.result-card #result-message{margin:18px 0;line-height:1.6;white-space:pre-wrap}
+</style>
 <footer>FOOTBALL MANAGER · Web Edition</footer>
 </body>
 </html>

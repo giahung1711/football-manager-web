@@ -250,7 +250,10 @@ TRANSFER_MARKET = ['Desire Doue',
  'Victor Osimhen',
  'James Ward-Prowse',
  'Kiernan Dewsbury-Hall',
- 'Harvey Elliott']
+ 'Harvey Elliott',
+ 'Cristiano Ronaldo',
+ 'Lionel Messi',
+ 'Neymar Junior']
 
 UPGRADE_RATES = {0: 90, 1: 80, 2: 60, 3: 40, 4: 25}
 
@@ -311,16 +314,40 @@ def value(p): return round(PLAYER_PRICES.get(p['name'], max(5,(p['rating']-65)*3
 def create_new_game(club):
     if club not in STARTING: raise ValueError('CLB không hợp lệ')
     starters=[player(x) for x in STARTING[club]]; bench=[player(x) for x in BENCH[club]]
-    return {"club":club,"budget":CLUB_OPTIONS[str(list(CLUB_OPTIONS).index(next(k for k,v in CLUB_OPTIONS.items() if v[0]==club))+1)][1],"season":1,"week":1,"points":0,"wins":0,"draws":0,"losses":0,"starting":starters,"bench":bench,"extras":[],"market":copy.deepcopy(TRANSFER_MARKET),"formation":"4-3-3","activity":[]}
+    return {"club":club,"budget":next(budget for _, (name, budget) in CLUB_OPTIONS.items() if name == club),"season":1,"week":1,"points":0,"wins":0,"draws":0,"losses":0,"starting":starters,"bench":bench,"extras":[],"market":copy.deepcopy(TRANSFER_MARKET),"formation":"4-3-3","activity":[]}
 
 def normalize_state(st):
-    # Preserve old 11-player saves; add the original club's five substitutes without resetting progress.
+    # Migrate legacy saves without resetting progress or existing owned players.
+    if not isinstance(st, dict):
+        st = {}
+    club = st.get('club')
     if 'starting' not in st:
-        old=st.pop('players',[]); st['starting']=old[:11]; st['bench']=[]; st['extras']=old[11:]
-    st.setdefault('bench',[player(x) for x in BENCH.get(st.get('club'),[])])
-    st.setdefault('extras',[]); st.setdefault('market',copy.deepcopy(TRANSFER_MARKET)); st['market']=[name for name in st['market'] if name not in {'Cristiano Ronaldo','Lionel Messi','Neymar Junior'}]; st.setdefault('season',1); st.setdefault('week',1)
-    st.setdefault('points',0); st.setdefault('wins',0); st.setdefault('draws',0); st.setdefault('losses',0); st.setdefault('formation','4-3-3'); st.setdefault('activity',[])
+        old = st.pop('players', []) or []
+        st['starting'] = old[:11]
+        st['bench'] = old[11:]
+    st.setdefault('starting', [])
+    # Old saves may contain an empty bench key. Add only missing default substitutes.
+    existing_bench = st.get('bench') or []
+    default_bench = [player(x) for x in BENCH.get(club, [])]
+    existing_names = {p.get('name') for p in existing_bench if isinstance(p, dict)}
+    st['bench'] = existing_bench + [p for p in default_bench if p['name'] not in existing_names]
+    st.setdefault('extras', [])
+    st.setdefault('market', copy.deepcopy(TRANSFER_MARKET))
+    # GOAT players are pack-only, not part of the ordinary transfer market.
+    goat_names = set(PACKS['4']['players'])
+    st['market'] = [n for n in st['market'] if n not in goat_names]
+    # Preserve a valid saved balance; repair only legacy saves with no balance.
+    if 'budget' not in st or st['budget'] is None:
+        st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
+    try:
+        st['budget'] = round(max(0.0, float(st['budget'])), 2)
+    except (TypeError, ValueError):
+        st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
+    st.setdefault('season', 1); st.setdefault('week', 1)
+    st.setdefault('points', 0); st.setdefault('wins', 0); st.setdefault('draws', 0); st.setdefault('losses', 0)
+    st.setdefault('formation', '4-3-3'); st.setdefault('activity', [])
     return st
+
 def all_players(st): return st['starting']+st['bench']+st['extras']
 def get_dashboard(st):
     arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(p['rating']+p.get('level',0) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
