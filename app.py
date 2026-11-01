@@ -18,6 +18,13 @@ login_manager = LoginManager(app); login_manager.login_view = 'login'
 def load_user(user_id): return db.session.get(User, int(user_id))
 with app.app_context(): db.create_all()
 
+def format_money(amount):
+    # In-game values are stored in millions of euros; display the full euro amount.
+    euros = int(round(float(amount or 0) * 1_000_000))
+    return f"{euros:,}".replace(',', '.') + ' €'
+
+app.jinja_env.filters['money'] = format_money
+
 def current_save(): return GameSave.query.filter_by(user_id=current_user.id).first()
 def load_state(save):
     # Always detach JSON state before mutation; SQLAlchemy JSON does not track in-place edits.
@@ -101,38 +108,38 @@ def action():
             cost=float(PLAYER_PRICES.get(name,0))
             if cost <= 0: raise ValueError('Giá cầu thủ không hợp lệ.')
             if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần €{cost:g}M, hiện có €{st["budget"]:g}M.')
-            st['budget']=round(st['budget']-cost,2); st['extras'].append(player(name)); st['market'].remove(name)
-            flash(f'Chiêu mộ thành công {name}, đã trừ €{cost:g}M. Còn €{st["budget"]:g}M.')
+            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name)); st['market'].remove(name)
+            flash(f'Chiêu mộ thành công {name}. Đã trừ {format_money(cost)}. Ngân sách còn {format_money(st["budget"])}.')
         elif act=='sell':
             group=request.form.get('group'); idx=int(request.form['index'])
             if group not in {'bench','extras'}: raise ValueError('Không thể bán cầu thủ ở danh sách này.')
             arr=st[group]; p=arr[idx]; amount=float(value(p))
             arr.pop(idx); st['budget']=round(st['budget']+amount,2)
             if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']: st['market'].append(p['name'])
-            flash(f'Đã bán {p["name"]}, cộng €{amount:g}M. Ngân sách: €{st["budget"]:g}M.')
+            flash(f'Đã bán {p["name"]}, cộng {format_money(amount)}. Ngân sách: {format_money(st["budget"])}.')
         elif act=='pack':
             key=request.form.get('pack')
             if key not in PACKS: raise ValueError('Gói cầu thủ không hợp lệ.')
             pack=PACKS[key]; cost=float(pack['price'])
             if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Gói giá €{cost:g}M, anh hiện có €{st["budget"]:g}M.')
             p=random.choice(pack['players'])
-            st['budget']=round(st['budget']-cost,2); st['extras'].append(player(p))
-            flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ €{cost:g}M, còn €{st["budget"]:g}M.')
+            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(p))
+            flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ {format_money(cost)}, còn {format_money(st["budget"])}.')
         elif act=='upgrade':
             group=request.form.get('group'); idx=int(request.form['index'])
             if group not in {'starting','bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
             p=st[group][idx]; level=int(p.get('level',0))
             if level>=5: raise ValueError('Cầu thủ đã đạt +5.')
             target=level+1; cost=round(UPGRADE_COSTS[target]*p['rating']/90,2)
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách ép thẻ. Cần €{cost:g}M.')
+            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách ép thẻ. Cần {format_money(cost)}.')
             st['budget']=round(st['budget']-cost,2)
             success=random.randint(1,100)<=UPGRADE_RATES[level]
             old_level=level
             p['level']=target if success else (0 if level==0 else random.randint(0,level-1))
-            if success: flash(f'🎉 Chúc mừng! {p["name"]} +{p["level"]}. Đã trừ €{cost:g}M; còn €{st["budget"]:g}M.')
-            else: flash(f'Ép thẻ thất bại! {p["name"]} từ +{old_level} xuống +{p["level"]}. Đã trừ €{cost:g}M; còn €{st["budget"]:g}M.')
+            if success: flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
+            else: flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
         elif act=='match':
-            result=simulate_match(st); flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng €{result['reward']}M. Ngân sách: €{st['budget']:g}M.")
+            result=simulate_match(st); flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
         elif act=='formation':
             formation=request.form.get('formation')
             if formation not in {'4-3-3','4-4-2','4-2-3-1'}: raise ValueError('Sơ đồ không hợp lệ.')

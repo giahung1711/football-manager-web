@@ -17,37 +17,63 @@
 </header>
 <main class="container">
   {% with messages = get_flashed_messages() %}
-    {% if messages %}<div class="messages">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}
+    {% if messages %}<div class="messages" role="status">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}
   {% endwith %}
   {% block content %}{% endblock %}
 </main>
-<div id="result-modal" class="result-modal" hidden>
-  <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+<div id="confirm-modal" class="fm-modal" hidden>
+  <div class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="modal-kicker">MANAGER DESK · XÁC NHẬN</div>
+    <h2 id="confirm-title">Xác nhận giao dịch</h2>
+    <p id="confirm-message"></p>
+    <div class="modal-actions">
+      <button type="button" class="button" id="cancel-confirm">Huỷ</button>
+      <button type="button" class="button primary" id="accept-confirm">Xác nhận</button>
+    </div>
+  </div>
+</div>
+<div id="result-modal" class="fm-modal" hidden>
+  <div class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="modal-kicker">MANAGER DESK · KẾT QUẢ</div>
     <h2 id="result-title">Thông báo</h2>
     <div id="result-message"></div>
     <button type="button" class="button primary" id="close-result">Đóng</button>
   </div>
 </div>
 <script>
-// Confirm costly actions before sending them to the server.
+// Custom in-game confirmation modal: no browser-native confirm popup.
+let pendingForm = null;
+const confirmModal = document.getElementById('confirm-modal');
+const confirmMessage = document.getElementById('confirm-message');
+function closeConfirm() { confirmModal.hidden = true; pendingForm = null; }
 document.querySelectorAll('form.confirm-action').forEach(form => {
   form.addEventListener('submit', event => {
-    if (!window.confirm(form.dataset.confirm || 'Xác nhận thao tác này?')) event.preventDefault();
+    if (form.dataset.confirmed === 'yes') { form.dataset.confirmed = 'no'; return; }
+    event.preventDefault();
+    pendingForm = form;
+    confirmMessage.textContent = form.dataset.confirm || 'Xác nhận thao tác này?';
+    confirmModal.hidden = false;
   });
 });
-// Show server-confirmed results (including balance changes) in a modal.
+document.getElementById('cancel-confirm').addEventListener('click', closeConfirm);
+document.getElementById('accept-confirm').addEventListener('click', () => {
+  if (!pendingForm) return;
+  const form = pendingForm;
+  form.dataset.confirmed = 'yes';
+  closeConfirm();
+  form.requestSubmit();
+});
+confirmModal.addEventListener('click', event => { if (event.target === confirmModal) closeConfirm(); });
+// Show server-confirmed result only after the action has completed.
 const flashBox = document.querySelector('.messages');
 if (flashBox && flashBox.textContent.trim()) {
   const modal = document.getElementById('result-modal');
   document.getElementById('result-message').textContent = flashBox.innerText.trim();
   modal.hidden = false;
   document.getElementById('close-result').addEventListener('click', () => modal.hidden = true);
+  modal.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
 }
 </script>
-<style>
-.result-modal{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}
-.result-modal[hidden]{display:none}.result-card{max-width:440px;width:100%;background:#fff;color:#172033;border-radius:16px;padding:26px;box-shadow:0 20px 70px #0005;text-align:center}.result-card h2{margin-top:0}.result-card #result-message{margin:18px 0;line-height:1.6;white-space:pre-wrap}
-</style>
 <footer>FOOTBALL MANAGER · Web Edition</footer>
 </body>
 </html>

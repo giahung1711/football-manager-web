@@ -326,11 +326,29 @@ def normalize_state(st):
         st['starting'] = old[:11]
         st['bench'] = old[11:]
     st.setdefault('starting', [])
-    # Old saves may contain an empty bench key. Add only missing default substitutes.
-    existing_bench = st.get('bench') or []
+    # Migrate legacy string entries to full player records and remove duplicate bench names.
+    def clean_players(items):
+        cleaned = []
+        seen = set()
+        for item in (items or []):
+            try:
+                record = player(item) if isinstance(item, str) else copy.deepcopy(item)
+                if not isinstance(record, dict) or not record.get('name'):
+                    continue
+                if record['name'] in seen:
+                    continue
+                seen.add(record['name'])
+                cleaned.append(record)
+            except (TypeError, KeyError, ValueError):
+                continue
+        return cleaned
+    st['starting'] = clean_players(st.get('starting'))
+    st['bench'] = clean_players(st.get('bench'))
+    st['extras'] = clean_players(st.get('extras'))
+    # Add default substitutes only when they are not already owned in any group.
+    owned_names = {p['name'] for group in ('starting', 'bench', 'extras') for p in st[group]}
     default_bench = [player(x) for x in BENCH.get(club, [])]
-    existing_names = {p.get('name') for p in existing_bench if isinstance(p, dict)}
-    st['bench'] = existing_bench + [p for p in default_bench if p['name'] not in existing_names]
+    st['bench'].extend(p for p in default_bench if p['name'] not in owned_names)
     st.setdefault('extras', [])
     st.setdefault('market', copy.deepcopy(TRANSFER_MARKET))
     # GOAT players are pack-only, not part of the ordinary transfer market.
