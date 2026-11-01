@@ -19,7 +19,7 @@ def load_user(user_id): return db.session.get(User, int(user_id))
 with app.app_context(): db.create_all()
 
 def format_money(amount):
-    euros = int(round(float(amount or 0)))
+    euros = int(round(float(amount or 0) * 1_000_000))
     return f"{euros:,}".replace(',', '.') + ' €'
 
 app.jinja_env.filters['money'] = format_money
