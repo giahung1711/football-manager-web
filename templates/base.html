@@ -37,7 +37,18 @@
     <div class="modal-kicker">MANAGER DESK · KẾT QUẢ</div>
     <h2 id="result-title">Thông báo</h2>
     <div id="result-message"></div>
-    <button type="button" class="button primary" id="close-result">Đóng</button>
+    {% if match_popup %}
+    <div class="modal-actions result-actions">
+      <button type="button" class="button" id="show-result-detail">Chi tiết</button>
+      <button type="button" class="button primary" id="close-result">Đóng</button>
+    </div>
+    <div id="result-detail" class="match-detail result-match-detail" hidden>
+      <h3>Diễn biến trận đấu</h3>
+      <p class="muted">{{match_popup.club}} {{match_popup.score}} {{match_popup.opponent}} · OVR {{match_popup.my_ovr}} - {{match_popup.opponent_ovr}}</p>
+      {% if match_popup.events %}<ol class="match-events">{% for event in match_popup.events %}<li><b>{{event.minute}}'</b> · {% if event.type=='goal' %}{% if event.detail=='Bàn thắng' %}⚽ {{event.player}} ghi bàn cho {{event.team}}{% elif event.detail=='Penalty' %}⚽ {{event.player}} ghi bàn penalty cho {{event.team}}{% else %}⚽ OG! {{event.player}} của {{event.detail.split(' - ')[-1]}} phản lưới, bàn thắng cho {{event.team}}{% endif %}{% else %}{{event.player}} ({{event.team}}) nhận {{event.detail}}{% endif %}</li>{% endfor %}</ol>{% else %}<p>Trận đấu không có bàn thắng hay thẻ phạt.</p>{% endif %}
+      <h3>Thống kê</h3><div class="match-stats"><span>Bàn thắng: <b>{{match_popup.stats.goals_home}} - {{match_popup.stats.goals_away}}</b></span><span>Penalty: <b>{{match_popup.stats.penalties}}</b></span><span>Phản lưới: <b>{{match_popup.stats.own_goals}}</b></span><span>Thẻ vàng: <b>{{match_popup.stats.yellow_cards}}</b></span><span>Thẻ đỏ: <b>{{match_popup.stats.red_cards}}</b></span></div>
+    </div>
+    {% else %}<button type="button" class="button primary" id="close-result">Đóng</button>{% endif %}
   </div>
 </div>
 <script>
@@ -70,7 +81,14 @@ if (flashBox && flashBox.textContent.trim()) {
   const modal = document.getElementById('result-modal');
   document.getElementById('result-message').textContent = flashBox.innerText.trim();
   modal.hidden = false;
-  document.getElementById('close-result').addEventListener('click', () => modal.hidden = true);
+  const closeResult = document.getElementById('close-result');
+  if (closeResult) closeResult.addEventListener('click', () => modal.hidden = true);
+  const detailButton = document.getElementById('show-result-detail');
+  if (detailButton) detailButton.addEventListener('click', () => {
+    const detail = document.getElementById('result-detail');
+    detail.hidden = !detail.hidden;
+    detailButton.textContent = detail.hidden ? 'Chi tiết' : 'Thu gọn';
+  });
   modal.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
 }
 </script>

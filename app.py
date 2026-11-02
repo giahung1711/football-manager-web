@@ -1,5 +1,5 @@
 import os, random, copy, math
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
@@ -39,7 +39,8 @@ def persist(save,state):
     db.session.commit()
 def page(save, tab='overview', extra=None):
     st=load_state(save)
-    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st),
+    match_popup=session.pop('last_match_result', None)
+    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
                            prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
                            market=st['market'], market_items=[{'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0)} for n in st['market'] if n not in {p['name'] for p in all_players(st)} and n not in PACKS['4']['players']], upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
@@ -138,7 +139,9 @@ def action():
             if success: flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
             else: flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
         elif act=='match':
-            result=simulate_match(st); flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
+            result=simulate_match(st)
+            session['last_match_result']=copy.deepcopy(result)
+            flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
         elif act=='formation':
             formation=request.form.get('formation')
             if formation not in {'4-3-3','4-4-2','4-2-3-1'}: raise ValueError('Sơ đồ không hợp lệ.')

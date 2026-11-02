@@ -7,7 +7,27 @@
 {% for key,label in [('overview','Tổng quan'),('squad','Đội hình'),('tactics','Chiến thuật'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
 </nav>
 {% if tab=='overview' %}
-<section class="panel"><h2>Đội hình xuất phát</h2><p>Thành tích: {{state.wins}} thắng · {{state.draws}} hòa · {{state.losses}} thua</p><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating+p.level}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></section>
+<section class="panel overview-panel">
+  <div class="overview-heading"><div><p class="eyebrow">CLUB PERFORMANCE</p><h2>Phong độ đội bóng</h2></div><span class="overview-season">MÙA {{state.season}}</span></div>
+  <div class="overview-metrics">
+    <div class="form-block">
+      <span class="metric-label">THÀNH TÍCH · 5 TRẬN GẦN NHẤT</span>
+      <div class="form-track" aria-label="Kết quả 5 trận gần nhất">
+        {% for match in state.match_history[:5] %}
+          <span class="form-result {% if match.result == 'THẮNG' %}form-win{% elif match.result == 'HÒA' %}form-draw{% else %}form-loss{% endif %}" title="{{match.result}}">{% if match.result == 'THẮNG' %}T{% elif match.result == 'HÒA' %}H{% else %}B{% endif %}</span>
+        {% endfor %}
+        {% for n in range(5 - (state.match_history[:5]|length)) %}<span class="form-result form-empty" title="Chưa thi đấu">—</span>{% endfor %}
+      </div>
+      <div class="form-legend"><span><i class="legend-dot form-win"></i>Thắng</span><span><i class="legend-dot form-draw"></i>Hòa</span><span><i class="legend-dot form-loss"></i>Thua</span></div>
+    </div>
+    <div class="record-block">
+      <div class="record-item"><span class="metric-label">TỔNG SỐ TRẬN</span><strong>{{state.wins + state.draws + state.losses}}</strong></div>
+      <div class="record-item"><span class="metric-label">TỈ LỆ THẮNG</span><strong>{% if state.wins + state.draws + state.losses > 0 %}{{((state.wins / (state.wins + state.draws + state.losses)) * 100)|round(1)}}%{% else %}0%{% endif %}</strong></div>
+    </div>
+  </div>
+  <div class="overview-ovr"><span class="metric-label">OVR ĐỘI HÌNH ĐÁ CHÍNH</span><strong>{{data.average_rating}}</strong><span class="ovr-caption">ĐIỂM SỨC MẠNH ĐỘI HÌNH</span></div>
+</section>
+<section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating+p.level}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
 {% elif tab=='squad' %}
 <section class="panel"><h2>Đội hình đá chính ({{state.starting|length}})</h2><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating+p.level}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
 <section class="panel"><h2>Đội hình dự bị ({{state.bench|length}})</h2>{% for p in state.bench %}<p>{{p.name}} · {{p.position}} · OVR {{p.rating+p.level}}</p>{% endfor %}</section>
