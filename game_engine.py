@@ -371,22 +371,110 @@ def normalize_state(st):
         st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
     st.setdefault('season', 1); st.setdefault('week', 1)
     st.setdefault('points', 0); st.setdefault('wins', 0); st.setdefault('draws', 0); st.setdefault('losses', 0)
-    st.setdefault('formation', '4-3-3'); st.setdefault('activity', [])
+    st.setdefault('formation', '4-3-3'); st.setdefault('activity', []); st.setdefault('match_history', [])
+    if not isinstance(st['match_history'], list): st['match_history'] = []
+    st['match_history'] = st['match_history'][:5]
     return st
 
 def all_players(st): return st['starting']+st['bench']+st['extras']
 def get_dashboard(st):
     arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(p['rating']+p.get('level',0) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
 
+def _match_player_name(p):
+    return p.get('name', 'Cầu thủ') if isinstance(p, dict) else str(p).split(' - ')[0]
+
+def _match_position(p):
+    return p.get('position', 'ST') if isinstance(p, dict) else (str(p).split(' - ')[1] if len(str(p).split(' - ')) > 1 else 'ST')
+
+def _match_rating(p):
+    if isinstance(p, dict):
+        return int(p.get('rating', 80)) + int(p.get('level', 0))
+    parts = str(p).split(' - ')
+    try: return int(parts[2])
+    except (IndexError, ValueError): return 80
+
+def _weighted_player(squad, weights):
+    return random.choices(squad, weights=weights, k=1)[0]
+
 def simulate_match(st):
-    opp= random.choice([c for c in STARTING if c!=st['club']]); opps=[player(x) for x in STARTING[opp]]
-    if len(st['starting'])!=11: raise ValueError('Cần đủ 11 cầu thủ đá chính')
-    my=sum(p['rating']+p.get('level',0) for p in st['starting'])/11; other=sum(p['rating'] for p in opps)/11
-    def goals(diff):
-        chance=max(.10,min(.55,.30+diff*.015)); return sum(random.random()<chance for _ in range(6))
-    a,b=goals(my-other),goals(other-my); result='THẮNG' if a>b else 'HÒA' if a==b else 'THUA'; reward=20 if a>b else 10 if a==b else 5
-    st['budget']+=reward; st['week']+=1
-    if a>b: st['wins']+=1; st['points']+=3
-    elif a==b: st['draws']+=1; st['points']+=1
-    else: st['losses']+=1
-    return {"opponent":opp,"score":f"{a} - {b}","result":result,"reward":reward}
+    """Simulate a match and return a Python-game-style event timeline + stats."""
+    from datetime import datetime, timezone
+    opponents = [club for club in STARTING if club != st['club']]
+    opponent = random.choice(opponents)
+    my_squad = list(st.get('starting') or [])
+    opponent_squad = [player(x) for x in STARTING[opponent]]
+    if len(my_squad) != 11:
+        raise ValueError('Cần đủ 11 cầu thủ đá chính')
+
+    my_ovr = sum(_match_rating(p) for p in my_squad) / len(my_squad)
+    opponent_ovr = sum(_match_rating(p) for p in opponent_squad) / len(opponent_squad)
+
+    def scoring_weight(p):
+        base = {'ST':1.50,'LW':1.35,'RW':1.35,'CAM':1.20,'CM':.90,'CDM':.65,'LB':.40,'RB':.40,'CB':.30,'GK':.01}.get(_match_position(p),.5)
+        return base * (1 + (_match_rating(p)-80)*.04)
+    def own_goal_weight(p):
+        base = {'GK':.15,'CB':.45,'LB':.35,'RB':.35,'CDM':.20}.get(_match_position(p),.01)
+        return base * max(.1, 1 - (_match_rating(p)-80)*.025)
+    def pick_scorer(squad): return _weighted_player(squad, [scoring_weight(p) for p in squad])
+
+    my_attack = [p for p in my_squad if _match_position(p) in ('ST','LW','RW','CAM')] or my_squad
+    opp_attack = [p for p in opponent_squad if _match_position(p) in ('ST','LW','RW','CAM')] or opponent_squad
+    my_def = [p for p in my_squad if _match_position(p) in ('GK','CB','LB','RB')] or my_squad
+    opp_def = [p for p in opponent_squad if _match_position(p) in ('GK','CB','LB','RB')] or opponent_squad
+
+    my_goals = opponent_goals = 0
+    events, used_minutes = [], set()
+    def minute():
+        available = [m for m in range(1, 91) if m not in used_minutes]
+        if not available: return 90
+        chosen = random.choice(available); used_minutes.add(chosen); return chosen
+    my_chance = max(.10, min(.55, .30 + (my_ovr-opponent_ovr)*.015))
+    opp_chance = max(.10, min(.55, .30 + (opponent_ovr-my_ovr)*.015))
+    opp_gk = next((p for p in opponent_squad if _match_position(p)=='GK'), None)
+    my_gk = next((p for p in my_squad if _match_position(p)=='GK'), None)
+    if opp_gk: my_chance *= max(.45, 1-(_match_rating(opp_gk)-80)*.015)
+    if my_gk: opp_chance *= max(.45, 1-(_match_rating(my_gk)-80)*.015)
+
+    for team, squad, attempts, chance in [(st['club'],my_squad,random.randint(3,7),my_chance),(opponent,opponent_squad,random.randint(3,7),opp_chance)]:
+        for _ in range(attempts):
+            if random.random() < chance:
+                scorer = pick_scorer(squad)
+                if team == st['club']: my_goals += 1
+                else: opponent_goals += 1
+                events.append({'minute':minute(),'type':'goal','team':team,'player':_match_player_name(scorer),'detail':'Bàn thắng'})
+
+    for team, squad, defenders in [(st['club'],my_squad,my_def),(opponent,opponent_squad,opp_def)]:
+        if random.random() < .30:
+            scorer=pick_scorer(squad)
+            if team == st['club']: my_goals += 1
+            else: opponent_goals += 1
+            events.append({'minute':minute(),'type':'goal','team':team,'player':_match_player_name(scorer),'detail':'Penalty'})
+        if random.random() < .35:
+            card_player=random.choice(squad)
+            events.append({'minute':minute(),'type':'card','team':team,'player':_match_player_name(card_player),'detail':'Thẻ vàng 🟨'})
+        if random.random() < .20:
+            og_player=_weighted_player(defenders,[own_goal_weight(p) for p in defenders])
+            scoring_team=opponent if team == st['club'] else st['club']
+            if scoring_team == st['club']: my_goals += 1
+            else: opponent_goals += 1
+            events.append({'minute':minute(),'type':'goal','team':scoring_team,'player':_match_player_name(og_player),'detail':f'Phản lưới nhà (OG) - {team}'})
+        if random.random() < .10:
+            card_player=random.choice(squad)
+            events.append({'minute':minute(),'type':'card','team':team,'player':_match_player_name(card_player),'detail':'Thẻ đỏ 🟥'})
+
+    events.sort(key=lambda e:e['minute'])
+    yellow=sum(1 for e in events if e['type']=='card' and 'vàng' in e['detail'])
+    red=sum(1 for e in events if e['type']=='card' and 'đỏ' in e['detail'])
+    penalties=sum(1 for e in events if e['type']=='goal' and e['detail']=='Penalty')
+    own_goals=sum(1 for e in events if e['type']=='goal' and 'OG' in e['detail'])
+    result='THẮNG' if my_goals>opponent_goals else 'HÒA' if my_goals==opponent_goals else 'THUA'
+    reward=20 if my_goals>opponent_goals else 10 if my_goals==opponent_goals else 5
+    st['budget']=round(float(st.get('budget',0))+reward,2); st['week']=int(st.get('week',1))+1
+    if my_goals>opponent_goals: st['wins']=int(st.get('wins',0))+1; st['points']=int(st.get('points',0))+3
+    elif my_goals==opponent_goals: st['draws']=int(st.get('draws',0))+1; st['points']=int(st.get('points',0))+1
+    else: st['losses']=int(st.get('losses',0))+1
+    match={'id':datetime.now(timezone.utc).isoformat(),'club':st['club'],'opponent':opponent,'score_home':my_goals,'score_away':opponent_goals,'score':f'{my_goals} - {opponent_goals}','result':result,'reward':reward,'my_ovr':round(my_ovr,1),'opponent_ovr':round(opponent_ovr,1),'events':events,'stats':{'goals_home':my_goals,'goals_away':opponent_goals,'penalties':penalties,'own_goals':own_goals,'yellow_cards':yellow,'red_cards':red}}
+    st.setdefault('match_history',[]).insert(0,match)
+    st['match_history']=st['match_history'][:5]
+    return match
+
