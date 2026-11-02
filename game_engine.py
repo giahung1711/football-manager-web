@@ -359,6 +359,14 @@ def normalize_state(st):
         st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
     try:
         st['budget'] = round(max(0.0, float(st['budget'])), 2)
+        # Match the original Python game: a new Real Madrid save starts at 300 M€.
+        # One-time correction for the current save that was initialized at 180 M€.
+        if club == 'Real Madrid' and st['budget'] == 180.0:
+            st['budget'] = 300.0
+        # Legacy repair: balances are stored in million euros (M€).
+        # Older saves may contain the same balance as raw euros by mistake.
+        if st['budget'] > 100_000:
+            st['budget'] = round(st['budget'] / 1_000_000, 2)
     except (TypeError, ValueError):
         st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
     st.setdefault('season', 1); st.setdefault('week', 1)
