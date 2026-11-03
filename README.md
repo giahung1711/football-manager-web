@@ -20,3 +20,16 @@ python app.py
 ```
 
 Khi deploy, giữ nguyên `DATABASE_URL` và `SECRET_KEY` hiện tại.
+
+
+## Admin account (private)
+
+The game has no public Admin registration or first-claim setup page. Provision the single Admin account through private environment variables in the hosting dashboard:
+
+- `ADMIN_USERNAME`: the Admin login name you choose.
+- `ADMIN_PASSWORD`: a strong password you choose and keep private.
+- `SECRET_KEY`: a separate long random secret used to protect sessions.
+
+Set these variables in the hosting provider's Environment/Variables settings before starting the app. On startup, the configured username is created/promoted as the only Admin and its password is synchronized from `ADMIN_PASSWORD`; all other accounts are forced to regular-player status. Never paste these secrets into chat, source code, or a public GitHub repository.
+
+After logging in with the Admin account, open **Admin** in the top navigation. Admin can view account names and creation dates, gift players (including custom OVR/card level) directly into a recipient's player collection, and grant in-game budget. Passwords are stored as secure hashes and are never displayed.

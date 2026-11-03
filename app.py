@@ -1,4 +1,4 @@
-import os, random, copy, math
+import os, random, copy, math, secrets, hmac
 from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave
@@ -16,13 +16,58 @@ db.init_app(app)
 login_manager = LoginManager(app); login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id): return db.session.get(User, int(user_id))
-with app.app_context(): db.create_all()
+with app.app_context():
+    db.create_all()
+    # Lightweight migration for existing SQLite/PostgreSQL databases.
+    from sqlalchemy import inspect, text
+    if 'is_admin' not in {column['name'] for column in inspect(db.engine).get_columns('user')}:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE "user" ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE'))
+    # The sole admin is provisioned from private hosting environment variables.
+    # Never expose an in-app admin registration or public first-claim setup page.
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    admin_password = os.environ.get('ADMIN_PASSWORD', '')
+    if admin_username and admin_password:
+        admin = User.query.filter_by(username=admin_username).first()
+        if admin is None:
+            admin = User(username=admin_username, is_admin=True)
+            admin.set_password(admin_password)
+            db.session.add(admin)
+        else:
+            admin.is_admin = True
+        # Always align the provisioned account password with the private host setting.
+        admin.set_password(admin_password)
+        # Enforce exactly one admin account.
+        User.query.filter(User.id != admin.id).update({User.is_admin: False})
+        db.session.commit()
+
+def admin_required(view):
+    from functools import wraps
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('Bạn không có quyền truy cập khu vực Admin.')
+            return redirect(url_for('dashboard'))
+        return view(*args, **kwargs)
+    return wrapped
 
 def format_money(amount):
     euros = int(round(float(amount or 0) * 1_000_000))
     return f"{euros:,}".replace(',', '.') + ' €'
 
 app.jinja_env.filters['money'] = format_money
+
+@app.context_processor
+def inject_admin_csrf():
+    if '_admin_csrf' not in session:
+        session['_admin_csrf'] = secrets.token_urlsafe(32)
+    return {'admin_csrf_token': session['_admin_csrf']}
+
+def valid_admin_csrf():
+    supplied = request.form.get('csrf_token', '')
+    expected = session.get('_admin_csrf', '')
+    return bool(supplied and expected and hmac.compare_digest(supplied, expected))
 
 def current_save(): return GameSave.query.filter_by(user_id=current_user.id).first()
 def load_state(save):
@@ -89,6 +134,81 @@ def dashboard():
 def game_tab(tab):
     if tab not in {'squad','transfers','shop','upgrade','tactics','finance','matches'}: return redirect(url_for('dashboard'))
     save=current_save(); return redirect(url_for('choose_club')) if not save else page(save,tab)
+@app.route('/admin', methods=['GET'])
+@admin_required
+def admin_panel():
+    users = User.query.order_by(User.created_at.desc()).all()
+    player_names = sorted(set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET))
+    # Include players already present in any saved squad.
+    for save in GameSave.query.all():
+        state = save.state or {}
+        for group in ('starting', 'bench', 'extras'):
+            player_names.update(p.get('name', '') for p in state.get(group, []) if p.get('name'))
+    return render_template('admin.html', users=users, player_names=sorted(player_names))
+
+@app.post('/admin/gift')
+@admin_required
+def admin_gift():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        recipient = db.session.get(User, user_id)
+        if not recipient:
+            raise ValueError('Không tìm thấy tài khoản nhận quà.')
+        save = GameSave.query.filter_by(user_id=recipient.id).first()
+        if not save:
+            raise ValueError('Tài khoản này chưa chọn CLB và chưa có dữ liệu game.')
+        name = request.form.get('player_name', '').strip()
+        if not name or len(name) > 80:
+            raise ValueError('Tên cầu thủ không hợp lệ.')
+        rating = int(request.form.get('rating', '80'))
+        level = int(request.form.get('level', '0'))
+        position = request.form.get('position', PLAYER_POSITIONS.get(name, 'ST')).upper()
+        if not 40 <= rating <= 99 or not 0 <= level <= 5:
+            raise ValueError('OVR phải từ 40–99 và cấp thẻ từ +0 đến +5.')
+        if position not in {'GK','CB','LB','RB','LWB','RWB','CDM','CM','CAM','LM','RM','LW','RW','ST','CF'}:
+            raise ValueError('Vị trí cầu thủ không hợp lệ.')
+        state = load_state(save)
+        owned = [p for group in ('starting','bench','extras') for p in state.get(group, [])]
+        if any(p.get('name') == name for p in owned):
+            raise ValueError(f'{recipient.username} đã sở hữu {name}.')
+        gifted = {'name': name, 'position': position, 'rating': rating, 'level': level}
+        state.setdefault('extras', []).append(gifted)
+        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng {name} OVR {rating} +{level}', 'week': state.get('week', 1)})
+        state['activity'] = state['activity'][:15]
+        persist(save, state)
+        flash(f'Đã tặng {name} OVR {rating} +{level} cho tài khoản {recipient.username}.')
+    except (ValueError, TypeError) as error:
+        flash(str(error))
+    return redirect(url_for('admin_panel'))
+
+@app.post('/admin/budget')
+@admin_required
+def admin_budget():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        amount = float(request.form.get('amount', '0'))
+        if amount <= 0 or amount > 100000:
+            raise ValueError('Số tiền tặng phải lớn hơn 0 và không quá 100.000 triệu €.')
+        save = GameSave.query.filter_by(user_id=user_id).first()
+        recipient = db.session.get(User, user_id)
+        if not save or not recipient:
+            raise ValueError('Không tìm thấy dữ liệu game của tài khoản này.')
+        state = load_state(save)
+        state['budget'] = round(float(state.get('budget', 0)) + amount, 2)
+        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng €{amount:g}M', 'week': state.get('week', 1)})
+        state['activity'] = state['activity'][:15]
+        persist(save, state)
+        flash(f'Đã tặng €{amount:g}M cho tài khoản {recipient.username}.')
+    except (ValueError, TypeError) as error:
+        flash(str(error))
+    return redirect(url_for('admin_panel'))
+
 @app.post('/action')
 @login_required
 def action():

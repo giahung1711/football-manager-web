@@ -10,6 +10,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(32), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    is_admin = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
