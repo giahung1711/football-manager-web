@@ -90,7 +90,10 @@ def page(save, tab='overview', extra=None):
                            market=st['market'], market_items=[{'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0)} for n in st['market'] if n not in {p['name'] for p in all_players(st)} and n not in PACKS['4']['players']], upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
 @app.route('/')
-def home(): return redirect(url_for('dashboard')) if current_user.is_authenticated else render_template('home.html')
+def home():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin_panel' if current_user.is_admin else 'dashboard'))
+    return render_template('home.html')
 @app.route('/register',methods=['GET','POST'])
 def register():
     if current_user.is_authenticated: return redirect(url_for('dashboard'))
@@ -107,7 +110,9 @@ def login():
     if current_user.is_authenticated: return redirect(url_for('dashboard'))
     if request.method=='POST':
         user=User.query.filter_by(username=request.form.get('username','').strip()).first()
-        if user and user.check_password(request.form.get('password','')): login_user(user); return redirect(url_for('dashboard'))
+        if user and user.check_password(request.form.get('password','')):
+            login_user(user)
+            return redirect(url_for('admin_panel' if user.is_admin else 'dashboard'))
         flash('Tên tài khoản hoặc mật khẩu không đúng.')
     return render_template('auth.html',mode='login')
 @app.post('/logout')
@@ -138,7 +143,7 @@ def game_tab(tab):
 @admin_required
 def admin_panel():
     users = User.query.order_by(User.created_at.desc()).all()
-    player_names = sorted(set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET))
+    player_names = set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET)
     # Include players already present in any saved squad.
     for save in GameSave.query.all():
         state = save.state or {}
