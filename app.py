@@ -1,4 +1,5 @@
 import os, random, copy, math, secrets, hmac
+from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave
@@ -170,24 +171,107 @@ def admin_gift():
             raise ValueError('Tên cầu thủ không hợp lệ.')
         rating = int(request.form.get('rating', '80'))
         level = int(request.form.get('level', '0'))
+        transfer_value = float(request.form.get('transfer_value', '0'))
         position = request.form.get('position', PLAYER_POSITIONS.get(name, 'ST')).upper()
-        if not 40 <= rating <= 99 or not 0 <= level <= 5:
-            raise ValueError('OVR phải từ 40–99 và cấp thẻ từ +0 đến +5.')
+        if rating < 1 or level < 0 or not math.isfinite(transfer_value) or transfer_value < 0:
+            raise ValueError('OVR/cấp thẻ không hợp lệ hoặc giá trị chuyển nhượng bị âm.')
         if position not in {'GK','CB','LB','RB','LWB','RWB','CDM','CM','CAM','LM','RM','LW','RW','ST','CF'}:
             raise ValueError('Vị trí cầu thủ không hợp lệ.')
         state = load_state(save)
         owned = [p for group in ('starting','bench','extras') for p in state.get(group, [])]
-        if any(p.get('name') == name for p in owned):
-            raise ValueError(f'{recipient.username} đã sở hữu {name}.')
-        gifted = {'name': name, 'position': position, 'rating': rating, 'level': level}
-        state.setdefault('extras', []).append(gifted)
-        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng {name} OVR {rating} +{level}', 'week': state.get('week', 1)})
+        pending_names = [m.get('player', {}).get('name') for m in state.get('mailbox', []) if m.get('type') == 'player_gift' and not m.get('opened')]
+        if any(p.get('name') == name for p in owned) or name in pending_names:
+            raise ValueError(f'{recipient.username} đã sở hữu hoặc đang có thư tặng {name}.')
+        gifted = {'name': name, 'position': position, 'rating': rating, 'level': level, 'market_value': transfer_value}
+        subject = request.form.get('mail_subject', '').strip()[:100] or 'Bạn nhận được một gói cầu thủ!'
+        body = request.form.get('mail_body', '').strip()[:1000] or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.'
+        mail = {'id': secrets.token_urlsafe(12), 'type': 'player_gift', 'subject': subject, 'body': body,
+                'player': gifted, 'opened': False, 'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M')}
+        state.setdefault('mailbox', []).insert(0, mail)
+        state.setdefault('activity', []).insert(0, {'message': f'Admin gửi thư tặng {name} OVR {rating} +{level}', 'week': state.get('week', 1)})
         state['activity'] = state['activity'][:15]
         persist(save, state)
-        flash(f'Đã tặng {name} OVR {rating} +{level} cho tài khoản {recipient.username}.')
+        flash(f'Đã gửi gói {name} vào hòm thư của {recipient.username}.')
     except (ValueError, TypeError) as error:
         flash(str(error))
     return redirect(url_for('admin_panel'))
+
+@app.route('/mailbox')
+@login_required
+def mailbox():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    mails = state.setdefault('mailbox', [])
+    return render_template('mailbox.html', mails=mails, unread_count=sum(1 for m in mails if not m.get('opened')))
+
+@app.post('/mailbox/open')
+@login_required
+def mailbox_open():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('mailbox'))
+    state = load_state(save)
+    mail_id = request.form.get('mail_id', '')
+    mail = next((m for m in state.setdefault('mailbox', []) if m.get('id') == mail_id), None)
+    if not mail:
+        flash('Không tìm thấy thư đã chọn.')
+    elif mail.get('opened'):
+        flash('Thư này đã được mở trước đó.')
+    elif mail.get('type') == 'player_gift':
+        gifted = copy.deepcopy(mail.get('player') or {})
+        if not gifted.get('name'):
+            flash('Gói quà trong thư không hợp lệ.')
+        elif any(p.get('name') == gifted['name'] for group in ('starting','bench','extras') for p in state.get(group, [])):
+            mail['opened'] = True
+            flash('Cầu thủ này đã có trong đội hình; thư được đánh dấu đã xử lý để tránh nhận trùng.')
+        else:
+            state.setdefault('bench', []).append(gifted)
+            mail['opened'] = True
+            state.setdefault('activity', []).insert(0, {'message': f'Đã nhận quà từ hòm thư: {gifted["name"]}', 'week': state.get('week', 1)})
+            state['activity'] = state['activity'][:15]
+            flash(f'Đã mở thư và nhận {gifted["name"]} vào đội hình dự bị!')
+    else:
+        flash('Loại thư này chưa được hỗ trợ.')
+    persist(save, state)
+    return redirect(url_for('mailbox'))
+
+@app.post('/mailbox/claim-all')
+@login_required
+def mailbox_claim_all():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('mailbox'))
+    state = load_state(save)
+    received = []
+    for mail in state.setdefault('mailbox', []):
+        if mail.get('opened') or mail.get('type') != 'player_gift':
+            continue
+        gifted = copy.deepcopy(mail.get('player') or {})
+        if not gifted.get('name'):
+            mail['opened'] = True
+            continue
+        if any(p.get('name') == gifted['name'] for group in ('starting','bench','extras') for p in state.get(group, [])):
+            mail['opened'] = True
+            continue
+        state.setdefault('bench', []).append(gifted)
+        mail['opened'] = True
+        received.append(gifted['name'])
+    if received:
+        state.setdefault('activity', []).insert(0, {'message': f'Nhận {len(received)} cầu thủ từ hòm thư', 'week': state.get('week', 1)})
+        state['activity'] = state['activity'][:15]
+        flash('Đã nhận: ' + ', '.join(received) + ' vào đội hình dự bị.')
+    else:
+        flash('Không có gói cầu thủ mới để nhận.')
+    persist(save, state)
+    return redirect(url_for('mailbox'))
 
 @app.post('/admin/budget')
 @admin_required
@@ -198,8 +282,8 @@ def admin_budget():
     try:
         user_id = int(request.form.get('user_id', ''))
         amount = float(request.form.get('amount', '0'))
-        if amount <= 0 or amount > 100000:
-            raise ValueError('Số tiền tặng phải lớn hơn 0 và không quá 100.000 triệu €.')
+        if not math.isfinite(amount) or amount <= 0:
+            raise ValueError('Số tiền tặng phải là số hữu hạn lớn hơn 0.')
         save = GameSave.query.filter_by(user_id=user_id).first()
         recipient = db.session.get(User, user_id)
         if not save or not recipient:

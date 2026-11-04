@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Hòm thư · FOOTBALL MANAGER{% endblock %}
+{% block content %}
+<section class="admin-header mailbox-header">
+  <p class="eyebrow">CLUB MESSAGES</p>
+  <div class="section-head"><div><h1>HÒM <span>THƯ</span></h1><p class="muted">Quà tặng và thông báo từ ban quản trị.</p></div><span class="pill">{{ unread_count }} thư chưa mở</span></div>
+</section>
+<section class="panel mailbox-panel">
+  <div class="section-head mailbox-actions">
+    <div><p class="eyebrow">YOUR INBOX</p><h2>Hộp quà của bạn</h2></div>
+    <form method="post" action="{{ url_for('mailbox_claim_all') }}"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button primary" type="submit" {% if unread_count == 0 %}disabled{% endif %}>Nhận tất cả</button></form>
+  </div>
+  {% if mails %}
+  <form method="post" action="{{ url_for('mailbox_open') }}" id="mail-open-form">
+    <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+    <div class="mail-list">
+      {% for mail in mails %}
+      <label class="mail-card {% if mail.opened %}mail-opened{% else %}mail-unread{% endif %}" for="mail-{{ loop.index }}">
+        <input id="mail-{{ loop.index }}" type="radio" name="mail_id" value="{{ mail.id }}" {% if mail.opened %}disabled{% endif %}>
+        <div class="mail-icon">{% if mail.opened %}✓{% else %}🎁{% endif %}</div>
+        <div class="mail-copy"><div class="mail-title-row"><strong>{{ mail.subject }}</strong><span class="mail-status">{{ 'Đã mở' if mail.opened else 'Mới' }}</span></div><p>{{ mail.body }}</p>
+          {% if mail.player %}<div class="mail-player-preview">{{ mail.player.name }} · {{ mail.player.position }} · OVR {{ mail.player.rating + mail.player.level }} · +{{ mail.player.level }}</div>{% endif %}
+          <small>{{ mail.created_at or 'Thư từ Admin' }}</small>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="mail-open-row"><button class="button primary" id="open-mail-button" type="submit" disabled>📦 Mở</button><span class="muted" id="mail-select-hint">Chọn một mục thư để bật nút Mở.</span></div>
+  </form>
+  {% else %}<div class="mail-empty"><span>📭</span><h3>Hòm thư đang trống</h3><p class="muted">Khi Admin gửi quà, thư sẽ xuất hiện tại đây.</p></div>{% endif %}
+</section>
+<script>
+const mailRadios = document.querySelectorAll('input[name="mail_id"]');
+const openMailButton = document.getElementById('open-mail-button');
+const mailHint = document.getElementById('mail-select-hint');
+mailRadios.forEach(radio => radio.addEventListener('change', () => {
+  if (openMailButton) openMailButton.disabled = !document.querySelector('input[name="mail_id"]:checked');
+  if (mailHint) mailHint.textContent = 'Đã chọn thư. Nhấn Mở để nhận quà.';
+}));
+</script>
+{% endblock %}

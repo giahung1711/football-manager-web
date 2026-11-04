@@ -310,7 +310,11 @@ def player(name, default_pos="ST", default_rating=80):
     return {"name":name,"position":PLAYER_POSITIONS.get(name,default_pos),"rating":PLAYER_RATINGS.get(name,default_rating),"level":0}
 
 def pack_player(p): return f"{p['name']} - {p['position']} - {p['rating']} - +{p.get('level',0)}"
-def value(p): return round(PLAYER_PRICES.get(p['name'], max(5,(p['rating']-65)*3))*CARD_VALUE_RATES.get(p.get('level',0),1),2)
+def value(p):
+    base = p.get('market_value')
+    if base is None:
+        base = PLAYER_PRICES.get(p['name'], max(5,(p['rating']-65)*3))
+    return round(float(base) * CARD_VALUE_RATES.get(p.get('level',0),1),2)
 def create_new_game(club):
     if club not in STARTING: raise ValueError('CLB không hợp lệ')
     starters=[player(x) for x in STARTING[club]]; bench=[player(x) for x in BENCH[club]]
