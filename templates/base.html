@@ -10,7 +10,7 @@
 <header class="topbar">
   <a class="brand" href="{{ url_for('home') }}">⚽ FOOTBALL MANAGER</a>
   {% if current_user.is_authenticated %}
-  <nav><a href="{{ url_for('dashboard') }}">Tổng quan</a>{% if not current_user.is_admin %}<a href="{{ url_for('mailbox') }}">Hòm thư</a>{% endif %}<a href="{{ url_for('game_tab', tab='squad') }}">Đội hình</a>{% if current_user.is_admin %}<a href="{{ url_for('admin_panel') }}">Admin</a>{% endif %}
+  <nav><a href="{{ url_for('dashboard') }}">Tổng quan</a>{% if not current_user.is_admin %}<a href="{{ url_for('friends') }}">Bạn bè</a><a href="{{ url_for('mailbox') }}">Hòm thư</a>{% endif %}<a href="{{ url_for('game_tab', tab='squad') }}">Đội hình</a>{% if current_user.is_admin %}<a href="{{ url_for('admin_panel') }}">Admin</a>{% endif %}
     <form method="post" action="{{ url_for('logout') }}"><button class="link-btn">Đăng xuất</button></form>
   </nav>
   {% endif %}
@@ -52,6 +52,10 @@
   </div>
 </div>
 <script>
+// Keep the online indicator fresh while the game page is open.
+{% if current_user.is_authenticated and not current_user.is_admin %}
+setInterval(() => fetch('{{ url_for('presence_ping') }}', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}}).catch(() => {}), 30000);
+{% endif %}
 // Custom in-game confirmation modal: no browser-native confirm popup.
 let pendingForm = null;
 const confirmModal = document.getElementById('confirm-modal');

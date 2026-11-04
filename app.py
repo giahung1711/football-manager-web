@@ -1,8 +1,8 @@
 import os, random, copy, math, secrets, hmac
-from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+from datetime import datetime, timedelta
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, GameSave
+from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, value, player, simulate_match)
@@ -21,9 +21,13 @@ with app.app_context():
     db.create_all()
     # Lightweight migration for existing SQLite/PostgreSQL databases.
     from sqlalchemy import inspect, text
-    if 'is_admin' not in {column['name'] for column in inspect(db.engine).get_columns('user')}:
+    user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
+    if 'is_admin' not in user_columns:
         with db.engine.begin() as connection:
-            connection.execute(text('ALTER TABLE "user" ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE'))
+            connection.execute(text('ALTER TABLE \"user\" ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE'))
+    if 'last_seen_at' not in user_columns:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE \"user\" ADD COLUMN last_seen_at TIMESTAMP NULL'))
     # The sole admin is provisioned from private hosting environment variables.
     # Never expose an in-app admin registration or public first-claim setup page.
     admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
@@ -297,6 +301,216 @@ def admin_budget():
     except (ValueError, TypeError) as error:
         flash(str(error))
     return redirect(url_for('admin_panel'))
+
+
+
+def friend_pair(a, b):
+    return (min(a, b), max(a, b))
+
+def are_friends(a, b):
+    low, high = friend_pair(a, b)
+    return Friendship.query.filter_by(user_low_id=low, user_high_id=high).first() is not None
+
+def get_user_profile(user):
+    save = GameSave.query.filter_by(user_id=user.id).first()
+    state = load_state(save) if save else {}
+    history = (state.get('match_history') or [])[:5]
+    wins = sum(1 for m in history if m.get('result') == 'Thắng')
+    draws = sum(1 for m in history if m.get('result') == 'Hòa')
+    losses = sum(1 for m in history if m.get('result') == 'Thua')
+    starters = state.get('starting', [])
+    ovr_values = [float(x.get('rating', 0)) + float(x.get('level', 0)) for x in starters]
+    online = bool(user.last_seen_at and user.last_seen_at >= datetime.utcnow() - timedelta(seconds=90))
+    return {'user': user, 'state': state, 'history': history, 'wins': wins, 'draws': draws, 'losses': losses,
+            'ovr': round(sum(ovr_values)/len(ovr_values), 1) if ovr_values else 0, 'online': online}
+
+@app.before_request
+def update_presence():
+    if current_user.is_authenticated and request.endpoint not in {'static', 'presence_ping'}:
+        current_user.last_seen_at = datetime.utcnow()
+        db.session.commit()
+
+@app.post('/presence/ping')
+@login_required
+def presence_ping():
+    current_user.last_seen_at = datetime.utcnow()
+    db.session.commit()
+    return {'ok': True}
+
+@app.get('/friends/presence')
+@login_required
+def friends_presence():
+    links = Friendship.query.filter((Friendship.user_low_id == current_user.id) | (Friendship.user_high_id == current_user.id)).all()
+    ids = [f.user_high_id if f.user_low_id == current_user.id else f.user_low_id for f in links]
+    cutoff = datetime.utcnow() - timedelta(seconds=90)
+    online_ids = [u.id for u in User.query.filter(User.id.in_(ids), User.last_seen_at >= cutoff).all()] if ids else []
+    return jsonify({'online_ids': online_ids})
+
+@app.route('/friends', methods=['GET', 'POST'])
+@login_required
+def friends():
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    query = request.args.get('q', '').strip()[:32]
+    results = []
+    if query:
+        results = User.query.filter(User.username.ilike(f'%{query}%'), User.id != current_user.id, User.is_admin.is_(False)).order_by(User.username.asc()).limit(20).all()
+    lows = Friendship.query.filter((Friendship.user_low_id == current_user.id) | (Friendship.user_high_id == current_user.id)).all()
+    friend_ids = [f.user_high_id if f.user_low_id == current_user.id else f.user_low_id for f in lows]
+    friend_users = User.query.filter(User.id.in_(friend_ids)).order_by(User.username.asc()).all() if friend_ids else []
+    friend_profiles = [get_user_profile(u) for u in friend_users]
+    incoming = FriendRequest.query.filter_by(receiver_id=current_user.id, status='pending').all()
+    outgoing = FriendRequest.query.filter_by(sender_id=current_user.id, status='pending').all()
+    incoming_items = [(r, db.session.get(User, r.sender_id)) for r in incoming]
+    outgoing_items = [(r, db.session.get(User, r.receiver_id)) for r in outgoing]
+    challenges = FriendlyChallenge.query.filter(
+        ((FriendlyChallenge.receiver_id == current_user.id) | (FriendlyChallenge.sender_id == current_user.id)),
+        FriendlyChallenge.status == 'pending').order_by(FriendlyChallenge.created_at.desc()).all()
+    challenge_items = [(c, db.session.get(User, c.sender_id), db.session.get(User, c.receiver_id)) for c in challenges]
+    return render_template('friends.html', query=query, results=results, friend_profiles=friend_profiles,
+                           incoming_items=incoming_items, outgoing_items=outgoing_items, challenge_items=challenge_items)
+
+@app.get('/friends/profile/<int:user_id>')
+@login_required
+def friend_profile(user_id):
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    target = db.session.get(User, user_id)
+    if not target or not are_friends(current_user.id, target.id):
+        flash('Chỉ có thể xem hồ sơ của bạn bè.')
+        return redirect(url_for('friends'))
+    profile = get_user_profile(target)
+    state = profile['state']
+    squad = state.get('starting', []) + state.get('bench', []) + state.get('extras', [])
+    return render_template('friend_profile.html', profile=profile, squad=squad)
+
+@app.post('/friends/request/<int:user_id>')
+@login_required
+def friend_request_send(user_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('friends'))
+    target = db.session.get(User, user_id)
+    if not target or target.id == current_user.id or target.is_admin:
+        flash('Không thể gửi lời mời kết bạn tới tài khoản này.')
+    elif are_friends(current_user.id, target.id):
+        flash('Hai người đã là bạn bè.')
+    elif FriendRequest.query.filter_by(sender_id=current_user.id, receiver_id=target.id, status='pending').first():
+        flash('Bạn đã gửi lời mời cho người này rồi.')
+    else:
+        reverse = FriendRequest.query.filter_by(sender_id=target.id, receiver_id=current_user.id, status='pending').first()
+        if reverse:
+            low, high = friend_pair(current_user.id, target.id)
+            db.session.add(Friendship(user_low_id=low, user_high_id=high))
+            reverse.status = 'accepted'
+            db.session.commit()
+            flash(f'Bạn và {target.username} đã trở thành bạn bè!')
+        else:
+            old_request = FriendRequest.query.filter_by(sender_id=current_user.id, receiver_id=target.id).first()
+            if old_request:
+                old_request.status = 'pending'
+                old_request.created_at = datetime.utcnow()
+            else:
+                db.session.add(FriendRequest(sender_id=current_user.id, receiver_id=target.id))
+            db.session.commit()
+            flash('Đã gửi lời mời kết bạn.')
+    return redirect(url_for('friends'))
+
+@app.post('/friends/request/<int:request_id>/<decision>')
+@login_required
+def friend_request_decide(request_id, decision):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('friends'))
+    item = db.session.get(FriendRequest, request_id)
+    if not item or item.receiver_id != current_user.id or item.status != 'pending' or decision not in {'accept','decline'}:
+        flash('Lời mời không hợp lệ hoặc đã được xử lý.')
+    elif decision == 'accept':
+        low, high = friend_pair(item.sender_id, item.receiver_id)
+        if not are_friends(item.sender_id, item.receiver_id):
+            db.session.add(Friendship(user_low_id=low, user_high_id=high))
+        item.status = 'accepted'
+        db.session.commit()
+        flash('Đã chấp nhận lời mời kết bạn!')
+    else:
+        item.status = 'declined'; db.session.commit(); flash('Đã từ chối lời mời.')
+    return redirect(url_for('friends'))
+
+@app.post('/friends/challenge/<int:user_id>')
+@login_required
+def friendly_challenge_send(user_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('friends'))
+    target = db.session.get(User, user_id)
+    if not target or target.id == current_user.id or not are_friends(current_user.id, user_id):
+        flash('Chỉ có thể mời bạn bè đá giao hữu.')
+    elif not GameSave.query.filter_by(user_id=user_id).first():
+        flash('Bạn này chưa có đội bóng để đá giao hữu.')
+    elif FriendlyChallenge.query.filter_by(sender_id=current_user.id, receiver_id=user_id, status='pending').first():
+        flash('Bạn đã gửi lời mời giao hữu đang chờ phản hồi.')
+    else:
+        db.session.add(FriendlyChallenge(sender_id=current_user.id, receiver_id=user_id))
+        db.session.commit(); flash(f'Đã gửi lời mời giao hữu tới {target.username}.')
+    return redirect(url_for('friends'))
+
+def resolve_friendly_match(challenge):
+    a = GameSave.query.filter_by(user_id=challenge.sender_id).first()
+    b = GameSave.query.filter_by(user_id=challenge.receiver_id).first()
+    if not a or not b:
+        raise ValueError('Một trong hai đội bóng không còn tồn tại.')
+    sa, sb = load_state(a), load_state(b)
+    def team_ovr(st):
+        squad = st.get('starting', [])
+        vals = [float(p.get('rating', 0)) + float(p.get('level', 0)) for p in squad]
+        return sum(vals)/len(vals) if vals else 60
+    oa, ob = team_ovr(sa), team_ovr(sb)
+    def goals(attack, defence):
+        lam = max(.15, min(3.8, 1.25 + (attack-defence)*.055))
+        # Poisson-style goal count, capped for readable scorelines.
+        prob = math.exp(-lam); cumulative = prob; r = random.random(); k = 0
+        while r > cumulative and k < 7:
+            k += 1; prob *= lam/k; cumulative += prob
+        return k
+    ga, gb = goals(oa, ob), goals(ob, oa)
+    now = datetime.utcnow().strftime('%d/%m/%Y %H:%M')
+    ida, idb = db.session.get(User, challenge.sender_id), db.session.get(User, challenge.receiver_id)
+    result = {'home_user': ida.username, 'away_user': idb.username, 'home_club': sa.get('club','CLB'), 'away_club': sb.get('club','CLB'),
+              'score': f'{ga} - {gb}', 'home_ovr': round(oa,1), 'away_ovr': round(ob,1), 'played_at': now, 'friendly': True}
+    for st, club, opponent, gf, gc, own_ovr, opp_ovr in [(sa, result['home_club'], result['away_club'], ga, gb, oa, ob), (sb, result['away_club'], result['home_club'], gb, ga, ob, oa)]:
+        label = 'Thắng' if gf > gc else ('Hòa' if gf == gc else 'Thua')
+        st.setdefault('match_history', []).insert(0, {'id': secrets.token_urlsafe(8), 'club': club, 'opponent': opponent, 'score': f'{gf} - {gc}',
+            'result': label, 'reward': 0, 'my_ovr': round(own_ovr,1), 'opponent_ovr': round(opp_ovr,1), 'friendly': True, 'played_at': now, 'events': [],
+            'stats': {'goals_home': gf, 'goals_away': gc, 'penalties': 0, 'own_goals': 0, 'yellow_cards': 0, 'red_cards': 0}})
+        st['match_history'] = st['match_history'][:5]
+        st.setdefault('activity', []).insert(0, {'message': f'Giao hữu với {opponent}: {gf} - {gc}', 'week': st.get('week',1)})
+        st['activity'] = st['activity'][:15]
+    persist(a, sa); persist(b, sb)
+    challenge.result_json = result; challenge.status = 'completed'
+    db.session.commit()
+    return result
+
+@app.post('/friends/challenge/<int:challenge_id>/<decision>')
+@login_required
+def friendly_challenge_decide(challenge_id, decision):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('friends'))
+    challenge = db.session.get(FriendlyChallenge, challenge_id)
+    if not challenge or challenge.receiver_id != current_user.id or challenge.status != 'pending' or decision not in {'accept','decline'}:
+        flash('Lời mời giao hữu không hợp lệ hoặc đã xử lý.')
+    elif decision == 'decline':
+        challenge.status = 'declined'; db.session.commit(); flash('Đã từ chối lời mời giao hữu.')
+    else:
+        try:
+            result = resolve_friendly_match(challenge)
+            flash(f"Giao hữu kết thúc: {result['home_club']} {result['score']} {result['away_club']}! Kết quả đã lưu vào hồ sơ cả hai đội.")
+        except ValueError as error:
+            db.session.rollback(); flash(str(error))
+    return redirect(url_for('friends'))
 
 @app.post('/action')
 @login_required

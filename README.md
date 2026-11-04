@@ -33,3 +33,11 @@ The game has no public Admin registration or first-claim setup page. Provision t
 Set these variables in the hosting provider's Environment/Variables settings before starting the app. On startup, the configured username is created/promoted as the only Admin and its password is synchronized from `ADMIN_PASSWORD`; all other accounts are forced to regular-player status. Never paste these secrets into chat, source code, or a public GitHub repository.
 
 After logging in with the Admin account, open **Admin** in the top navigation. Admin can view account names and creation dates, gift players (including custom OVR/card level) directly into a recipient's player collection, and grant in-game budget. Passwords are stored as secure hashes and are never displayed.
+
+## Hệ thống bạn bè
+- Thanh điều hướng người chơi: **Tổng quan → Bạn bè → Hòm thư**.
+- Tìm kiếm tài khoản, gửi/nhận lời mời kết bạn và chấp nhận/từ chối.
+- Hồ sơ bạn bè hiển thị CLB, OVR đội hình chính, đội hình/cầu thủ và 5 trận gần nhất.
+- Trạng thái online dựa trên lần hoạt động gần nhất (90 giây); trang Bạn bè tự cập nhật trạng thái định kỳ.
+- Gửi lời mời giao hữu cho bạn bè. Khi người nhận chấp nhận, trận đấu được mô phỏng và kết quả lưu vào lịch sử của cả hai đội; giao hữu không cộng ngân sách.
+- Các bảng FriendRequest, Friendship, FriendlyChallenge và cột User.last_seen_at được tạo/migrate tự động khi ứng dụng khởi động. Không cần xoá database hiện tại.
