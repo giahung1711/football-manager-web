@@ -330,18 +330,22 @@ def normalize_state(st):
         st['starting'] = old[:11]
         st['bench'] = old[11:]
     st.setdefault('starting', [])
-    # Migrate legacy string entries to full player records and remove duplicate bench names.
+    # Migrate legacy entries and enforce one copy of each player across the whole club.
+    # Keep the first copy (starting XI has priority), so a duplicate cannot silently
+    # occupy two slots or block match validation.
+    seen_names = set()
     def clean_players(items):
         cleaned = []
-        seen = set()
         for item in (items or []):
             try:
                 record = player(item) if isinstance(item, str) else copy.deepcopy(item)
                 if not isinstance(record, dict) or not record.get('name'):
                     continue
-                if record['name'] in seen:
+                name = str(record['name']).strip()
+                if not name or name.casefold() in seen_names:
                     continue
-                seen.add(record['name'])
+                record['name'] = name
+                seen_names.add(name.casefold())
                 cleaned.append(record)
             except (TypeError, KeyError, ValueError):
                 continue
@@ -401,7 +405,7 @@ def _weighted_player(squad, weights):
     return random.choices(squad, weights=weights, k=1)[0]
 
 def simulate_match(st):
-    """Simulate a match and return a Python-game-style event timeline + stats."""
+    """Simulate a match with chronological events and red-card-aware scoring."""
     from datetime import datetime, timezone
     opponents = [club for club in STARTING if club != st['club']]
     opponent = random.choice(opponents)
@@ -415,58 +419,89 @@ def simulate_match(st):
 
     def scoring_weight(p):
         base = {'ST':1.50,'LW':1.35,'RW':1.35,'CAM':1.20,'CM':.90,'CDM':.65,'LB':.40,'RB':.40,'CB':.30,'GK':.01}.get(_match_position(p),.5)
-        return base * (1 + (_match_rating(p)-80)*.04)
+        return max(.01, base * (1 + (_match_rating(p)-80)*.04))
     def own_goal_weight(p):
         base = {'GK':.15,'CB':.45,'LB':.35,'RB':.35,'CDM':.20}.get(_match_position(p),.01)
-        return base * max(.1, 1 - (_match_rating(p)-80)*.025)
-    def pick_scorer(squad): return _weighted_player(squad, [scoring_weight(p) for p in squad])
+        return max(.01, base * max(.1, 1 - (_match_rating(p)-80)*.025))
+    def weighted_pick(squad, weights):
+        return random.choices(squad, weights=weights, k=1)[0]
 
-    my_attack = [p for p in my_squad if _match_position(p) in ('ST','LW','RW','CAM')] or my_squad
-    opp_attack = [p for p in opponent_squad if _match_position(p) in ('ST','LW','RW','CAM')] or opponent_squad
-    my_def = [p for p in my_squad if _match_position(p) in ('GK','CB','LB','RB')] or my_squad
-    opp_def = [p for p in opponent_squad if _match_position(p) in ('GK','CB','LB','RB')] or opponent_squad
-
-    my_goals = opponent_goals = 0
     events, used_minutes = [], set()
     def minute():
         available = [m for m in range(1, 91) if m not in used_minutes]
         if not available: return 90
         chosen = random.choice(available); used_minutes.add(chosen); return chosen
-    my_chance = max(.10, min(.55, .30 + (my_ovr-opponent_ovr)*.015))
-    opp_chance = max(.10, min(.55, .30 + (opponent_ovr-my_ovr)*.015))
+
+    # Cards are assigned first so later scoring opportunities can exclude sent-off players.
+    team_data = [
+        {'club': st['club'], 'squad': my_squad, 'defenders': [p for p in my_squad if _match_position(p) in ('GK','CB','LB','RB')] or my_squad, 'is_home': True},
+        {'club': opponent, 'squad': opponent_squad, 'defenders': [p for p in opponent_squad if _match_position(p) in ('GK','CB','LB','RB')] or opponent_squad, 'is_home': False},
+    ]
+    red_off = {st['club']: {}, opponent: {}}
+    for team in team_data:
+        squad, club = team['squad'], team['club']
+        if random.random() < .35:
+            card_player = random.choice(squad)
+            events.append({'minute': minute(), 'type':'card', 'team':club, 'player':_match_player_name(card_player), 'detail':'Thẻ vàng 🟨'})
+        if random.random() < .10:
+            card_player = random.choice(squad)
+            red_minute = minute()
+            red_off[club][_match_player_name(card_player)] = red_minute
+            events.append({'minute':red_minute, 'type':'card', 'team':club, 'player':_match_player_name(card_player), 'detail':'Thẻ đỏ 🟥'})
+
+    # A sending-off reduces that team's scoring chance; the removed probability
+    # is transferred to the opponent, keeping the two chances balanced.
+    red_home = len(red_off[st['club']])
+    red_away = len(red_off[opponent])
+    base_my = max(.10, min(.55, .30 + (my_ovr-opponent_ovr)*.015))
+    base_opp = max(.10, min(.55, .30 + (opponent_ovr-my_ovr)*.015))
+    penalty_my = min(.20, .08 * red_home)
+    penalty_opp = min(.20, .08 * red_away)
+    my_chance = max(.05, min(.70, base_my - penalty_my + penalty_opp))
+    opp_chance = max(.05, min(.70, base_opp - penalty_opp + penalty_my))
+
     opp_gk = next((p for p in opponent_squad if _match_position(p)=='GK'), None)
     my_gk = next((p for p in my_squad if _match_position(p)=='GK'), None)
     if opp_gk: my_chance *= max(.45, 1-(_match_rating(opp_gk)-80)*.015)
     if my_gk: opp_chance *= max(.45, 1-(_match_rating(my_gk)-80)*.015)
 
-    for team, squad, attempts, chance in [(st['club'],my_squad,random.randint(3,7),my_chance),(opponent,opponent_squad,random.randint(3,7),opp_chance)]:
-        for _ in range(attempts):
-            if random.random() < chance:
-                scorer = pick_scorer(squad)
-                if team == st['club']: my_goals += 1
-                else: opponent_goals += 1
-                events.append({'minute':minute(),'type':'goal','team':team,'player':_match_player_name(scorer),'detail':'Bàn thắng'})
+    goals_by_team = {st['club']: 0, opponent: 0}
+    def eligible_players(squad, club, event_minute):
+        sent_off = red_off[club]
+        return [p for p in squad if sent_off.get(_match_player_name(p), 999) > event_minute]
+    def add_goal(team, squad, detail='Bàn thắng', scorer_pool=None):
+        event_minute = minute()
+        eligible = scorer_pool if scorer_pool is not None else eligible_players(squad, team, event_minute)
+        if not eligible:
+            return False
+        scorer = weighted_pick(eligible, [scoring_weight(p) for p in eligible])
+        goals_by_team[team] += 1
+        events.append({'minute':event_minute, 'type':'goal', 'team':team, 'player':_match_player_name(scorer), 'detail':detail})
+        return True
 
-    for team, squad, defenders in [(st['club'],my_squad,my_def),(opponent,opponent_squad,opp_def)]:
+    for team, chance in [(st['club'], my_chance), (opponent, opp_chance)]:
+        squad = my_squad if team == st['club'] else opponent_squad
+        for _ in range(random.randint(3,7)):
+            if random.random() < chance:
+                add_goal(team, squad)
         if random.random() < .30:
-            scorer=pick_scorer(squad)
-            if team == st['club']: my_goals += 1
-            else: opponent_goals += 1
-            events.append({'minute':minute(),'type':'goal','team':team,'player':_match_player_name(scorer),'detail':'Penalty'})
-        if random.random() < .35:
-            card_player=random.choice(squad)
-            events.append({'minute':minute(),'type':'card','team':team,'player':_match_player_name(card_player),'detail':'Thẻ vàng 🟨'})
+            add_goal(team, squad, 'Penalty')
+
+    for team in team_data:
+        club, defenders = team['club'], team['defenders']
         if random.random() < .20:
-            og_player=_weighted_player(defenders,[own_goal_weight(p) for p in defenders])
-            scoring_team=opponent if team == st['club'] else st['club']
-            if scoring_team == st['club']: my_goals += 1
-            else: opponent_goals += 1
-            events.append({'minute':minute(),'type':'goal','team':scoring_team,'player':_match_player_name(og_player),'detail':f'Phản lưới nhà (OG) - {team}'})
-        if random.random() < .10:
-            card_player=random.choice(squad)
-            events.append({'minute':minute(),'type':'card','team':team,'player':_match_player_name(card_player),'detail':'Thẻ đỏ 🟥'})
+            event_minute = minute()
+            eligible_defenders = eligible_players(defenders, club, event_minute)
+            if eligible_defenders:
+                own_goal_player = weighted_pick(eligible_defenders, [own_goal_weight(p) for p in eligible_defenders])
+                scoring_team = opponent if club == st['club'] else st['club']
+                goals_by_team[scoring_team] += 1
+                events.append({'minute':event_minute, 'type':'goal', 'team':scoring_team,
+                               'player':_match_player_name(own_goal_player),
+                               'detail':f'Phản lưới nhà (OG) - {club}'})
 
     events.sort(key=lambda e:e['minute'])
+    my_goals, opponent_goals = goals_by_team[st['club']], goals_by_team[opponent]
     yellow=sum(1 for e in events if e['type']=='card' and 'vàng' in e['detail'])
     red=sum(1 for e in events if e['type']=='card' and 'đỏ' in e['detail'])
     penalties=sum(1 for e in events if e['type']=='goal' and e['detail']=='Penalty')
@@ -481,4 +516,3 @@ def simulate_match(st):
     st.setdefault('match_history',[]).insert(0,match)
     st['match_history']=st['match_history'][:5]
     return match
-

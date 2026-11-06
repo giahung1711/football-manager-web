@@ -464,13 +464,11 @@ def resolve_friendly_match(challenge):
         raise ValueError('Một trong hai đội bóng không còn tồn tại.')
     sa, sb = load_state(a), load_state(b)
     def team_ovr(st):
-        squad = st.get('starting', [])
-        vals = [float(p.get('rating', 0)) + float(p.get('level', 0)) for p in squad]
+        vals = [float(p.get('rating', 0)) + float(p.get('level', 0)) for p in st.get('starting', [])]
         return sum(vals)/len(vals) if vals else 60
     oa, ob = team_ovr(sa), team_ovr(sb)
     def goals(attack, defence):
         lam = max(.15, min(3.8, 1.25 + (attack-defence)*.055))
-        # Poisson-style goal count, capped for readable scorelines.
         prob = math.exp(-lam); cumulative = prob; r = random.random(); k = 0
         while r > cumulative and k < 7:
             k += 1; prob *= lam/k; cumulative += prob
@@ -478,15 +476,50 @@ def resolve_friendly_match(challenge):
     ga, gb = goals(oa, ob), goals(ob, oa)
     now = datetime.utcnow().strftime('%d/%m/%Y %H:%M')
     ida, idb = db.session.get(User, challenge.sender_id), db.session.get(User, challenge.receiver_id)
-    result = {'home_user': ida.username, 'away_user': idb.username, 'home_club': sa.get('club','CLB'), 'away_club': sb.get('club','CLB'),
+    if not ida or not idb:
+        raise ValueError('Không tìm thấy tài khoản tham gia giao hữu.')
+    home_club, away_club = sa.get('club','CLB'), sb.get('club','CLB')
+    result = {'home_user': ida.username, 'away_user': idb.username, 'home_club': home_club, 'away_club': away_club,
               'score': f'{ga} - {gb}', 'home_ovr': round(oa,1), 'away_ovr': round(ob,1), 'played_at': now, 'friendly': True}
-    for st, club, opponent, gf, gc, own_ovr, opp_ovr in [(sa, result['home_club'], result['away_club'], ga, gb, oa, ob), (sb, result['away_club'], result['home_club'], gb, ga, ob, oa)]:
+
+    events, used = [], set()
+    def event_minute():
+        choices = [m for m in range(1, 91) if m not in used]
+        if not choices: return 90
+        value = random.choice(choices); used.add(value); return value
+    for team_name, squad, count in [(home_club, sa.get('starting', []), ga), (away_club, sb.get('starting', []), gb)]:
+        scorers = [p for p in squad if str(p.get('position','')).upper() != 'GK'] or squad
+        for _ in range(count):
+            if scorers:
+                scorer = random.choice(scorers)
+                events.append({'minute':event_minute(), 'type':'goal', 'team':team_name,
+                               'player':scorer.get('name','Cầu thủ'), 'detail':'Bàn thắng'})
+        if squad and random.random() < .45:
+            card = random.choice(squad)
+            events.append({'minute':event_minute(), 'type':'card', 'team':team_name,
+                           'player':card.get('name','Cầu thủ'), 'detail':'Thẻ vàng 🟨'})
+        if squad and random.random() < .06:
+            card = random.choice(squad)
+            events.append({'minute':event_minute(), 'type':'card', 'team':team_name,
+                           'player':card.get('name','Cầu thủ'), 'detail':'Thẻ đỏ 🟥'})
+    events.sort(key=lambda e:e['minute'])
+    yellow = sum(1 for e in events if e['type']=='card' and 'vàng' in e['detail'])
+    red = sum(1 for e in events if e['type']=='card' and 'đỏ' in e['detail'])
+    for st, club, opponent, gf, gc, own_ovr, opp_ovr in [
+        (sa, home_club, away_club, ga, gb, oa, ob),
+        (sb, away_club, home_club, gb, ga, ob, oa)
+    ]:
         label = 'Thắng' if gf > gc else ('Hòa' if gf == gc else 'Thua')
-        st.setdefault('match_history', []).insert(0, {'id': secrets.token_urlsafe(8), 'club': club, 'opponent': opponent, 'score': f'{gf} - {gc}',
-            'result': label, 'reward': 0, 'my_ovr': round(own_ovr,1), 'opponent_ovr': round(opp_ovr,1), 'friendly': True, 'played_at': now, 'events': [],
-            'stats': {'goals_home': gf, 'goals_away': gc, 'penalties': 0, 'own_goals': 0, 'yellow_cards': 0, 'red_cards': 0}})
+        match_stats = {'goals_home':gf, 'goals_away':gc, 'penalties':0, 'own_goals':0,
+                       'yellow_cards':yellow, 'red_cards':red}
+        st.setdefault('match_history', []).insert(0, {
+            'id':secrets.token_urlsafe(8), 'club':club, 'opponent':opponent,
+            'score':f'{gf} - {gc}', 'result':label, 'reward':0,
+            'my_ovr':round(own_ovr,1), 'opponent_ovr':round(opp_ovr,1),
+            'friendly':True, 'played_at':now, 'events':copy.deepcopy(events), 'stats':match_stats
+        })
         st['match_history'] = st['match_history'][:5]
-        st.setdefault('activity', []).insert(0, {'message': f'Giao hữu với {opponent}: {gf} - {gc}', 'week': st.get('week',1)})
+        st.setdefault('activity', []).insert(0, {'message':f'Giao hữu với {opponent}: {gf} - {gc}', 'week':st.get('week',1)})
         st['activity'] = st['activity'][:15]
     persist(a, sa); persist(b, sb)
     challenge.result_json = result; challenge.status = 'completed'
@@ -523,7 +556,20 @@ def action():
             a=int(request.form['a']); b=int(request.form['b'])
             out=st['starting'][a]; inn=st['bench'][b]
             if out['position']!=inn['position']: raise ValueError('Chỉ được thay cầu thủ cùng vị trí.')
+            duplicate = any(p['name'].strip().casefold() == inn['name'].strip().casefold() for i,p in enumerate(st['starting']) if i != a)
+            if duplicate: raise ValueError(f"Không thể thay: {inn['name']} đã có trong đội hình đá chính.")
             st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
+        elif act=='promote':
+            group=request.form.get('group'); idx=int(request.form.get('index','-1'))
+            if group not in {'bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
+            if len(st['starting']) >= 11: raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ.')
+            reserve=st[group]
+            if idx < 0 or idx >= len(reserve): raise ValueError('Không tìm thấy cầu thủ dự bị.')
+            incoming=reserve[idx]
+            if any(p['name'].strip().casefold() == incoming['name'].strip().casefold() for p in st['starting']):
+                raise ValueError(f"Không thể thêm: {incoming['name']} đã có trong đội hình đá chính.")
+            st['starting'].append(reserve.pop(idx))
+            flash(f"Đã thêm {incoming['name']} vào đội hình đá chính. Hiện có {len(st['starting'])}/11 cầu thủ.")
         elif act=='buy':
             name=request.form.get('name','').strip()
             if name not in st['market'] or name in PACKS['4']['players']: raise ValueError('Cầu thủ không có trên TTCN thông thường.')
@@ -576,5 +622,5 @@ def action():
     except (ValueError,KeyError,IndexError,TypeError) as e:
         db.session.rollback(); flash(str(e))
     return redirect(request.referrer or url_for('dashboard'))
-def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
+def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
 if __name__=='__main__': app.run(debug=True)
