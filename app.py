@@ -554,8 +554,14 @@ def action():
     try:
         if act=='swap':
             a=int(request.form['a']); b=int(request.form['b'])
+            if a < 0 or a >= len(st['starting']) or b < 0 or b >= len(st['bench']):
+                raise ValueError('Không tìm thấy cầu thủ cần thay.')
             out=st['starting'][a]; inn=st['bench'][b]
-            if out['position']!=inn['position']: raise ValueError('Chỉ được thay cầu thủ cùng vị trí.')
+            # So sánh vị trí chính xác sau khi chuẩn hóa; CDM và CAM luôn là hai vị trí riêng.
+            out_position = str(out.get('position', '')).strip().upper()
+            in_position = str(inn.get('position', '')).strip().upper()
+            if not out_position or not in_position or out_position != in_position:
+                raise ValueError(f'Không thể thay {out["name"]} ({out_position or "?"}) bằng {inn["name"]} ({in_position or "?"}). Chỉ được thay cầu thủ cùng vị trí; CDM không thể thay CAM và ngược lại.')
             duplicate = any(p['name'].strip().casefold() == inn['name'].strip().casefold() for i,p in enumerate(st['starting']) if i != a)
             if duplicate: raise ValueError(f"Không thể thay: {inn['name']} đã có trong đội hình đá chính.")
             st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
