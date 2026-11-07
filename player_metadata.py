@@ -11,6 +11,10 @@ import os
 import re
 import tempfile
 import time
+import queue
+import threading
+import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -23,11 +27,94 @@ NEGATIVE_CACHE_TTL = 15 * 60
 AUTH_COOLDOWN = 15 * 60
 RATE_LIMIT_COOLDOWN = 5 * 60
 SERVER_COOLDOWN = 2 * 60
+# API-Football Free: stay well below typical per-minute limits and reserve
+# part of the daily allowance for manual/API dashboard checks.
+REQUEST_INTERVAL_SECONDS = 7.5
+MAX_DAILY_REQUESTS = 60
 API_BASE = "https://v3.football.api-sports.io"
 
 
+def _ascii_name(value):
+    value = str(value or "").casefold().replace("ø", "o").replace("ł", "l")
+    value = unicodedata.normalize("NFKD", value)
+    return "".join(ch for ch in value if not unicodedata.combining(ch))
+
+
 def _norm(value):
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+    return re.sub(r"[^a-z0-9]+", "", _ascii_name(value))
+
+
+def _name_tokens(value):
+    return set(re.findall(r"[a-z0-9]+", _ascii_name(value)))
+
+
+# Correct common in-game spelling variants before asking the provider.
+_SEARCH_ALIASES = {
+    _norm("Grabiel Magalhaes"): "Gabriel Magalhaes",
+}
+
+_REQUEST_LOCK = threading.Lock()
+_LAST_REQUEST_AT = 0.0
+_METADATA_QUEUE = queue.Queue()
+_PENDING_LOCK = threading.Lock()
+_PENDING_NAMES = set()
+_WORKER_LOCK = threading.Lock()
+_WORKER_STARTED = False
+
+
+class APIRequestBudgetExhausted(Exception):
+    pass
+
+
+def _reserve_daily_request():
+    """Count requests locally and stop before consuming the whole Free quota."""
+    cache = _read_cache()
+    today = datetime.now(timezone.utc).date().isoformat()
+    budget = cache.get("__api_daily_budget__")
+    if not isinstance(budget, dict) or budget.get("date") != today:
+        budget = {"date": today, "count": 0}
+    count = int(budget.get("count", 0))
+    if count >= MAX_DAILY_REQUESTS:
+        return False
+    budget["count"] = count + 1
+    cache["__api_daily_budget__"] = budget
+    _write_cache(cache)
+    return True
+
+
+def _start_metadata_worker():
+    global _WORKER_STARTED
+    with _WORKER_LOCK:
+        if _WORKER_STARTED:
+            return
+        thread = threading.Thread(target=_metadata_worker, name="fm-player-metadata", daemon=True)
+        thread.start()
+        _WORKER_STARTED = True
+
+
+def _queue_metadata_refresh(name):
+    key = _norm(name)
+    if not key:
+        return
+    with _PENDING_LOCK:
+        if key in _PENDING_NAMES:
+            return
+        _PENDING_NAMES.add(key)
+    _start_metadata_worker()
+    _METADATA_QUEUE.put((name, key))
+
+
+def _metadata_worker():
+    while True:
+        name, key = _METADATA_QUEUE.get()
+        try:
+            _fetch_player_metadata(name)
+        except Exception as exc:
+            logger.error("metadata background sync failed player=%s error=%s", name, type(exc).__name__)
+        finally:
+            with _PENDING_LOCK:
+                _PENDING_NAMES.discard(key)
+            _METADATA_QUEUE.task_done()
 
 
 def _read_cache():
@@ -40,6 +127,20 @@ def _read_cache():
 
 def _write_cache(cache):
     try:
+        # API request reservations are written immediately before each HTTP
+        # call. Merge the newest counter so a later metadata-cache write cannot
+        # accidentally reset the daily safety limit using an older snapshot.
+        try:
+            latest = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+            latest_budget = latest.get("__api_daily_budget__") if isinstance(latest, dict) else None
+            current_budget = cache.get("__api_daily_budget__")
+            if isinstance(latest_budget, dict) and (
+                    not isinstance(current_budget, dict) or
+                    latest_budget.get("date") == current_budget.get("date") and
+                    int(latest_budget.get("count", 0)) > int(current_budget.get("count", 0))):
+                cache["__api_daily_budget__"] = latest_budget
+        except (OSError, ValueError, TypeError):
+            pass
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(prefix="fm-player-cache-", dir=str(CACHE_FILE.parent))
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
@@ -64,13 +165,21 @@ def _complete_metadata(data):
 
 
 def _api_get(endpoint, params, api_key):
-    """One API request with safe logging; never logs the API key."""
-    return requests.get(
-        f"{API_BASE}/{endpoint}",
-        params=params,
-        headers={"x-apisports-key": api_key},
-        timeout=(4, 12),
-    )
+    """Serialized, paced API request with a conservative daily budget."""
+    global _LAST_REQUEST_AT
+    with _REQUEST_LOCK:
+        wait = REQUEST_INTERVAL_SECONDS - (time.monotonic() - _LAST_REQUEST_AT)
+        if wait > 0:
+            time.sleep(wait)
+        if not _reserve_daily_request():
+            raise APIRequestBudgetExhausted("local daily API request budget reached")
+        _LAST_REQUEST_AT = time.monotonic()
+        return requests.get(
+            f"{API_BASE}/{endpoint}",
+            params=params,
+            headers={"x-apisports-key": api_key},
+            timeout=(4, 12),
+        )
 
 
 def _safe_response_detail(response, api_key=""):
@@ -133,6 +242,37 @@ def _extract_team_id(squad_rows, player_id):
     return next(iter(unique.values())) if len(unique) == 1 else None
 
 
+def _cached_team_for_player(cache, player_id, now):
+    target = str(player_id)
+    for cache_key, item in cache.items():
+        if not cache_key.startswith("__team_squad__") or not isinstance(item, dict):
+            continue
+        if now - int(item.get("checked_at", 0)) >= CACHE_TTL:
+            continue
+        if target in {str(value) for value in item.get("player_ids", [])}:
+            team = item.get("team")
+            if isinstance(team, dict) and team.get("id") and team.get("name"):
+                return team
+    return None
+
+
+def _cache_team_squad(cache, squad_rows, team, now):
+    for row in squad_rows:
+        row_team = row.get("team") or {}
+        if str(row_team.get("id")) != str(team.get("id")):
+            continue
+        players = row.get("players")
+        if isinstance(players, list) and players:
+            ids = [str(item.get("id")) for item in players
+                   if isinstance(item, dict) and item.get("id")]
+            if ids:
+                cache[f"__team_squad__{team['id']}"] = {
+                    "checked_at": now, "team": team, "player_ids": ids,
+                }
+                _write_cache(cache)
+        return
+
+
 def _get_current_league(team_id, api_key, cache, now, player_name):
     team_cache_key = f"__team_league__{team_id}"
     cached = cache.get(team_cache_key)
@@ -157,8 +297,8 @@ def _get_current_league(team_id, api_key, cache, now, player_name):
     return league_name
 
 
-def get_player_metadata(name, force=False):
-    """Return complete verified metadata from season-independent profile/squad APIs."""
+def _fetch_player_metadata(name, force=False):
+    """Fetch one player in the background; called only by the paced worker."""
     if not name:
         return None
 
@@ -190,6 +330,8 @@ def get_player_metadata(name, force=False):
 
     cache = _read_cache()
     key = _norm(name)
+    search_name = _SEARCH_ALIASES.get(key, name)
+    search_key = _norm(search_name)
     cached = cache.get(key)
     now = int(time.time())
     cooldown = cache.get("__provider_cooldown__")
@@ -207,15 +349,31 @@ def get_player_metadata(name, force=False):
         logger.info("API-Football profile lookup started player=%s", name)
         # /players/profiles is season-independent; unlike /players it does not
         # require a statistics season that may be unavailable on the Free plan.
-        response = _api_get("players/profiles", {"search": name}, api_key)
+        response = _api_get("players/profiles", {"search": search_name}, api_key)
         profiles = _api_payload(response, "players/profiles", name, api_key)
         if profiles is None:
             if response.status_code in (401, 403, 429) or response.status_code >= 500:
                 _remember_provider_failure(cache, response.status_code, now)
             return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
 
-        exact = [row for row in profiles if _norm((row.get("player") or {}).get("name")) == key]
-        pool = exact or profiles
+        exact = [row for row in profiles
+                 if _norm((row.get("player") or {}).get("name")) == search_key]
+        if len(exact) == 1:
+            pool = exact
+        elif len(exact) > 1:
+            pool = []  # identical names with multiple profiles are ambiguous
+        else:
+            query_tokens = _name_tokens(search_name)
+            scored = []
+            for row in profiles:
+                athlete_name = (row.get("player") or {}).get("name", "")
+                candidate_tokens = _name_tokens(athlete_name)
+                score = len(query_tokens & candidate_tokens) / max(1, len(query_tokens))
+                if score >= 0.8:
+                    scored.append((score, row))
+            best_score = max((score for score, _ in scored), default=0)
+            best = [row for score, row in scored if score == best_score]
+            pool = best if len(best) == 1 else []
         player = next(((row.get("player") or {}) for row in pool
                        if (row.get("player") or {}).get("id") and
                        (row.get("player") or {}).get("nationality")), None)
@@ -225,19 +383,23 @@ def get_player_metadata(name, force=False):
             logger.warning("API-Football profile not found/ambiguous player=%s", name)
             return None
 
-        # Ask for the player's current squad association, not historical stats.
-        response = _api_get("players/squads", {"player": player["id"]}, api_key)
-        squads = _api_payload(response, "players/squads", name, api_key)
-        if squads is None:
-            if response.status_code in (401, 403, 429) or response.status_code >= 500:
-                _remember_provider_failure(cache, response.status_code, now)
-            return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
-        team = _extract_team_id(squads, player["id"])
+        # Reuse a verified team roster when the provider returned the full
+        # squad list for an earlier player from the same club.
+        team = _cached_team_for_player(cache, player["id"], now)
         if not team:
-            logger.warning("API-Football current squad unresolved player=%s id=%s", name, player["id"])
-            cache[key] = {"checked_at": now, "data": None}
-            _write_cache(cache)
-            return None
+            response = _api_get("players/squads", {"player": player["id"]}, api_key)
+            squads = _api_payload(response, "players/squads", name, api_key)
+            if squads is None:
+                if response.status_code in (401, 403, 429) or response.status_code >= 500:
+                    _remember_provider_failure(cache, response.status_code, now)
+                return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
+            team = _extract_team_id(squads, player["id"])
+            if not team:
+                logger.warning("API-Football current squad unresolved player=%s id=%s", name, player["id"])
+                cache[key] = {"checked_at": now, "data": None}
+                _write_cache(cache)
+                return None
+            _cache_team_squad(cache, squads, team, now)
 
         league_name = _get_current_league(team["id"], api_key, cache, now, name)
         data = {
@@ -261,6 +423,8 @@ def get_player_metadata(name, force=False):
                     name, data["club"], data["league"], data["nationality"])
         return data
 
+    except APIRequestBudgetExhausted:
+        logger.warning("API-Football daily safety budget reached; remaining player lookups paused")
     except requests.Timeout:
         logger.error("API-Football timeout player=%s", name)
         _remember_provider_failure(cache, 0, now)
@@ -271,6 +435,63 @@ def get_player_metadata(name, force=False):
         logger.exception("API-Football invalid response player=%s error=%s", name, type(exc).__name__)
 
     return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
+
+
+
+def get_player_metadata(name, force=False):
+    """Return cached verified data immediately and queue any needed refresh.
+
+    Rendering never performs provider I/O. A single daemon worker processes
+    names one at a time with a 7.5-second gap between every API request.
+    """
+    if not name:
+        return None
+
+    # Retired ICON/HEROES may be configured with nationality only. Their
+    # retired status and special card type must be explicitly Admin-curated.
+    try:
+        curated = json.loads(os.environ.get("SPECIAL_PLAYER_METADATA", "{}"))
+        curated_item = next((v for k, v in curated.items() if _norm(k) == _norm(name)), None)
+        if isinstance(curated_item, dict):
+            special_type = str(curated_item.get("type", "")).upper()
+            retired = bool(curated_item.get("retired") or curated_item.get("career_status") == "retired")
+            if retired and special_type in {"ICON", "HEROES"} and curated_item.get("nationality"):
+                return {
+                    "nationality": curated_item["nationality"], "club": "", "league": "",
+                    "source": curated_item.get("source", "Admin verified"),
+                    "is_icon": special_type == "ICON", "is_hero": special_type == "HEROES",
+                    "card_type": special_type, "career_status": "retired",
+                }
+            if special_type in {"ICON", "HEROES"} and all(
+                    curated_item.get(k) for k in ("nationality", "club", "league")):
+                return {
+                    "nationality": curated_item["nationality"], "club": curated_item["club"],
+                    "league": curated_item["league"],
+                    "source": curated_item.get("source", "Admin verified"),
+                    "is_icon": special_type == "ICON", "is_hero": special_type == "HEROES",
+                    "card_type": special_type,
+                }
+    except (ValueError, AttributeError, TypeError):
+        logger.warning("SPECIAL_PLAYER_METADATA is invalid; skipping curated records")
+
+    cache = _read_cache()
+    key = _norm(name)
+    cached = cache.get(key)
+    now = int(time.time())
+    if isinstance(cached, dict):
+        data = cached.get("data")
+        ttl = CACHE_TTL if _complete_metadata(data) else NEGATIVE_CACHE_TTL
+        if now - int(cached.get("checked_at", 0)) < ttl and not force:
+            return data if _complete_metadata(data) else None
+        # Continue showing last verified data while refreshing it in background.
+        stale_verified = data if _complete_metadata(data) else None
+    else:
+        stale_verified = None
+
+    if not os.environ.get("APISPORTS_KEY", "").strip():
+        return stale_verified
+    _queue_metadata_refresh(name)
+    return stale_verified
 
 
 def enrich_player(record):

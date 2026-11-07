@@ -95,13 +95,17 @@ def page(save, tab='overview', extra=None):
     for group in ('starting', 'bench', 'extras'):
         st[group] = [enrich_player(p) for p in st.get(group, [])]
     market_items=[]
-    for n in st['market']:
-        if n in {p['name'] for p in all_players(st)} or n in PACKS['4']['players']:
-            continue
-        meta = get_player_metadata(n)
-        if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
-            continue
-        market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
+    # Only resolve transfer-market cards when the transfer page is requested.
+    # Queueing every market player on dashboard/squad renders wastes API quota.
+    if tab == 'transfers':
+        owned_names = {p['name'] for p in all_players(st)}
+        for n in st['market']:
+            if n in owned_names or n in PACKS['4']['players']:
+                continue
+            meta = get_player_metadata(n)
+            if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
+                continue
+            market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
     match_popup=session.pop('last_match_result', None)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
                            prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
