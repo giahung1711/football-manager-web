@@ -19,6 +19,10 @@ logger = logging.getLogger("player_metadata")
 CACHE_FILE = Path(os.environ.get("PLAYER_METADATA_CACHE", "/tmp/fm_player_metadata_cache.json"))
 CACHE_TTL = 12 * 60 * 60
 NEGATIVE_CACHE_TTL = 15 * 60
+# Provider-wide cooldown prevents every page render from retrying dozens of players.
+AUTH_COOLDOWN = 15 * 60
+RATE_LIMIT_COOLDOWN = 5 * 60
+SERVER_COOLDOWN = 2 * 60
 API_BASE = "https://v3.football.api-sports.io"
 
 
@@ -59,8 +63,88 @@ def _complete_metadata(data):
     return isinstance(data, dict) and all(data.get(k) for k in ("nationality", "club", "league"))
 
 
+def _api_get(endpoint, params, api_key):
+    """One API request with safe logging; never logs the API key."""
+    return requests.get(
+        f"{API_BASE}/{endpoint}",
+        params=params,
+        headers={"x-apisports-key": api_key},
+        timeout=(4, 12),
+    )
+
+
+def _api_payload(response, endpoint, player_name):
+    if response.status_code != 200:
+        logger.error("API-Football HTTP failure endpoint=%s player=%s status=%s",
+                     endpoint, player_name, response.status_code)
+        return None
+    payload = response.json()
+    errors = payload.get("errors")
+    if errors:
+        logger.error("API-Football response error endpoint=%s player=%s details=%s",
+                     endpoint, player_name, json.dumps(errors, ensure_ascii=False)[:300])
+        return None
+    return payload.get("response") or []
+
+
+def _remember_provider_failure(cache, status, now):
+    if status in (401, 403):
+        delay = AUTH_COOLDOWN
+    elif status == 429:
+        delay = RATE_LIMIT_COOLDOWN
+    else:
+        delay = SERVER_COOLDOWN
+    cache["__provider_cooldown__"] = {"until": now + delay, "status": status}
+    _write_cache(cache)
+
+
+def _extract_team_id(squad_rows, player_id):
+    """Read current team association from /players/squads without guessing."""
+    candidates = []
+    for row in squad_rows:
+        if not isinstance(row, dict):
+            continue
+        team = row.get("team") or {}
+        if not team.get("id") or not team.get("name"):
+            continue
+        players = row.get("players")
+        # If API supplies a player list, require the requested player to be in it.
+        if isinstance(players, list) and players:
+            if not any(str(x.get("id")) == str(player_id) for x in players if isinstance(x, dict)):
+                continue
+        candidates.append({"id": team["id"], "name": team["name"]})
+    # A player should normally be associated with one current squad. If the API
+    # returns multiple ambiguous teams, do not silently choose one.
+    unique = {str(x["id"]): x for x in candidates}
+    return next(iter(unique.values())) if len(unique) == 1 else None
+
+
+def _get_current_league(team_id, api_key, cache, now, player_name):
+    team_cache_key = f"__team_league__{team_id}"
+    cached = cache.get(team_cache_key)
+    if isinstance(cached, dict) and now - int(cached.get("checked_at", 0)) < CACHE_TTL:
+        return cached.get("league")
+    response = _api_get("leagues", {"team": team_id, "current": "true"}, api_key)
+    rows = _api_payload(response, "leagues", player_name)
+    if rows is None:
+        if response.status_code in (401, 403, 429) or response.status_code >= 500:
+            _remember_provider_failure(cache, response.status_code, now)
+        return None
+    # Ignore cups; only accept one unambiguous active domestic league.
+    leagues = []
+    for row in rows:
+        league = row.get("league") or {}
+        if str(league.get("type", "")).casefold() == "league" and league.get("name"):
+            leagues.append(league["name"])
+    leagues = sorted(set(leagues))
+    league_name = leagues[0] if len(leagues) == 1 else None
+    cache[team_cache_key] = {"checked_at": now, "league": league_name}
+    _write_cache(cache)
+    return league_name
+
+
 def get_player_metadata(name, force=False):
-    """Return complete verified metadata or None; never return placeholders."""
+    """Return complete verified metadata from season-independent profile/squad APIs."""
     if not name:
         return None
 
@@ -94,70 +178,68 @@ def get_player_metadata(name, force=False):
     key = _norm(name)
     cached = cache.get(key)
     now = int(time.time())
+    cooldown = cache.get("__provider_cooldown__")
+    if isinstance(cooldown, dict) and now < int(cooldown.get("until", 0)):
+        logger.warning("API-Football provider cooldown active status=%s", cooldown.get("status"))
+        return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
     if not force and isinstance(cached, dict):
         data = cached.get("data")
         ttl = CACHE_TTL if _complete_metadata(data) else NEGATIVE_CACHE_TTL
         if now - int(cached.get("checked_at", 0)) < ttl:
-            if _complete_metadata(data):
-                logger.info("metadata cache hit player=%s", name)
-                return data
-            logger.info("metadata negative-cache hit player=%s; retry after TTL", name)
+            return data if _complete_metadata(data) else None
+
+    try:
+        logger.info("API-Football profile lookup started player=%s", name)
+        # /players/profiles is season-independent; unlike /players it does not
+        # require a statistics season that may be unavailable on the Free plan.
+        response = _api_get("players/profiles", {"search": name}, api_key)
+        profiles = _api_payload(response, "players/profiles", name)
+        if profiles is None:
+            if response.status_code in (401, 403, 429) or response.status_code >= 500:
+                _remember_provider_failure(cache, response.status_code, now)
+            return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
+
+        exact = [row for row in profiles if _norm((row.get("player") or {}).get("name")) == key]
+        pool = exact or profiles
+        player = next(((row.get("player") or {}) for row in pool
+                       if (row.get("player") or {}).get("id") and
+                       (row.get("player") or {}).get("nationality")), None)
+        if not player:
+            cache[key] = {"checked_at": now, "data": None}
+            _write_cache(cache)
+            logger.warning("API-Football profile not found/ambiguous player=%s", name)
             return None
 
-    logger.info("API-Football lookup started player=%s season=2026", name)
-    try:
-        response = requests.get(
-            f"{API_BASE}/players",
-            params={"search": name, "season": 2026},
-            headers={"x-apisports-key": api_key},
-            timeout=(4, 12),
-        )
-        if response.status_code != 200:
-            logger.error("API-Football HTTP failure player=%s status=%s", name, response.status_code)
+        # Ask for the player's current squad association, not historical stats.
+        response = _api_get("players/squads", {"player": player["id"]}, api_key)
+        squads = _api_payload(response, "players/squads", name)
+        if squads is None:
+            if response.status_code in (401, 403, 429) or response.status_code >= 500:
+                _remember_provider_failure(cache, response.status_code, now)
             return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
-
-        payload = response.json()
-        api_errors = payload.get("errors")
-        if api_errors:
-            # API may return HTTP 200 with an errors object (invalid key/quota/etc.).
-            logger.error("API-Football response error player=%s details=%s", name,
-                         json.dumps(api_errors, ensure_ascii=False)[:500])
-            return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
-
-        candidates = payload.get("response") or []
-        exact = [item for item in candidates
-                 if _norm((item.get("player") or {}).get("name")) == key]
-        pool = exact or candidates
-        selected = next((item for item in pool
-                         if (item.get("player") or {}).get("nationality")
-                         and (item.get("statistics") or [{}])[0].get("team", {}).get("name")
-                         and (item.get("statistics") or [{}])[0].get("league", {}).get("name")), None)
-
-        if not selected:
-            logger.warning("API-Football no complete exact/usable result player=%s candidates=%s exact=%s",
-                           name, len(candidates), len(exact))
+        team = _extract_team_id(squads, player["id"])
+        if not team:
+            logger.warning("API-Football current squad unresolved player=%s id=%s", name, player["id"])
             cache[key] = {"checked_at": now, "data": None}
             _write_cache(cache)
             return None
 
-        athlete = selected.get("player") or {}
-        stats = selected.get("statistics") or [{}]
-        stat = stats[0] if stats else {}
-        team = stat.get("team") or {}
-        league = stat.get("league") or {}
+        league_name = _get_current_league(team["id"], api_key, cache, now, name)
         data = {
-            "nationality": athlete.get("nationality"),
-            "club": team.get("name"),
-            "league": league.get("name"),
+            "nationality": player.get("nationality"),
+            "club": team["name"],
+            "league": league_name,
             "source": "API-Football",
             "updated_at": now,
         }
         if not _complete_metadata(data):
-            logger.warning("API-Football incomplete result player=%s", name)
+            logger.warning("API-Football metadata incomplete player=%s club=%s league_resolved=%s",
+                           name, team["name"], bool(league_name))
             cache[key] = {"checked_at": now, "data": None}
             _write_cache(cache)
             return None
 
+        cache.pop("__provider_cooldown__", None)
         cache[key] = {"checked_at": now, "data": data}
         _write_cache(cache)
         logger.info("API-Football verified player=%s club=%s league=%s nationality=%s",
@@ -166,12 +248,13 @@ def get_player_metadata(name, force=False):
 
     except requests.Timeout:
         logger.error("API-Football timeout player=%s", name)
+        _remember_provider_failure(cache, 0, now)
     except requests.RequestException as exc:
         logger.error("API-Football network failure player=%s error=%s", name, type(exc).__name__)
+        _remember_provider_failure(cache, 0, now)
     except (ValueError, TypeError, KeyError, IndexError) as exc:
         logger.exception("API-Football invalid response player=%s error=%s", name, type(exc).__name__)
 
-    # Preserve a previously verified record during transient failures.
     return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
 
 
