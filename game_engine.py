@@ -318,7 +318,7 @@ def value(p):
 def create_new_game(club):
     if club not in STARTING: raise ValueError('CLB không hợp lệ')
     starters=[player(x) for x in STARTING[club]]; bench=[player(x) for x in BENCH[club]]
-    return {"club":club,"budget":next(budget for _, (name, budget) in CLUB_OPTIONS.items() if name == club),"season":1,"week":1,"points":0,"wins":0,"draws":0,"losses":0,"starting":starters,"bench":bench,"extras":[],"market":copy.deepcopy(TRANSFER_MARKET),"formation":"4-3-3","activity":[]}
+    return {"club":club,"budget":next(budget for _, (name, budget) in CLUB_OPTIONS.items() if name == club),"season":1,"week":1,"points":0,"wins":0,"draws":0,"losses":0,"starting":starters,"bench":bench,"extras":[],"market":copy.deepcopy(TRANSFER_MARKET),"formation":"4-3-3 (Tấn công)","activity":[]}
 
 def normalize_state(st):
     # Migrate legacy saves without resetting progress or existing owned players.
@@ -379,7 +379,8 @@ def normalize_state(st):
         st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
     st.setdefault('season', 1); st.setdefault('week', 1)
     st.setdefault('points', 0); st.setdefault('wins', 0); st.setdefault('draws', 0); st.setdefault('losses', 0)
-    st.setdefault('formation', '4-3-3'); st.setdefault('activity', []); st.setdefault('match_history', [])
+    st.setdefault('formation', '4-3-3 (Tấn công)');
+    if st.get('formation') == '4-3-3': st['formation'] = '4-3-3 (Tấn công)'; st.setdefault('activity', []); st.setdefault('match_history', [])
     if not isinstance(st['match_history'], list): st['match_history'] = []
     st['match_history'] = st['match_history'][:5]
     return st

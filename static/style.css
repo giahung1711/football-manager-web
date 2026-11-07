@@ -90,3 +90,19 @@
 .legend-frame.premium{border-color:#ffe5a0;box-shadow:0 0 7px #ffd86c}
 .legend-frame.icon{border-color:#d8a8ff;box-shadow:0 0 7px #b77aff}
 .pitch-panel{max-width:100%;}
+
+/* Tactical pitch cards: individual slot positioning and responsive card portraits */
+.pitch-positioned{display:block;min-height:720px;padding:0;}
+.pitch-positioned .pitch-player-card{position:absolute;transform:translate(-50%,-50%);width:clamp(78px,8.5vw,108px);min-height:126px;cursor:grab;z-index:3;padding:7px 5px 8px;}
+.pitch-positioned .pitch-player-card:active{cursor:grabbing}
+.pitch-positioned .pitch-player-card .player-avatar{width:64px;height:66px;margin:22px auto 3px;object-fit:cover;border-radius:8px;background:#ffffff18}
+.pitch-positioned .pitch-player-card .photo-fallback{display:none;place-items:center;font-size:25px}
+.pitch-positioned .pitch-player-card strong{font-size:11px;line-height:1.1}
+.pitch-positioned .pitch-player-card small{font-size:9px}
+.pitch-positioned .pitch-player-card.drop-target{outline:3px solid #b9ff75;filter:brightness(1.35);transform:translate(-50%,-50%) scale(1.07)}
+.pitch-positioned .pitch-player-card.dragging,.bench-player.dragging{opacity:.45}
+.bench-player[draggable="true"]{cursor:grab}.drag-hint{color:var(--muted);font-size:20px}
+.card-legend .legend-frame.premium{border-color:#ffe5a0;box-shadow:0 0 7px #ffd86c}.card-legend .legend-frame.icon{border-color:#d8a8ff;box-shadow:0 0 7px #b77aff}
+.player-card.card-icon{border-color:#d9aaff;background:linear-gradient(145deg,#f1e4ff,#6b35a8 35%,#211037 75%);box-shadow:0 0 24px #b77affaa}
+.player-card.card-premium{border-color:#ffe5a0;background:linear-gradient(145deg,#fff0b8,#8d6420 24%,#34230c 68%);box-shadow:0 0 22px #ffd86c99}
+@media(max-width:650px){.pitch-positioned{min-height:610px}.pitch-positioned .pitch-player-card{width:clamp(58px,17vw,78px);min-height:98px;padding:4px 3px}.pitch-positioned .pitch-player-card .player-avatar{width:42px;height:43px;margin-top:20px}.pitch-positioned .pitch-player-card strong{font-size:9px}.pitch-positioned .pitch-player-card .player-ovr{font-size:14px}}

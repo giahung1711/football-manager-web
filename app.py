@@ -557,14 +557,39 @@ def action():
             if a < 0 or a >= len(st['starting']) or b < 0 or b >= len(st['bench']):
                 raise ValueError('Không tìm thấy cầu thủ cần thay.')
             out=st['starting'][a]; inn=st['bench'][b]
-            # So sánh vị trí chính xác sau khi chuẩn hóa; CDM và CAM luôn là hai vị trí riêng.
-            out_position = str(out.get('position', '')).strip().upper()
+            out_position = str(out.get('assigned_position') or out.get('position', '')).strip().upper()
             in_position = str(inn.get('position', '')).strip().upper()
-            if not out_position or not in_position or out_position != in_position:
-                raise ValueError(f'Không thể thay {out["name"]} ({out_position or "?"}) bằng {inn["name"]} ({in_position or "?"}). Chỉ được thay cầu thủ cùng vị trí; CDM không thể thay CAM và ngược lại.')
+            if (out_position == 'GK') != (in_position == 'GK'):
+                raise ValueError('Thủ môn chỉ có thể thay thế thủ môn. Các vị trí ngoài sân có thể thay thế cho nhau.')
+            inn['assigned_position'] = out_position
+            out['assigned_position'] = str(out.get('position', out_position)).upper()
             duplicate = any(p['name'].strip().casefold() == inn['name'].strip().casefold() for i,p in enumerate(st['starting']) if i != a)
             if duplicate: raise ValueError(f"Không thể thay: {inn['name']} đã có trong đội hình đá chính.")
             st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
+        elif act=='drag_swap':
+            source_group = request.form.get('source_group', '')
+            source_index = int(request.form.get('source_index', '-1'))
+            target_index = int(request.form.get('target_index', '-1'))
+            if source_group not in {'starting', 'bench'} or target_index < 0 or target_index >= len(st['starting']):
+                raise ValueError('Vị trí kéo thả không hợp lệ.')
+            source = st[source_group]
+            if source_index < 0 or source_index >= len(source):
+                raise ValueError('Không tìm thấy cầu thủ được kéo.')
+            if source_group == 'starting' and source_index == target_index:
+                raise ValueError('Hãy thả cầu thủ vào vị trí khác.')
+            incoming = source[source_index]
+            outgoing = st['starting'][target_index]
+            incoming_pos = str(incoming.get('position', '')).upper()
+            target_pos = str(outgoing.get('assigned_position') or outgoing.get('position', '')).upper()
+            if (incoming_pos == 'GK') != (target_pos == 'GK'):
+                raise ValueError('Thủ môn chỉ có thể đổi chỗ với thủ môn.')
+            if source_group == 'bench':
+                st['starting'][target_index], st['bench'][source_index] = incoming, outgoing
+            else:
+                st['starting'][target_index], st['starting'][source_index] = incoming, outgoing
+            st['starting'][target_index]['assigned_position'] = target_pos
+            st['starting'][source_index]['assigned_position'] = str(st['starting'][source_index].get('position', '')).upper()
+            flash(f'Đã cập nhật vị trí của {incoming["name"]}.')
         elif act=='promote':
             group=request.form.get('group'); idx=int(request.form.get('index','-1'))
             if group not in {'bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
@@ -619,8 +644,11 @@ def action():
             flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
         elif act=='formation':
             formation=request.form.get('formation')
-            if formation not in {'4-3-3','4-4-2','4-2-3-1'}: raise ValueError('Sơ đồ không hợp lệ.')
-            st['formation']=formation; flash('Đã cập nhật sơ đồ chiến thuật.')
+            if formation not in {'4-3-3 (Tấn công)','4-3-3 (Phòng thủ)','4-2-4','4-1-2-1-2'}: raise ValueError('Sơ đồ không hợp lệ.')
+            st['formation']=formation;
+            role_sets = {'4-3-3 (Tấn công)':['LW','ST','RW','CM','CDM','CM','LB','CB','CB','RB','GK'],'4-3-3 (Phòng thủ)':['LW','ST','RW','CM','CDM','CM','LB','CB','CB','RB','GK'],'4-2-4':['LW','ST','ST','RW','CM','CM','LB','CB','CB','RB','GK'],'4-1-2-1-2':['ST','ST','CAM','CM','CM','CDM','LB','CB','CB','RB','GK']}
+            for i, p in enumerate(st.get('starting', [])[:11]): p['assigned_position'] = role_sets[formation][i]
+            flash('Đã cập nhật sơ đồ chiến thuật và vị trí thi đấu.')
         else: raise ValueError('Thao tác không hợp lệ.')
         st.setdefault('activity',[]).insert(0,{'message':flash_message_placeholder(act),'week':st.get('week',1)})
         st['activity']=st['activity'][:15]
