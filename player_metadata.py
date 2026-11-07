@@ -73,10 +73,24 @@ def _api_get(endpoint, params, api_key):
     )
 
 
-def _api_payload(response, endpoint, player_name):
+def _safe_response_detail(response, api_key=""):
+    """Return a short provider error detail without exposing credentials."""
+    try:
+        detail = (response.text or "").strip()
+    except Exception:
+        detail = ""
+    if api_key:
+        detail = detail.replace(api_key, "[REDACTED]")
+    detail = re.sub(r"(?i)(x-apisports-key|authorization)(\s*[:=]\s*)[^,;\s]+",
+                    r"\1\2[REDACTED]", detail)
+    return re.sub(r"\s+", " ", detail)[:500] or "<empty response body>"
+
+
+def _api_payload(response, endpoint, player_name, api_key=""):
     if response.status_code != 200:
-        logger.error("API-Football HTTP failure endpoint=%s player=%s status=%s",
-                     endpoint, player_name, response.status_code)
+        logger.error("API-Football HTTP failure endpoint=%s player=%s status=%s detail=%s",
+                     endpoint, player_name, response.status_code,
+                     _safe_response_detail(response, api_key))
         return None
     payload = response.json()
     errors = payload.get("errors")
@@ -125,7 +139,7 @@ def _get_current_league(team_id, api_key, cache, now, player_name):
     if isinstance(cached, dict) and now - int(cached.get("checked_at", 0)) < CACHE_TTL:
         return cached.get("league")
     response = _api_get("leagues", {"team": team_id, "current": "true"}, api_key)
-    rows = _api_payload(response, "leagues", player_name)
+    rows = _api_payload(response, "leagues", player_name, api_key)
     if rows is None:
         if response.status_code in (401, 403, 429) or response.status_code >= 500:
             _remember_provider_failure(cache, response.status_code, now)
@@ -180,7 +194,8 @@ def get_player_metadata(name, force=False):
     now = int(time.time())
     cooldown = cache.get("__provider_cooldown__")
     if isinstance(cooldown, dict) and now < int(cooldown.get("until", 0)):
-        logger.warning("API-Football provider cooldown active status=%s", cooldown.get("status"))
+        # The provider failure was already logged at its source; avoid one log
+        # line per player/render while the shared cooldown is active.
         return cached.get("data") if isinstance(cached, dict) and _complete_metadata(cached.get("data")) else None
     if not force and isinstance(cached, dict):
         data = cached.get("data")
@@ -193,7 +208,7 @@ def get_player_metadata(name, force=False):
         # /players/profiles is season-independent; unlike /players it does not
         # require a statistics season that may be unavailable on the Free plan.
         response = _api_get("players/profiles", {"search": name}, api_key)
-        profiles = _api_payload(response, "players/profiles", name)
+        profiles = _api_payload(response, "players/profiles", name, api_key)
         if profiles is None:
             if response.status_code in (401, 403, 429) or response.status_code >= 500:
                 _remember_provider_failure(cache, response.status_code, now)
@@ -212,7 +227,7 @@ def get_player_metadata(name, force=False):
 
         # Ask for the player's current squad association, not historical stats.
         response = _api_get("players/squads", {"player": player["id"]}, api_key)
-        squads = _api_payload(response, "players/squads", name)
+        squads = _api_payload(response, "players/squads", name, api_key)
         if squads is None:
             if response.status_code in (401, 403, 429) or response.status_code >= 500:
                 _remember_provider_failure(cache, response.status_code, now)
