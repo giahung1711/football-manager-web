@@ -53,110 +53,6 @@ _SEARCH_ALIASES = {
     _norm("Grabiel Magalhaes"): "Gabriel Magalhaes",
 }
 
-# Curated records for named special players and the explicitly requested
-# Vietnamese custom players. These are presentation metadata only; player
-# records, ratings, ownership and progression remain in the normal game state.
-_MANUAL_METADATA = {
-    _norm("Zidane"): {"nationality": "France", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Beckenbauer"): {"nationality": "Germany", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Matthäus"): {"nationality": "Germany", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Cafu"): {"nationality": "Brazil", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Rio Ferdinand"): {"nationality": "England", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Ronaldinho"): {"nationality": "Brazil", "club": "", "league": "", "card_type": "ICON", "is_icon": True},
-    _norm("Lionel Messi"): {
-        "nationality": "Argentina", "club": "Inter Miami CF", "league": "Major League Soccer",
-        "club_logo": "https://media.api-sports.io/football/teams/9568.png",
-        "league_logo": "https://media.api-sports.io/football/leagues/253.png", "card_type": "REGULAR",
-    },
-    _norm("Cristiano Ronaldo"): {
-        "nationality": "Portugal", "club": "Al Nassr", "league": "Saudi Pro League",
-        "club_logo": "https://media.api-sports.io/football/teams/250.png",
-        "league_logo": "https://media.api-sports.io/football/leagues/307.png", "card_type": "REGULAR",
-    },
-}
-for _vn_name in ("Le Minh", "Chi Hieu", "Minh Khang", "Trieu Vy", "Pun", "Sweet", "Phuc Vinh", "Hoang Quan"):
-    _MANUAL_METADATA[_norm(_vn_name)] = {"nationality": "Vietnam", "club": "", "league": "", "card_type": "REGULAR"}
-
-# Country name -> Unicode flag. Unknown/missing values deliberately return an
-# empty string so only the unavailable country element is omitted.
-_COUNTRY_FLAGS = {
-    "argentina":"🇦🇷", "australia":"🇦🇺", "austria":"🇦🇹", "belgium":"🇧🇪", "brazil":"🇧🇷",
-    "cameroon":"🇨🇲", "canada":"🇨🇦", "chile":"🇨🇱", "china":"🇨🇳", "colombia":"🇨🇴",
-    "croatia":"🇭🇷", "czech republic":"🇨🇿", "czechia":"🇨🇿", "denmark":"🇩🇰", "egypt":"🇪🇬",
-    "england":"🏴", "france":"🇫🇷", "germany":"🇩🇪", "ghana":"🇬🇭", "greece":"🇬🇷",
-    "ivory coast":"🇨🇮", "cote d'ivoire":"🇨🇮", "iran":"🇮🇷", "iraq":"🇮🇶", "ireland":"🇮🇪",
-    "italy":"🇮🇹", "japan":"🇯🇵", "mexico":"🇲🇽", "morocco":"🇲🇦", "netherlands":"🇳🇱",
-    "nigeria":"🇳🇬", "norway":"🇳🇴", "poland":"🇵🇱", "portugal":"🇵🇹", "romania":"🇷🇴",
-    "scotland":"🏴", "senegal":"🇸🇳", "serbia":"🇷🇸", "south korea":"🇰🇷", "spain":"🇪🇸",
-    "sweden":"🇸🇪", "switzerland":"🇨🇭", "turkey":"🇹🇷", "türkiye":"🇹🇷", "ukraine":"🇺🇦",
-    "united states":"🇺🇸", "usa":"🇺🇸", "uruguay":"🇺🇾", "wales":"🏴", "vietnam":"🇻🇳",
-}
-
-_COUNTRY_ISO = {
-    # ISO alpha-2 codes for football nations, aliases as commonly returned by API-Football.
-    "afghanistan":"AF", "albania":"AL", "algeria":"DZ", "andorra":"AD", "angola":"AO", "antigua and barbuda":"AG",
-    "argentina":"AR", "armenia":"AM", "australia":"AU", "austria":"AT", "azerbaijan":"AZ", "bahamas":"BS",
-    "bahrain":"BH", "bangladesh":"BD", "barbados":"BB", "belarus":"BY", "belgium":"BE", "belize":"BZ",
-    "benin":"BJ", "bermuda":"BM", "bhutan":"BT", "bolivia":"BO", "bosnia":"BA", "bosnia and herzegovina":"BA",
-    "botswana":"BW", "brazil":"BR", "brunei":"BN", "bulgaria":"BG", "burkina faso":"BF", "burundi":"BI",
-    "cambodia":"KH", "cameroon":"CM", "canada":"CA", "cape verde":"CV", "central african republic":"CF",
-    "chad":"TD", "chile":"CL", "china":"CN", "colombia":"CO", "comoros":"KM", "congo":"CG",
-    "costa rica":"CR", "croatia":"HR", "cuba":"CU", "curacao":"CW", "cyprus":"CY", "czech republic":"CZ", "czechia":"CZ",
-    "democratic republic of the congo":"CD", "denmark":"DK", "djibouti":"DJ", "dominica":"DM", "dominican republic":"DO",
-    "ecuador":"EC", "egypt":"EG", "el salvador":"SV", "england":"GB", "equatorial guinea":"GQ", "eritrea":"ER",
-    "estonia":"EE", "eswatini":"SZ", "ethiopia":"ET", "fiji":"FJ", "finland":"FI", "france":"FR", "gabon":"GA",
-    "gambia":"GM", "georgia":"GE", "germany":"DE", "ghana":"GH", "gibraltar":"GI", "greece":"GR", "grenada":"GD",
-    "guatemala":"GT", "guinea":"GN", "guinea-bissau":"GW", "guyana":"GY", "haiti":"HT", "honduras":"HN",
-    "hong kong":"HK", "hungary":"HU", "iceland":"IS", "india":"IN", "indonesia":"ID", "iran":"IR", "iraq":"IQ",
-    "ireland":"IE", "israel":"IL", "italy":"IT", "ivory coast":"CI", "cote d'ivoire":"CI", "jamaica":"JM",
-    "japan":"JP", "jordan":"JO", "kazakhstan":"KZ", "kenya":"KE", "kosovo":"XK", "kuwait":"KW", "kyrgyzstan":"KG",
-    "laos":"LA", "latvia":"LV", "lebanon":"LB", "lesotho":"LS", "liberia":"LR", "libya":"LY", "liechtenstein":"LI",
-    "lithuania":"LT", "luxembourg":"LU", "macau":"MO", "madagascar":"MG", "malawi":"MW", "malaysia":"MY",
-    "maldives":"MV", "mali":"ML", "malta":"MT", "mauritania":"MR", "mauritius":"MU", "mexico":"MX", "moldova":"MD",
-    "monaco":"MC", "mongolia":"MN", "montenegro":"ME", "morocco":"MA", "mozambique":"MZ", "myanmar":"MM",
-    "namibia":"NA", "nepal":"NP", "netherlands":"NL", "new zealand":"NZ", "nicaragua":"NI", "niger":"NE", "nigeria":"NG",
-    "north korea":"KP", "north macedonia":"MK", "northern ireland":"GB", "norway":"NO", "oman":"OM", "pakistan":"PK",
-    "palestine":"PS", "panama":"PA", "papua new guinea":"PG", "paraguay":"PY", "peru":"PE", "philippines":"PH",
-    "poland":"PL", "portugal":"PT", "puerto rico":"PR", "qatar":"QA", "romania":"RO", "russia":"RU", "russian federation":"RU",
-    "rwanda":"RW", "saint kitts and nevis":"KN", "saint lucia":"LC", "saint vincent":"VC", "samoa":"WS", "san marino":"SM",
-    "sao tome and principe":"ST", "saudi arabia":"SA", "scotland":"GB", "senegal":"SN", "serbia":"RS", "seychelles":"SC",
-    "sierra leone":"SL", "singapore":"SG", "slovakia":"SK", "slovenia":"SI", "solomon islands":"SB", "somalia":"SO",
-    "south africa":"ZA", "south korea":"KR", "south sudan":"SS", "spain":"ES", "sri lanka":"LK", "sudan":"SD",
-    "suriname":"SR", "sweden":"SE", "switzerland":"CH", "syria":"SY", "tahiti":"PF", "taiwan":"TW", "tajikistan":"TJ",
-    "tanzania":"TZ", "thailand":"TH", "togo":"TG", "tonga":"TO", "trinidad and tobago":"TT", "tunisia":"TN",
-    "turkey":"TR", "türkiye":"TR", "turkmenistan":"TM", "uganda":"UG", "ukraine":"UA", "united arab emirates":"AE",
-    "united kingdom":"GB", "united states":"US", "usa":"US", "uruguay":"UY", "uzbekistan":"UZ", "vanuatu":"VU",
-    "venezuela":"VE", "vietnam":"VN", "wales":"GB", "yemen":"YE", "zambia":"ZM", "zimbabwe":"ZW",
-}
-
-
-def country_flag(country):
-    name = str(country or "").strip().casefold()
-    # England, Scotland and Wales use Unicode subdivision flag tag sequences.
-    subdivision_flags = {
-        "england": "\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F",
-        "scotland": "\U0001F3F4\U000E0067\U000E0062\U000E0073\U000E0063\U000E0074\U000E007F",
-        "wales": "\U0001F3F4\U000E0067\U000E0062\U000E0077\U000E006C\U000E0073\U000E007F",
-    }
-    known = subdivision_flags.get(name, _COUNTRY_FLAGS.get(name))
-    if known:
-        return known
-    code = _COUNTRY_ISO.get(name)
-    if code and len(code) == 2 and code.isalpha():
-        return "".join(chr(0x1F1E6 + ord(letter.upper()) - ord("A")) for letter in code)
-    return ""
-
-# Common full-name variants for ICON players; names are normalized before match.
-_MANUAL_NAME_ALIASES = {
-    _norm("Zinedine Zidane"): _norm("Zidane"),
-    _norm("Franz Beckenbauer"): _norm("Beckenbauer"),
-    _norm("Lothar Matthäus"): _norm("Matthäus"),
-    _norm("Lothar Matthaus"): _norm("Matthäus"),
-    _norm("Marcos Cafu"): _norm("Cafu"),
-    _norm("Ronaldinho Gaucho"): _norm("Ronaldinho"),
-    _norm("Ronaldinho Gaúcho"): _norm("Ronaldinho"),
-}
-
 _REQUEST_LOCK = threading.Lock()
 _LAST_REQUEST_AT = 0.0
 _METADATA_QUEUE = queue.Queue()
@@ -339,7 +235,7 @@ def _extract_team_id(squad_rows, player_id):
         if isinstance(players, list) and players:
             if not any(str(x.get("id")) == str(player_id) for x in players if isinstance(x, dict)):
                 continue
-        candidates.append({"id": team["id"], "name": team["name"], "logo": team.get("logo", "")})
+        candidates.append({"id": team["id"], "name": team["name"]})
     # A player should normally be associated with one current squad. If the API
     # returns multiple ambiguous teams, do not silently choose one.
     unique = {str(x["id"]): x for x in candidates}
@@ -381,9 +277,7 @@ def _get_current_league(team_id, api_key, cache, now, player_name):
     team_cache_key = f"__team_league__{team_id}"
     cached = cache.get(team_cache_key)
     if isinstance(cached, dict) and now - int(cached.get("checked_at", 0)) < CACHE_TTL:
-        # Older cache versions stored the league name directly.
-        value = cached.get("league")
-        return value if isinstance(value, dict) else {"name": value, "logo": cached.get("logo", "")}
+        return cached.get("league")
     response = _api_get("leagues", {"team": team_id, "current": "true"}, api_key)
     rows = _api_payload(response, "leagues", player_name, api_key)
     if rows is None:
@@ -395,12 +289,12 @@ def _get_current_league(team_id, api_key, cache, now, player_name):
     for row in rows:
         league = row.get("league") or {}
         if str(league.get("type", "")).casefold() == "league" and league.get("name"):
-            leagues.append({"name": league["name"], "logo": league.get("logo", "")})
-    unique = {item["name"]: item for item in leagues}
-    league_data = next(iter(unique.values())) if len(unique) == 1 else None
-    cache[team_cache_key] = {"checked_at": now, "league": league_data}
+            leagues.append(league["name"])
+    leagues = sorted(set(leagues))
+    league_name = leagues[0] if len(leagues) == 1 else None
+    cache[team_cache_key] = {"checked_at": now, "league": league_name}
     _write_cache(cache)
-    return league_data
+    return league_name
 
 
 def _fetch_player_metadata(name, force=False):
@@ -507,18 +401,11 @@ def _fetch_player_metadata(name, force=False):
                 return None
             _cache_team_squad(cache, squads, team, now)
 
-        league_data = _get_current_league(team["id"], api_key, cache, now, name)
-        if isinstance(league_data, dict):
-            league_name = league_data.get("name")
-            league_logo = league_data.get("logo")
-        else:
-            league_name, league_logo = league_data, ""
+        league_name = _get_current_league(team["id"], api_key, cache, now, name)
         data = {
             "nationality": player.get("nationality"),
             "club": team["name"],
             "league": league_name,
-            "club_logo": (team.get("logo") or ""),
-            "league_logo": league_logo or "",
             "source": "API-Football",
             "updated_at": now,
         }
@@ -559,15 +446,6 @@ def get_player_metadata(name, force=False):
     """
     if not name:
         return None
-
-    # Prefer the explicitly curated records for named players. Incomplete
-    # records are still useful: the card can render its core and hide only the
-    # unavailable metadata elements.
-    normalized_name = _norm(name)
-    manual_key = _MANUAL_NAME_ALIASES.get(normalized_name, normalized_name)
-    manual = _MANUAL_METADATA.get(manual_key)
-    if manual:
-        return {**manual, "source": "Curated in project", "updated_at": int(time.time())}
 
     # Retired ICON/HEROES may be configured with nationality only. Their
     # retired status and special card type must be explicitly Admin-curated.
@@ -620,19 +498,6 @@ def enrich_player(record):
     """Attach verified metadata for this render without mutating the saved squad."""
     import copy
     result = copy.deepcopy(record)
-    # The specifically requested player facts take precedence over older/manual
-    # metadata, while keeping the existing core rating/position/level intact.
-    normalized_name = _norm(result.get("name", ""))
-    manual_key = _MANUAL_NAME_ALIASES.get(normalized_name, normalized_name)
-    manual = _MANUAL_METADATA.get(manual_key)
-    if manual:
-        result.update(manual)
-        result["source"] = "Curated in project"
-        result["metadata_complete"] = bool(result.get("nationality") and result.get("club") and result.get("league"))
-        result["is_icon"] = bool(manual.get("is_icon"))
-        result["is_hero"] = bool(manual.get("is_hero"))
-        result["country_flag"] = country_flag(result.get("nationality"))
-        return result
     # Admin-gifted records carry reviewed metadata and a source URL. A fully
     # retired ICON/HEROES player needs nationality + special badge only.
     if result.get("metadata_admin_verified") and result.get("nationality"):
@@ -644,30 +509,20 @@ def enrich_player(record):
             result["metadata_complete"] = True
             result["is_icon"] = card_type == "ICON"
             result["is_hero"] = card_type == "HEROES"
-            result["country_flag"] = country_flag(result.get("nationality"))
             return result
         if result.get("club") and result.get("league"):
             result["metadata_complete"] = True
             result["is_icon"] = card_type == "ICON"
             result["is_hero"] = card_type == "HEROES"
-            result["country_flag"] = country_flag(result.get("nationality"))
             return result
     meta = get_player_metadata(result.get("name", ""))
     if not meta:
-        # A custom record may already contain useful manually entered fields.
-        # Keep these rather than marking the player ineligible for rendering.
-        result["metadata_complete"] = bool(result.get("nationality") and result.get("club") and result.get("league"))
-        card_type = str(result.get("card_type", "REGULAR")).upper()
-        result["is_icon"] = bool(result.get("is_icon")) or card_type == "ICON"
-        result["is_hero"] = bool(result.get("is_hero")) or card_type == "HEROES"
-        result["country_flag"] = country_flag(result.get("nationality"))
+        result["metadata_complete"] = False
         return result
     result.update(meta)
-    result["metadata_complete"] = bool(result.get("nationality") and result.get("club") and result.get("league"))
-    result["country_flag"] = country_flag(result.get("nationality"))
+    result["metadata_complete"] = True
     special = _special_types().get(_norm(result.get("name")))
-    record_type = str(result.get("card_type", "REGULAR")).upper()
-    result["is_icon"] = bool(meta.get("is_icon")) or special == "ICON" or record_type == "ICON"
-    result["is_hero"] = bool(meta.get("is_hero")) or special == "HEROES" or record_type == "HEROES"
-    result["card_type"] = meta.get("card_type") or special or record_type
+    result["is_icon"] = bool(meta.get("is_icon")) or special == "ICON"
+    result["is_hero"] = bool(meta.get("is_hero")) or special == "HEROES"
+    result["card_type"] = meta.get("card_type") or special or "REGULAR"
     return result

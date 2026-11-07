@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
-from player_metadata import enrich_player, get_player_metadata, country_flag
-from game_engine import (CLUBS, STARTING, BENCH, create_new_game, get_dashboard, all_players, normalize_state,
+from player_metadata import enrich_player, get_player_metadata
+from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, value, player, simulate_match)
 
@@ -63,7 +63,6 @@ def format_money(amount):
     return f"{euros:,}".replace(',', '.') + ' €'
 
 app.jinja_env.filters['money'] = format_money
-app.jinja_env.globals['country_flag'] = country_flag
 
 @app.context_processor
 def inject_admin_csrf():
@@ -91,8 +90,8 @@ def persist(save,state):
     db.session.commit()
 def page(save, tab='overview', extra=None):
     st=load_state(save)
-    # Metadata is resolved from the connected provider/cache. Metadata is strictly
-    # optional for rendering; only the core OVR and position determine card validity.
+    # Metadata is resolved from the connected football-data provider and cached for 12h.
+    # Saved squad records remain untouched; unknown/incomplete players are not rendered as verified cards.
     for group in ('starting', 'bench', 'extras'):
         st[group] = [enrich_player(p) for p in st.get(group, [])]
     market_items=[]
@@ -103,9 +102,10 @@ def page(save, tab='overview', extra=None):
         for n in st['market']:
             if n in owned_names or n in PACKS['4']['players']:
                 continue
-            meta = get_player_metadata(n) or {}
-            market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta,
-                                 'country_flag': country_flag(meta.get('nationality'))})
+            meta = get_player_metadata(n)
+            if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
+                continue
+            market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
     match_popup=session.pop('last_match_result', None)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
                            prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
@@ -165,31 +165,12 @@ def game_tab(tab):
 @admin_required
 def admin_panel():
     users = User.query.order_by(User.created_at.desc()).all()
-    player_names = set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET) | set(PACKS['4']['players'])
-    # Include every initial squad/bench and every player saved in all user games,
-    # including current market pools and unclaimed Admin player gifts.
-    for roster in (STARTING, BENCH):
-        for names in roster.values():
-            player_names.update(player(name).get('name', '') for name in names if name)
+    player_names = set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET)
+    # Include players already present in any saved squad.
     for save in GameSave.query.all():
         state = save.state or {}
-        player_names.update(name for name in state.get('market', []) if name)
         for group in ('starting', 'bench', 'extras'):
-            player_names.update(p.get('name', '') for p in state.get(group, []) if isinstance(p, dict) and p.get('name'))
-        # Older saves may still use the pre-migration single players array.
-        for old_record in state.get('players', []) or []:
-            if isinstance(old_record, dict) and old_record.get('name'):
-                player_names.add(old_record['name'])
-            elif isinstance(old_record, str) and old_record:
-                player_names.add(player(old_record).get('name', ''))
-        for mail in state.get('mailbox', []) or []:
-            gift = mail.get('player') if isinstance(mail, dict) else None
-            if isinstance(gift, dict) and gift.get('name'):
-                player_names.add(gift['name'])
-    # Admin dashboard triggers a paced, background refresh across the complete
-    # known game player pool. API credentials and request budgets stay runtime-only.
-    for name in sorted(player_names):
-        get_player_metadata(name)
+            player_names.update(p.get('name', '') for p in state.get(group, []) if p.get('name'))
     return render_template('admin.html', users=users, player_names=sorted(player_names))
 
 @app.post('/admin/gift')
