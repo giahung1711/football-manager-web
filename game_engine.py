@@ -379,9 +379,15 @@ def normalize_state(st):
         st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
     st.setdefault('season', 1); st.setdefault('week', 1)
     st.setdefault('points', 0); st.setdefault('wins', 0); st.setdefault('draws', 0); st.setdefault('losses', 0)
-    st.setdefault('formation', '4-3-3 (Tấn công)');
-    if st.get('formation') == '4-3-3': st['formation'] = '4-3-3 (Tấn công)'; st.setdefault('activity', []); st.setdefault('match_history', [])
-    if not isinstance(st['match_history'], list): st['match_history'] = []
+    st.setdefault('formation', '4-3-3 (Tấn công)')
+    if st.get('formation') == '4-3-3':
+        st['formation'] = '4-3-3 (Tấn công)'
+    # Always initialize these legacy-save fields; previously match_history was
+    # only set for the old bare formation label and could crash normalized saves.
+    st.setdefault('activity', [])
+    st.setdefault('match_history', [])
+    if not isinstance(st['match_history'], list):
+        st['match_history'] = []
     st['match_history'] = st['match_history'][:5]
     return st
 

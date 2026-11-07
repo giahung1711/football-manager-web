@@ -167,3 +167,10 @@
  .pitch-positioned .ornate-card .special-label{top:39px;font-size:7px}
  .pitch-positioned .ornate-card .upgrade-badge{right:8px;top:7px;font-size:7px;min-width:19px}
 }
+
+/* Metadata ornaments are optional: absent country/club/league assets do not
+   occupy space and never affect the underlying player-card rendering. */
+.pitch-positioned .ornate-card .country-flag{display:block;position:relative;z-index:2;font-size:16px;line-height:1.05;margin:2px auto;white-space:nowrap}
+.pitch-positioned .ornate-card .card-club-logo,.pitch-positioned .ornate-card .card-league-logo{position:relative;z-index:2;display:block;object-fit:contain;max-width:30px;max-height:22px;width:auto;height:auto;margin:2px auto;filter:drop-shadow(0 1px 2px #0008)}
+.pitch-positioned .ornate-card .card-league-logo{max-width:25px;max-height:19px}
+.market-logo{width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-left:5px}
