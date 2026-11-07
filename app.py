@@ -190,16 +190,47 @@ def admin_gift():
         level = int(request.form.get('level', '0'))
         transfer_value = float(request.form.get('transfer_value', '0'))
         position = request.form.get('position', PLAYER_POSITIONS.get(name, 'ST')).upper()
+        nationality = request.form.get('nationality', '').strip()[:80]
+        club = request.form.get('player_club', '').strip()[:100]
+        league = request.form.get('player_league', '').strip()[:100]
+        card_type = request.form.get('card_type', 'REGULAR').upper()
+        career_status = request.form.get('career_status', 'active').lower()
+        source_url = request.form.get('metadata_source_url', '').strip()[:500]
+        allowed_types = {'REGULAR', 'HEROES', 'ICON'}
         if rating < 1 or level < 0 or not math.isfinite(transfer_value) or transfer_value < 0:
             raise ValueError('OVR/cấp thẻ không hợp lệ hoặc giá trị chuyển nhượng bị âm.')
         if position not in {'GK','CB','LB','RB','LWB','RWB','CDM','CM','CAM','LM','RM','LW','RW','ST','CF'}:
             raise ValueError('Vị trí cầu thủ không hợp lệ.')
+        if card_type not in allowed_types or career_status not in {'active', 'retired'}:
+            raise ValueError('Phân loại thẻ hoặc trạng thái sự nghiệp không hợp lệ.')
+        if not nationality:
+            raise ValueError('Phải nhập quốc gia đã xác minh của cầu thủ.')
+        if career_status == 'active' and (not club or not league):
+            raise ValueError('Cầu thủ còn thi đấu cấp CLB phải có CLB và giải đấu hiện tại.')
+        if career_status == 'retired' and card_type not in {'ICON', 'HEROES'}:
+            raise ValueError('Cầu thủ giải nghệ hoàn toàn phải được phân loại ICON hoặc HEROES mới được gift theo quy tắc hiện tại.')
+        if card_type in {'ICON', 'HEROES'}:
+            from urllib.parse import urlparse
+            parsed_source = urlparse(source_url)
+            trusted_domains = ('fifa.com', 'uefa.com', 'worldfootball.net', 'rsssf.org', 'transfermarkt.com', 'premierleague.com', 'laliga.com', 'bundesliga.com', 'ligue1.com', 'seriea.com', 'the-afc.com', 'conmebol.com', 'concacaf.com', 'cafonline.com')
+            host = (parsed_source.hostname or '').lower()
+            if parsed_source.scheme != 'https' or not any(host == d or host.endswith('.' + d) for d in trusted_domains):
+                raise ValueError('ICON/HEROES cần đường dẫn HTTPS từ nguồn bóng đá uy tín (FIFA, UEFA, WorldFootball, RSSSF, Transfermarkt hoặc trang giải đấu/liên đoàn chính thức).')
         state = load_state(save)
         owned = [p for group in ('starting','bench','extras') for p in state.get(group, [])]
         pending_names = [m.get('player', {}).get('name') for m in state.get('mailbox', []) if m.get('type') == 'player_gift' and not m.get('opened')]
         if any(p.get('name') == name for p in owned) or name in pending_names:
             raise ValueError(f'{recipient.username} đã sở hữu hoặc đang có thư tặng {name}.')
-        gifted = {'name': name, 'position': position, 'rating': rating, 'level': level, 'market_value': transfer_value}
+        gifted = {
+            'name': name, 'position': position, 'rating': rating, 'level': level,
+            'market_value': transfer_value, 'nationality': nationality,
+            'club': club if career_status == 'active' else '',
+            'league': league if career_status == 'active' else '',
+            'card_type': card_type, 'career_status': career_status,
+            'metadata_source_url': source_url, 'metadata_admin_verified': True,
+            'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
+            'metadata_complete': True,
+        }
         subject = request.form.get('mail_subject', '').strip()[:100] or 'Bạn nhận được một gói cầu thủ!'
         body = request.form.get('mail_body', '').strip()[:1000] or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.'
         mail = {'id': secrets.token_urlsafe(12), 'type': 'player_gift', 'subject': subject, 'body': body,

@@ -18,12 +18,15 @@
     <label>Tài khoản nhận</label><select name="user_id" required>{% for user in users if not user.is_admin %}<option value="{{ user.id }}">{{ user.username }}</option>{% endfor %}</select>
     <label>Cầu thủ</label><input name="player_name" list="admin-player-list" placeholder="Nhập hoặc chọn cầu thủ" required><datalist id="admin-player-list">{% for name in player_names %}<option value="{{ name }}">{% endfor %}</datalist>
     <div class="admin-fields"><div><label>OVR (tự do)</label><input type="number" name="rating" min="1" step="1" value="95" required></div><div><label>Vị trí</label><select name="position">{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST','CF'] %}<option value="{{ pos }}">{{ pos }}</option>{% endfor %}</select></div><div><label>Cấp thẻ (tự do)</label><input type="number" name="level" min="0" step="1" value="0" required></div></div>
+    <div class="admin-fields"><div><label>Quốc gia</label><input name="nationality" maxlength="80" placeholder="Ví dụ: Portugal" required></div><div><label>Trạng thái sự nghiệp</label><select name="career_status"><option value="active">Còn thi đấu cấp CLB</option><option value="retired">Đã giải nghệ hoàn toàn</option></select></div><div><label>Phân loại thẻ</label><select name="card_type"><option value="REGULAR">Thẻ thường</option><option value="HEROES">HEROES</option><option value="ICON">ICON</option></select></div></div>
+    <div class="admin-fields"><div><label>CLB hiện tại</label><input name="player_club" maxlength="100" placeholder="Bắt buộc nếu còn thi đấu"></div><div><label>Giải đấu hiện tại</label><input name="player_league" maxlength="100" placeholder="Bắt buộc nếu còn thi đấu"></div></div>
+    <label>Nguồn xác minh (bắt buộc với ICON/HEROES)</label><input type="url" name="metadata_source_url" maxlength="500" placeholder="https://...">
     <label>Giá trị chuyển nhượng (triệu €)</label><input type="number" name="transfer_value" min="0" step="any" value="100" required>
     <label>Tên thư</label><input name="mail_subject" maxlength="100" placeholder="Ví dụ: Quà đặc biệt từ Admin">
     <label>Nội dung thư</label><textarea name="mail_body" rows="3" maxlength="1000" placeholder="Nhập lời nhắn gửi người chơi..."></textarea>
     <button class="button primary" type="submit">🎁 Gửi gói cầu thủ vào hòm thư</button>
   </form>
-  <p class="muted admin-note">Cầu thủ sẽ nằm trong hòm thư của người nhận. Khi mở gói, cầu thủ tự động vào đội hình dự bị chính.</p>
+  <p class="muted admin-note">Cầu thủ sẽ nằm trong hòm thư của người nhận. Khi mở gói, cầu thủ tự động vào đội hình dự bị chính. ICON/HEROES phải có nguồn HTTPS từ website bóng đá uy tín; cầu thủ giải nghệ hoàn toàn chỉ cần quốc gia và huy hiệu đặc biệt.</p>
 </section>
 <section class="panel admin-panel">
   <p class="eyebrow">FINANCE GIFT</p><h2>Tặng ngân sách</h2>
