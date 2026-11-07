@@ -35,27 +35,27 @@
     <div class="pitch-line pitch-halfway"></div><div class="pitch-circle"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
     <div class="pitch-lane pitch-forwards">
       {% for p in state.starting if p.position in ['LW','RW','ST','CF'] %}
-      <div class="player-card card-{{ 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
+      <div class="player-card card-{{ 'icon' if p.get('is_icon') else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
       {% endfor %}
     </div>
     <div class="pitch-lane pitch-midfield">
       {% for p in state.starting if p.position in ['CDM','CM','CAM','LM','RM'] %}
-      <div class="player-card card-{{ 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
+      <div class="player-card card-{{ 'icon' if p.get('is_icon') else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
       {% endfor %}
     </div>
     <div class="pitch-lane pitch-defence">
       {% for p in state.starting if p.position in ['LB','CB','RB','LWB','RWB'] %}
-      <div class="player-card card-{{ 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
+      <div class="player-card card-{{ 'icon' if p.get('is_icon') else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">⚽</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
       {% endfor %}
     </div>
     <div class="pitch-lane pitch-goalkeeper">
       {% for p in state.starting if p.position == 'GK' %}
-      <div class="player-card card-{{ 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">🧤</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
+      <div class="player-card card-{{ 'icon' if p.get('is_icon') else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' }}"><span class="player-ovr">{{p.rating+p.level}}</span><span class="player-position">{{p.position}}</span><div class="player-avatar">🧤</div><strong>{{p.name}}</strong><small>+{{p.level}}</small></div>
       {% endfor %}
     </div>
     {% if state.starting|length < 11 %}<div class="pitch-warning">Đội hình còn thiếu {{11-state.starting|length}} cầu thủ</div>{% endif %}
   </div>
-  <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · OVR gốc 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span class="muted">Khung dựa trên OVR gốc, không đổi khi ép thẻ.</span></div>
+  <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · OVR gốc 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span><i class="legend-frame premium"></i>Cao cấp · 90–95</span><span><i class="legend-frame icon"></i>ICON</span><span class="muted">Khung dựa trên OVR gốc, không đổi khi ép thẻ.</span></div>
 </section>
 <section class="panel"><div class="section-head"><h2>Cầu thủ dự bị ({{state.bench|length}})</h2><span class="muted">Chọn cầu thủ để bổ sung đội hình</span></div><div class="bench-grid">{% for p in state.bench %}<div class="bench-player"><span class="bench-ovr">{{p.rating+p.level}}</span><div><strong>{{p.name}}</strong><small>{{p.position}} · +{{p.level}}</small></div>{% if state.starting|length < 11 %}<form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="promote"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">＋</button></form>{% endif %}</div>{% endfor %}{% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}</div></section>
 <section class="panel"><h2>Thêm cầu thủ khác vào đội hình</h2>{% if state.starting|length < 11 %}{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating+p.level}}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="promote"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">＋ Thêm vào đá chính</button></form></div>{% endfor %}{% if not state.extras %}<p class="muted">Không có cầu thủ bổ sung.</p>{% endif %}{% else %}<p class="muted">Đội hình đã đủ 11 cầu thủ.</p>{% endif %}</section>
