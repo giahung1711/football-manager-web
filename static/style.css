@@ -206,25 +206,19 @@
 .pitch-positioned .ornate-card .card-club b,.pitch-positioned .ornate-card .card-league b{display:block;max-width:100%;overflow:hidden;text-overflow:clip}
 @media(max-width:700px){.pitch-positioned .ornate-card .card-country{font-size:11px}.pitch-positioned .ornate-card .card-club,.pitch-positioned .ornate-card .card-league{width:18px;max-width:18px;height:13px;min-height:13px;flex-basis:18px;font-size:5px;margin-top:1px}}
 
-/* Original FM collectible-card polish: separate ICON/HEROES editions, clean footer, richer portrait illustration. */
-.pitch-positioned .ornate-card.card-heroes{background:linear-gradient(150deg,#fff0df 0%,#dc8b55 18%,#783e2b 46%,#21131a 82%)}
-.pitch-positioned .ornate-card.card-heroes:before{border:3px double #ffe0bd;box-shadow:inset 0 0 15px #ffb87566,0 0 8px #ef985888}
-.pitch-positioned .ornate-card.card-heroes:after{border-color:#ffe7d088}
-.pitch-positioned .ornate-card.card-heroes .special-label{background:linear-gradient(90deg,#4a211b,#c76d42,#4a211b);box-shadow:0 0 8px #ffad72}
-.pitch-positioned .ornate-card.card-icon .special-label{top:50px;background:linear-gradient(90deg,#281044,#a75ce2,#281044);border-color:#f5d9ff;box-shadow:0 0 10px #c68bff}
-.pitch-positioned .ornate-card .portrait-art{isolation:isolate;border-radius:45% 45% 12% 12%;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#fff9 0%,#ffffff25 42%,transparent 72%);filter:drop-shadow(0 3px 4px #0008)}
-.pitch-positioned .ornate-card .portrait-head{z-index:2;border-radius:44% 44% 40% 40%;background:linear-gradient(90deg,#70452f,#d6a17b 48%,#8a563b);box-shadow:inset 0 -4px 0 #603a2a,inset 0 4px 0 #d9b08c}
-.pitch-positioned .ornate-card .portrait-head:before{background:linear-gradient(180deg,#17151a,#30252a);height:12px;border-radius:65% 65% 25% 25%;box-shadow:0 2px 0 #090a0d}
-.pitch-positioned .ornate-card .portrait-body{z-index:1;border-radius:48% 48% 0 0;background:linear-gradient(90deg,#10182b 0%,#233f72 22%,#f1f1ed 49%,#233f72 76%,#10182b 100%);border-top:3px solid #e8d7b8;box-shadow:inset 0 8px 0 #ffffff12}
-.pitch-positioned .ornate-card .portrait-kit-mark{position:absolute;z-index:3;left:50%;top:48px;transform:translateX(-50%);font-size:11px;font-weight:1000;color:#f8e7b2;text-shadow:0 1px 3px #000;opacity:.9}
-.pitch-positioned .ornate-card .card-country{display:inline-block;width:auto;max-width:none;font-size:14px;line-height:1;margin:4px auto 0;overflow:visible;text-shadow:0 2px 4px #000}
-.pitch-positioned .ornate-card .card-club{display:inline-grid;place-items:center;width:26px;height:22px;max-width:26px;min-height:22px;margin:3px auto 0;border:1px solid #fff9;border-radius:50% 50% 5px 5px;background:linear-gradient(145deg,#fff5cf,#bd9a50 55%,#503b17);color:#211808;font-size:7px;font-weight:1000;line-height:1;text-shadow:none;box-shadow:0 2px 5px #0007}
-.pitch-positioned .ornate-card .card-club b{display:block;max-width:22px;overflow:hidden;white-space:nowrap;text-overflow:clip}
-.pitch-positioned .ornate-card .special-label{z-index:5;white-space:nowrap}
-.pitch-positioned .ornate-card .position-penalty{font-size:7px!important;line-height:1;white-space:nowrap}
-@media(max-width:700px){
- .pitch-positioned .ornate-card.card-heroes .special-label{top:37px;font-size:6px}
- .pitch-positioned .ornate-card .portrait-kit-mark{top:35px;font-size:8px}
- .pitch-positioned .ornate-card .card-country{font-size:11px}
- .pitch-positioned .ornate-card .card-club{width:19px;height:16px;max-width:19px;min-height:16px;font-size:5px}
-}
+/* 3D portrait card refresh: real provider portraits when available, graceful fallback otherwise. */
+.pitch-positioned .ornate-card .portrait-art{position:relative;isolation:isolate;width:88px;height:91px;flex:0 0 91px;margin:30px auto 3px;overflow:hidden;border-radius:44% 44% 8px 8px;background:radial-gradient(ellipse at 50% 38%,#fff8,transparent 70%);filter:drop-shadow(0 4px 5px #0008)}
+.pitch-positioned .ornate-card .player-portrait{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 15%;z-index:2;mask-image:linear-gradient(#000 78%,transparent 100%)}
+.pitch-positioned .ornate-card .portrait-fallback{position:absolute;inset:0;display:block}
+.pitch-positioned .ornate-card .portrait-fallback[hidden]{display:none}
+.pitch-positioned .ornate-card .card-club{display:flex;align-items:center;justify-content:center;gap:4px;width:auto;max-width:90%;height:18px;min-height:18px;padding:0 5px;border:0;background:transparent;color:#fff}
+.pitch-positioned .ornate-card .card-club img{width:17px;height:17px;object-fit:contain;filter:drop-shadow(0 1px 2px #000)}
+.pitch-positioned .ornate-card .card-club b{font-size:7px;text-shadow:0 1px 3px #000}
+.pitch-positioned .ornate-card.card-heroes{background:linear-gradient(150deg,#d9f7ff 0%,#31a6b9 18%,#263b77 50%,#11132d 85%)}
+.pitch-positioned .ornate-card.card-heroes:before{border:3px double #9ff5ff;box-shadow:inset 0 0 15px #54eaff88,0 0 12px #39d7ff88}
+.pitch-positioned .ornate-card.card-heroes:after{border-color:#d1fbff99}
+.pitch-positioned .ornate-card.card-heroes .special-label{background:linear-gradient(90deg,#102a4b,#2a9eb3,#102a4b);border:1px solid #a6f5ff;color:#e9ffff;box-shadow:0 0 10px #47dfff}
+.pitch-positioned .ornate-card.card-icon{background:linear-gradient(150deg,#fffdf0 0%,#e8ce83 17%,#9c7533 42%,#3b2b17 75%,#17101d 100%)}
+.pitch-positioned .ornate-card.card-icon:before{border:3px double #fff0bd;box-shadow:inset 0 0 16px #ffe6a288,0 0 13px #ffe6a288}
+.pitch-positioned .ornate-card.card-icon .special-label{background:linear-gradient(90deg,#493316,#d6ad55,#493316);border:1px solid #fff0bd;color:#fff8df;box-shadow:0 0 10px #f2d27a}
+@media(max-width:700px){.pitch-positioned .ornate-card .portrait-art{width:56px;height:59px;flex-basis:59px;margin-top:27px}.pitch-positioned .ornate-card .card-club img{width:13px;height:13px}}

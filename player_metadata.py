@@ -235,7 +235,7 @@ def _extract_team_id(squad_rows, player_id):
         if isinstance(players, list) and players:
             if not any(str(x.get("id")) == str(player_id) for x in players if isinstance(x, dict)):
                 continue
-        candidates.append({"id": team["id"], "name": team["name"]})
+        candidates.append({"id": team["id"], "name": team["name"], "logo": team.get("logo") or ""})
     # A player should normally be associated with one current squad. If the API
     # returns multiple ambiguous teams, do not silently choose one.
     unique = {str(x["id"]): x for x in candidates}
@@ -405,6 +405,8 @@ def _fetch_player_metadata(name, force=False):
         data = {
             "nationality": player.get("nationality"),
             "club": team["name"],
+            "club_logo_url": team.get("logo", ""),
+            "photo_url": player.get("photo", ""),
             "league": league_name,
             "source": "API-Football",
             "updated_at": now,

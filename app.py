@@ -200,6 +200,12 @@ def admin_gift():
         card_type = request.form.get('card_type', 'REGULAR').upper()
         career_status = request.form.get('career_status', 'active').lower()
         source_url = request.form.get('metadata_source_url', '').strip()[:500]
+        photo_url = request.form.get('photo_url', '').strip()[:500]
+        if photo_url:
+            from urllib.parse import urlparse
+            parsed_photo = urlparse(photo_url)
+            if parsed_photo.scheme != 'https' or not parsed_photo.netloc:
+                raise ValueError('Ảnh cầu thủ phải dùng đường dẫn HTTPS hợp lệ.')
         allowed_types = {'REGULAR', 'HEROES', 'ICON'}
         if rating < 1 or level < 0 or not math.isfinite(transfer_value) or transfer_value < 0:
             raise ValueError('OVR/cấp thẻ không hợp lệ hoặc giá trị chuyển nhượng bị âm.')
@@ -232,6 +238,7 @@ def admin_gift():
             'league': league if career_status == 'active' else '',
             'card_type': card_type, 'career_status': career_status,
             'metadata_source_url': source_url, 'metadata_admin_verified': True,
+            'photo_url': photo_url,
             'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
             'metadata_complete': True,
         }
