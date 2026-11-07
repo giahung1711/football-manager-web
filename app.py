@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
+from player_metadata import enrich_player, get_player_metadata
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, value, player, simulate_match)
@@ -89,10 +90,22 @@ def persist(save,state):
     db.session.commit()
 def page(save, tab='overview', extra=None):
     st=load_state(save)
+    # Metadata is resolved from the connected football-data provider and cached for 12h.
+    # Saved squad records remain untouched; unknown/incomplete players are not rendered as verified cards.
+    for group in ('starting', 'bench', 'extras'):
+        st[group] = [enrich_player(p) for p in st.get(group, [])]
+    market_items=[]
+    for n in st['market']:
+        if n in {p['name'] for p in all_players(st)} or n in PACKS['4']['players']:
+            continue
+        meta = get_player_metadata(n)
+        if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
+            continue
+        market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
     match_popup=session.pop('last_match_result', None)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
                            prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
-                           market=st['market'], market_items=[{'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0)} for n in st['market'] if n not in {p['name'] for p in all_players(st)} and n not in PACKS['4']['players']], upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
+                           market=st['market'], market_items=market_items, upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
 @app.route('/')
 def home():

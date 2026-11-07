@@ -41,3 +41,11 @@ After logging in with the Admin account, open **Admin** in the top navigation. A
 - Trạng thái online dựa trên lần hoạt động gần nhất (90 giây); trang Bạn bè tự cập nhật trạng thái định kỳ.
 - Gửi lời mời giao hữu cho bạn bè. Khi người nhận chấp nhận, trận đấu được mô phỏng và kết quả lưu vào lịch sử của cả hai đội; giao hữu không cộng ngân sách.
 - Các bảng FriendRequest, Friendship, FriendlyChallenge và cột User.last_seen_at được tạo/migrate tự động khi ứng dụng khởi động. Không cần xoá database hiện tại.
+
+## Đồng bộ dữ liệu cầu thủ và khung thẻ
+
+- Khung thẻ hiện tại được thiết kế theo cảm hứng FC Online: Thường, Bạc, Vàng, Cao cấp và ICON. Khung sự kiện chưa được triển khai.
+- Dữ liệu quốc tịch, CLB hiện tại và giải đấu được truy vấn từ API-Football (API-SPORTS) và cache 12 giờ. Cầu thủ chỉ được hiển thị trong thẻ/TT chuyển nhượng khi đủ cả ba trường; không dùng nhãn hoặc giá trị giả như “chưa cập nhật”.
+- Cần thêm biến môi trường `APISPORTS_KEY` trên hosting (Runtime) với API key của API-SPORTS. Không đưa key vào GitHub hoặc ZIP.
+- ICON/HEROES không được suy đoán từ API. Với cầu thủ còn thi đấu, Admin có thể cấu hình `SPECIAL_PLAYER_TYPES` dạng JSON, ví dụ: `{"Player Name":"ICON","Another Player":"HEROES"}`. Với cầu thủ đã giải nghệ, dùng `SPECIAL_PLAYER_METADATA` dạng JSON gồm đủ `nationality`, `club` (CLB cuối cùng), `league` (giải đấu cuối cùng), `type` (`ICON` hoặc `HEROES`) và `source` (nguồn xác minh). Chỉ khai báo sau khi kiểm chứng. ICON dùng khung ICON; HEROES có huy hiệu HEROES riêng.
+- Khi API không trả đủ dữ liệu hoặc key chưa được cấu hình, cầu thủ đó bị ẩn khỏi thẻ/market thay vì hiển thị thông tin chưa xác minh. Dữ liệu đội hình đã lưu trong database không bị xóa hay ghi đè bởi tác vụ đồng bộ.
