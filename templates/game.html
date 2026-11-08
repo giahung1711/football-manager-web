@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 {% block title %}{{ state.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
@@ -27,7 +28,7 @@
   </div>
   <div class="overview-ovr"><span class="metric-label">OVR ĐỘI HÌNH ĐÁ CHÍNH</span><strong>{{data.average_rating}}</strong><span class="ovr-caption">ĐIỂM SỨC MẠNH ĐỘI HÌNH</span></div>
 </section>
-<section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating+p.level}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
 {% elif tab=='squad' %}
 {% set formations = {
 '4-3-3 (Tấn công)': [('LW',15,19),('ST',50,13),('RW',85,19),('CM',31,41),('CAM',50,32),('CM',69,41),('LB',12,67),('CB',37,70),('CB',63,70),('RB',88,67),('GK',50,87)],
@@ -42,85 +43,95 @@
   <div class="football-pitch pitch-positioned" id="footballPitch" aria-label="Sơ đồ cầu thủ trên sân">
     <div class="pitch-line pitch-halfway"></div><div class="pitch-circle"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
     {% set country_flags = {'Argentina':'🇦🇷','Brazil':'🇧🇷','France':'🇫🇷','Germany':'🇩🇪','Italy':'🇮🇹','Spain':'🇪🇸','Portugal':'🇵🇹','England':'🏴','Netherlands':'🇳🇱','Croatia':'🇭🇷','Vietnam':'🇻🇳','Việt Nam':'🇻🇳','Senegal':'🇸🇳','Belgium':'🇧🇪','Uruguay':'🇺🇾','Ivory Coast':'🇨🇮','Côte d’Ivoire':'🇨🇮','Cameroon':'🇨🇲','Austria':'🇦🇹','Poland':'🇵🇱','Switzerland':'🇨🇭','Norway':'🇳🇴','Egypt':'🇪🇬','Saudi Arabia':'🇸🇦','United States':'🇺🇸'} %}
-    
     {% for p in state.starting[:11] %}
       {% if p.get('rating') is not none and p.get('position') %}
         {% set slot = slots[loop.index0] %}
         {% set role = p.get('assigned_position') or slot[0] %}
-        {% set raw = p.rating + p.level %}
+        {% set raw = p.rating + [0,1,2,3,4,6,8,10,13][p.level|int] %}
         {% set shown = raw if (p.position|upper == role|upper or p.position|upper == 'GK' and role == 'GK') else ((raw * 0.95 + 0.5)|int) %}
-        
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
-        
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        
         <div class="player-card pitch-player-card ornate-card card-{{rarity}}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
           <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
-          
           {% if p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
             <span class="special-label">HEROES</span>
           {% endif %}
-
           <div class="portrait-art" aria-label="Ảnh chân dung {{p.name}}">
             {% if p.get('photo_url') %}
               <img class="player-portrait" src="{{p.photo_url}}" alt="{{p.name}}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
-              <span class="portrait-fallback" hidden>
-                <span class="portrait-glow"></span>
-                <span class="portrait-head"></span>
-                <span class="portrait-body"></span>
-              </span>
+              <span class="portrait-fallback" hidden><span class="portrait-glow"></span><span class="portrait-head"></span><span class="portrait-body"></span></span>
             {% else %}
-              <span class="portrait-fallback">
-                <span class="portrait-glow"></span>
-                <span class="portrait-head"></span>
-                <span class="portrait-body"></span>
-              </span>
+              <span class="portrait-fallback"><span class="portrait-glow"></span><span class="portrait-head"></span><span class="portrait-body"></span></span>
             {% endif %}
           </div>
-
           <strong>{{p.name}}</strong>
-          
-          {% if p.get('nationality') %}
-            <span class="card-country" title="{{p.nationality}}">{{country_flags.get(p.nationality, '🌐')}} {{p.nationality}}</span>
-          {% endif %}
-          
+          {% if p.get('nationality') %}<span class="card-country" title="{{p.nationality}}">{{country_flags.get(p.nationality, '🌐')}} {{p.nationality}}</span>{% endif %}
           <div class="card-club" title="CLB">
-            {% if is_icon_hero %}
-              <span>⭐ Huyền thoại</span>
+            {% if is_icon_hero %}<span>⭐ Huyền thoại</span>
             {% elif p.get('club') %}
-              {% if p.get('club_logo_url') %}
-                <img src="{{p.club_logo_url}}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">
-              {% endif %}
+              {% if p.get('club_logo_url') %}<img src="{{p.club_logo_url}}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">{% endif %}
               <b>{{p.club}}</b>
             {% endif %}
           </div>
-
-          {% if shown != raw %}
-            <small class="position-penalty">−5% vị trí</small>
-          {% endif %}
+          {% if shown != raw %}<small class="position-penalty">−5% vị trí</small>{% endif %}
         </div>
       {% endif %}
     {% endfor %}
   </div>
   <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span><i class="legend-frame premium"></i>Cao cấp · 90–95</span><span><i class="legend-frame icon"></i>ICON</span><span class="muted">Khung theo OVR gốc · sai vị trí giảm 5% OVR cá nhân</span></div>
 </section>
-<section class="panel"><div class="section-head"><h2>Cầu thủ dự bị ({{state.bench|length}})</h2><span class="muted">Kéo thẻ dự bị vào sân để thay người</span></div><div class="bench-grid" id="benchDropZone">{% for p in state.bench %}{% if p.get('rating') is not none and p.get('position') %}<div class="bench-player" draggable="true" data-group="bench" data-index="{{loop.index0}}"><span class="bench-ovr">{{p.rating+p.level}}</span><div><strong>{{p.name}}</strong><small>{{p.position}} · {{p.nationality}}{% if p.club %} · {{p.club}}{% elif p.get('card_type') in ['ICON','HEROES'] %} · {{p.card_type}}{% endif %} · +{{p.level}}</small></div><span class="drag-hint">⠿</span></div>{% endif %}{% endfor %}{% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}</div></section>
+<section class="panel"><div class="section-head"><h2>Cầu thủ dự bị ({{state.bench|length}})</h2><span class="muted">Kéo thẻ dự bị vào sân để thay người</span></div><div class="bench-grid" id="benchDropZone">{% for p in state.bench %}{% if p.get('rating') is not none and p.get('position') %}<div class="bench-player" draggable="true" data-group="bench" data-index="{{loop.index0}}"><span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span><div><strong>{{p.name}}</strong><small>{{p.position}} · {{p.nationality}}{% if p.club %} · {{p.club}}{% elif p.get('card_type') in ['ICON','HEROES'] %} · {{p.card_type}}{% endif %} · +{{p.level}}</small></div><span class="drag-hint">⠿</span></div>{% endif %}{% endfor %}{% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}</div></section>
 <form id="dragSwapForm" method="post" action="{{url_for('action')}}" hidden><input name="action" value="drag_swap"><input name="source_group"><input name="source_index"><input name="target_index"><input name="target_group" value="starting"></form>
 <script>
 (()=>{let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
 </script>
 {% elif tab=='transfers' %}
 <section class="panel"><h2>Thị trường chuyển nhượng</h2><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
-<section class="panel"><h2>Bán cầu thủ dự bị</h2>{% for p in state.bench %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating+p.level}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section><section class="panel"><h2>Cầu thủ dự bị khác</h2>{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating+p.level}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section>
+<section class="panel"><h2>Bán cầu thủ dự bị</h2>{% for p in state.bench %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section><section class="panel"><h2>Cầu thủ dự bị khác</h2>{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section>
 {% elif tab=='shop' %}
 <section class="panel"><h2>Cửa hàng gói cầu thủ</h2>{% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}. Tiền sẽ bị trừ ngay khi xác nhận."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}</section>
 {% elif tab=='upgrade' %}
-<section class="panel"><h2>Nâng cấp thẻ cầu thủ</h2><p>Tỉ lệ thành công theo cấp hiện tại: 90%, 80%, 60%, 40%, 25%. Thất bại có thể tụt cấp.</p>{% for group in ['starting','bench','extras'] %}<h3>{{'Đá chính' if group=='starting' else 'Dự bị' if group=='bench' else 'Cầu thủ khác'}}</h3>{% for p in state[group] %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating+p.level}} · +{{p.level}}</span>{% if p.level<5 %}<form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận ép {{p.name}} lên +{{p.level+1}}? Chi phí: {{(upgrade_costs[p.level+1] * p.rating / 90)|money}}. Ngân sách hiện tại: {{state.budget|money}}. Tỉ lệ thành công: {{upgrade_rates[p.level]}}%. Tiền vẫn bị trừ nếu thất bại."><input type="hidden" name="action" value="upgrade"><input type="hidden" name="group" value="{{group}}"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Ép +{{p.level+1}}</button></form>{% else %}<span>MAX +5</span>{% endif %}</div>{% endfor %}{% endfor %}</section>
+{% set success_rates = [99,90,80,60,40,30,20,10] %}
+{% set cost_rates = [0,2,6,10,15,20,25,42,60] %}
+{% set value_multipliers = [1.0,1.10,1.30,1.65,2.15,2.90,4.155,5.760,8.560] %}
+{% set downgrade_text = ['Thất bại: giữ +0 (100%)','Thất bại: về +0 (100%)','Thất bại: +0 (50%) hoặc +1 (50%)','Thất bại: +0 (30%), +1 (50%), +2 (20%)','Thất bại: +0 (20%), +1 (35%), +2 (35%), +3 (10%)','Thất bại: +0 (12%), +1 (15%), +2 (30%), +3 (30%), +4 (13%)','Thất bại: +0 (6%), +1 (8%), +2 (12%), +3 (14%), +4 (40%), +5 (20%)','Thất bại: +0 (1%), +1 (2%), +2 (4%), +3 (13%), +4 (15%), +5 (45%), +6 (20%)'] %}
+<section class="panel upgrade-intro">
+  <div class="section-head"><div><p class="eyebrow">PLAYER DEVELOPMENT</p><h2>Trung tâm ép thẻ</h2><p class="muted">Tối đa +8 · OVR có thể vượt 99 · Chi phí tính theo giá trị gốc của cầu thủ.</p></div><div class="upgrade-inventory"><span>🛡️ Thẻ bảo vệ</span><strong>{{state.get('inventory',{}).get('Thẻ bảo vệ',0)}}</strong></div></div>
+  <div class="upgrade-milestones"><div><b>+1 → +4</b><span>mỗi cấp +1 OVR</span></div><div><b>+5 → +7</b><span>mỗi cấp +2 OVR</span></div><div><b>+8</b><span>+3 OVR</span></div><div><b>+8</b><span>tổng cộng +13 OVR</span></div></div>
+  <p class="muted">Thẻ bảo vệ chỉ dùng cho lần ép +7 lên +8. Nếu bật bảo vệ, hệ thống tiêu hao đúng 1 thẻ cho mỗi lần thử; thất bại sẽ giữ nguyên +7.</p>
+</section>
+{% for group in ['starting','bench','extras'] %}
+<section class="panel upgrade-group">
+  <h2>{{'Đội hình chính' if group=='starting' else 'Đội hình dự bị' if group=='bench' else 'Cầu thủ khác'}}</h2>
+  {% if state[group] %}
+  <div class="upgrade-player-list">
+  {% for p in state[group] %}
+    {% set lv = p.get('level',0)|int %}
+    {% set base_value = prices.get(p.name,0) / value_multipliers[lv] %}
+    {% set current_ovr = p.rating + [0,1,2,3,4,6,8,10,13][lv] %}
+    <article class="upgrade-player-card">
+      <div class="upgrade-player-main"><div class="upgrade-player-ovr"><strong>{{current_ovr}}</strong><span>OVR</span></div><div class="upgrade-player-info"><h3>{{p.name}}</h3><p>{{p.position}} · OVR gốc {{p.rating}} · Cấp +{{lv}}</p><div class="upgrade-level-track">{% for n in range(9) %}<i class="{% if n <= lv %}active{% endif %}"></i>{% endfor %}</div></div><div class="upgrade-player-value"><span>Giá trị thẻ</span><strong>{{(base_value * value_multipliers[lv])|money}}</strong></div></div>
+      {% if lv < 8 %}
+      <div class="upgrade-next"><div><b>Ép lên +{{lv+1}}</b><span>Tỉ lệ thành công: {{success_rates[lv]}}% · Chi phí: {{cost_rates[lv+1]}}% giá trị gốc</span><small>{{downgrade_text[lv]}}</small></div>
+        <form method="post" action="{{url_for('action')}}" class="upgrade-form confirm-action" data-confirm="Xác nhận ép {{p.name}} từ +{{lv}} lên +{{lv+1}}? Tỉ lệ thành công: {{success_rates[lv]}}%. Chi phí: {{(base_value * cost_rates[lv+1] / 100)|money}}. Tiền vẫn bị trừ nếu thất bại.">
+          <input type="hidden" name="action" value="upgrade"><input type="hidden" name="group" value="{{group}}"><input type="hidden" name="index" value="{{loop.index0}}">
+          {% if lv == 7 %}<label class="protection-toggle"><input type="checkbox" name="use_protection" value="1"><span>Dùng 1 Thẻ bảo vệ</span></label>{% endif %}
+          <button class="button primary" type="submit">Ép +{{lv+1}}</button>
+        </form>
+      </div>
+      {% else %}<div class="upgrade-max">✦ Đã đạt cấp tối đa +8</div>{% endif %}
+    </article>
+  {% endfor %}
+  </div>
+  {% else %}<p class="muted">Chưa có cầu thủ trong danh sách này.</p>{% endif %}
+</section>
+{% endfor %}
+<section class="panel"><h2>Quy tắc ép thẻ</h2><div class="upgrade-rules-wrap"><table class="upgrade-rules"><thead><tr><th>Cấp ép</th><th>Tỉ lệ</th><th>Chi phí</th><th>OVR tăng</th></tr></thead><tbody>{% for n in range(8) %}<tr><td>+{{n}} → +{{n+1}}</td><td>{{success_rates[n]}}%</td><td>{{cost_rates[n+1]}}% giá trị gốc</td><td>+{{[1,1,1,1,2,2,2,3][n]}}</td></tr>{% endfor %}</tbody></table></div></section>
 {% elif tab=='tactics' %}<section class="panel"><h2>Chiến thuật</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="formation"><label>Sơ đồ đội hình</label><select name="formation">{% for f in ['4-3-3 (Tấn công)','4-3-3 (Phòng thủ)','4-2-4','4-1-2-1-2'] %}<option {% if state.formation==f %}selected{% endif %}>{{f}}</option>{% endfor %}</select><button class="button primary">Lưu chiến thuật</button></form></section>
 {% elif tab=='matches' %}
 <section class="panel"><div class="section-head"><div><h2>Trận đấu</h2><p class="muted">Đá giao hữu với một CLB trong game. Thắng +20M, hòa +10M, thua +5M.</p></div><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Thi đấu ngay</button></form></div></section>
