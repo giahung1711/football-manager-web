@@ -42,21 +42,70 @@
   <div class="football-pitch pitch-positioned" id="footballPitch" aria-label="Sơ đồ cầu thủ trên sân">
     <div class="pitch-line pitch-halfway"></div><div class="pitch-circle"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
     {% set country_flags = {'Argentina':'🇦🇷','Brazil':'🇧🇷','France':'🇫🇷','Germany':'🇩🇪','Italy':'🇮🇹','Spain':'🇪🇸','Portugal':'🇵🇹','England':'🏴','Netherlands':'🇳🇱','Croatia':'🇭🇷','Vietnam':'🇻🇳','Việt Nam':'🇻🇳','Senegal':'🇸🇳','Belgium':'🇧🇪','Uruguay':'🇺🇾','Ivory Coast':'🇨🇮','Côte d’Ivoire':'🇨🇮','Cameroon':'🇨🇲','Austria':'🇦🇹','Poland':'🇵🇱','Switzerland':'🇨🇭','Norway':'🇳🇴','Egypt':'🇪🇬','Saudi Arabia':'🇸🇦','United States':'🇺🇸'} %}
-    {% for p in state.starting[:11] %}{% if p.get('rating') is not none and p.get('position') %}{% set slot = slots[loop.index0] %}{% set role = p.get('assigned_position') or slot[0] %}{% set raw = p.rating + p.level %}{% set shown = raw if (p.position|upper == role|upper or p.position|upper == 'GK' and role == 'GK') else ((raw * 0.95 + 0.5)|int) %}{% set rarity = 'icon' if p.get('is_icon') else 'heroes' if p.get('is_hero') else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}{% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-    <div class="player-card pitch-player-card ornate-card card-{{rarity}}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
-      <span class="player-ovr">{{shown}}</span><span class="player-position">{{role}}</span>
-      <div class="portrait-art" aria-label="Ảnh chân dung {{p.name}}">
-        {% if p.get('photo_url') %}<img class="player-portrait" src="{{p.photo_url}}" alt="{{p.name}}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
-        <span class="portrait-fallback" hidden><span class="portrait-glow"></span><span class="portrait-head"></span><span class="portrait-body"></span></span>
-        {% else %}<span class="portrait-fallback"><span class="portrait-glow"></span><span class="portrait-head"></span><span class="portrait-body"></span></span>{% endif %}
-      </div>
-      <strong>{{p.name}}</strong>
-      {% if p.get('nationality') %}<span class="card-country" title="{{p.nationality}}">{{country_flags.get(p.nationality, '🌐')}}</span>{% endif %}
-      {% if p.get('club') %}<span class="card-club" title="CLB: {{p.club}}">{% if p.get('club_logo_url') %}<img src="{{p.club_logo_url}}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">{% endif %}<b>{{p.club.split()|map('first')|join|upper}}</b></span>{% endif %}
-      <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
-      {% if p.get('is_icon') %}<span class="special-label">ICON</span>{% elif p.get('is_hero') %}<span class="special-label">HEROES</span>{% endif %}
-      {% if shown != raw %}<small class="position-penalty">−5% vị trí</small>{% endif %}
-    </div>{% endif %}{% endfor %}
+    
+    {% for p in state.starting[:11] %}
+      {% if p.get('rating') is not none and p.get('position') %}
+        {% set slot = slots[loop.index0] %}
+        {% set role = p.get('assigned_position') or slot[0] %}
+        {% set raw = p.rating + p.level %}
+        {% set shown = raw if (p.position|upper == role|upper or p.position|upper == 'GK' and role == 'GK') else ((raw * 0.95 + 0.5)|int) %}
+        
+        {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
+        {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
+        
+        {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
+        
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+          <span class="player-ovr">{{shown}}</span>
+          <span class="player-position">{{role}}</span>
+          <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
+          
+          {% if p.get('is_icon') or p.get('card_type') == 'ICON' %}
+            <span class="special-label">ICON</span>
+          {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
+            <span class="special-label">HEROES</span>
+          {% endif %}
+
+          <div class="portrait-art" aria-label="Ảnh chân dung {{p.name}}">
+            {% if p.get('photo_url') %}
+              <img class="player-portrait" src="{{p.photo_url}}" alt="{{p.name}}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+              <span class="portrait-fallback" hidden>
+                <span class="portrait-glow"></span>
+                <span class="portrait-head"></span>
+                <span class="portrait-body"></span>
+              </span>
+            {% else %}
+              <span class="portrait-fallback">
+                <span class="portrait-glow"></span>
+                <span class="portrait-head"></span>
+                <span class="portrait-body"></span>
+              </span>
+            {% endif %}
+          </div>
+
+          <strong>{{p.name}}</strong>
+          
+          {% if p.get('nationality') %}
+            <span class="card-country" title="{{p.nationality}}">{{country_flags.get(p.nationality, '🌐')}} {{p.nationality}}</span>
+          {% endif %}
+          
+          <div class="card-club" title="CLB">
+            {% if is_icon_hero %}
+              <span>⭐ Huyền thoại</span>
+            {% elif p.get('club') %}
+              {% if p.get('club_logo_url') %}
+                <img src="{{p.club_logo_url}}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">
+              {% endif %}
+              <b>{{p.club}}</b>
+            {% endif %}
+          </div>
+
+          {% if shown != raw %}
+            <small class="position-penalty">−5% vị trí</small>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
   </div>
   <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span><i class="legend-frame premium"></i>Cao cấp · 90–95</span><span><i class="legend-frame icon"></i>ICON</span><span class="muted">Khung theo OVR gốc · sai vị trí giảm 5% OVR cá nhân</span></div>
 </section>
