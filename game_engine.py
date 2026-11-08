@@ -1,4 +1,5 @@
 import random, copy
+from decimal import Decimal, ROUND_HALF_UP
 CLUB_OPTIONS = {'1': ('Real Madrid', 300),
  '2': ('Barcelona', 250),
  '3': ('Arsenal', 200),
@@ -255,11 +256,44 @@ TRANSFER_MARKET = ['Desire Doue',
  'Lionel Messi',
  'Neymar Junior']
 
-UPGRADE_RATES = {0: 90, 1: 80, 2: 60, 3: 40, 4: 25}
+# Tỷ lệ thành công: khóa theo cấp hiện tại (0 nghĩa là ép +0 lên +1).
+UPGRADE_RATES = {
+    0: 99, 1: 90, 2: 80, 3: 60,
+    4: 40, 5: 30, 6: 20, 7: 10,
+}
 
-UPGRADE_COSTS = {1: 10, 2: 20, 3: 40, 4: 65, 5: 90}
+# Chi phí ép theo cấp đích, tính theo % giá trị gốc của cầu thủ.
+UPGRADE_COSTS = {
+    1: 2, 2: 6, 3: 10, 4: 15,
+    5: 20, 6: 25, 7: 42, 8: 60,
+}
 
-CARD_VALUE_RATES = {0: 1.0, 1: 1.1, 2: 1.3, 3: 1.55, 4: 1.85, 5: 2.25}
+# Khi thất bại, key là cấp thẻ nhận được và value là xác suất %.
+UPGRADE_FAILURE_DISTRIBUTION = {
+    0: {0: 100},
+    1: {0: 100},
+    2: {0: 50, 1: 50},
+    3: {0: 30, 1: 50, 2: 20},
+    4: {0: 20, 1: 35, 2: 35, 3: 10},
+    5: {0: 12, 1: 15, 2: 30, 3: 30, 4: 13},
+    6: {0: 6, 1: 8, 2: 12, 3: 14, 4: 40, 5: 20},
+    7: {0: 1, 1: 2, 2: 4, 3: 13, 4: 15, 5: 45, 6: 20},
+}
+
+# OVR tăng theo mốc cấp thẻ thành công, không bị giới hạn ở 99.
+UPGRADE_OVR_BONUS = {
+    1: 1, 2: 1, 3: 1, 4: 1,
+    5: 2, 6: 2, 7: 2, 8: 3,
+}
+
+# Hệ số giá trị cộng dồn; mọi mức đều tính từ giá trị gốc.
+CARD_VALUE_RATES = {
+    0: 1.000, 1: 1.100, 2: 1.300,
+    3: 1.650, 4: 2.150, 5: 2.900,
+    6: 4.155, 7: 5.760, 8: 8.560,
+}
+
+MAX_UPGRADE_LEVEL = 8
 
 PACKS = {'1': {'name': 'Gói Đồng',
        'price': 20,
@@ -309,12 +343,45 @@ def player(name, default_pos="ST", default_rating=80):
         a=name.split(" - "); return {"name":a[0],"position":a[1],"rating":int(a[2]),"level":int(a[3].replace("+", "")) if len(a)>3 else 0}
     return {"name":name,"position":PLAYER_POSITIONS.get(name,default_pos),"rating":PLAYER_RATINGS.get(name,default_rating),"level":0}
 
-def pack_player(p): return f"{p['name']} - {p['position']} - {p['rating']} - +{p.get('level',0)}"
-def value(p):
+def pack_player(p):
+    return f"{p['name']} - {p['position']} - {p['rating']} - +{p.get('level', 0)}"
+
+def round_half_up(number, digits=2):
+    """Làm tròn kiểu half-up, tránh quy tắc bankers rounding của round()."""
+    quantum = Decimal("1").scaleb(-digits)
+    return float(Decimal(str(number)).quantize(quantum, rounding=ROUND_HALF_UP))
+
+def player_base_value(p):
+    """Giá trị gốc của cầu thủ, không phụ thuộc cấp ép thẻ."""
     base = p.get('market_value')
     if base is None:
-        base = PLAYER_PRICES.get(p['name'], max(5,(p['rating']-65)*3))
-    return round(float(base) * CARD_VALUE_RATES.get(p.get('level',0),1),2)
+        base = PLAYER_PRICES.get(p['name'], max(5, (int(p.get('rating', 80)) - 65) * 3))
+    return max(0.0, float(base))
+
+def player_upgrade_ovr(p):
+    """Tính OVR hiện tại từ OVR gốc và cấp thẻ; không sửa OVR gốc."""
+    try:
+        level = int(p.get('level', 0))
+    except (TypeError, ValueError):
+        level = 0
+    level = max(0, min(MAX_UPGRADE_LEVEL, level))
+    bonus = sum(UPGRADE_OVR_BONUS.get(step, 0) for step in range(1, level + 1))
+    return int(p.get('rating', 80)) + bonus
+
+def upgrade_cost(p, target_level):
+    """Chi phí ép cấp đích, tính theo phần trăm giá trị gốc."""
+    if target_level not in UPGRADE_COSTS:
+        raise ValueError('Cấp ép thẻ không hợp lệ')
+    return round_half_up(player_base_value(p) * UPGRADE_COSTS[target_level] / 100)
+
+def value(p):
+    """Giá trị hiện tại = giá trị gốc × hệ số cấp thẻ hiện tại."""
+    try:
+        level = int(p.get('level', 0))
+    except (TypeError, ValueError):
+        level = 0
+    level = max(0, min(MAX_UPGRADE_LEVEL, level))
+    return round_half_up(player_base_value(p) * CARD_VALUE_RATES[level])
 def create_new_game(club):
     if club not in STARTING: raise ValueError('CLB không hợp lệ')
     starters=[player(x) for x in STARTING[club]]; bench=[player(x) for x in BENCH[club]]
@@ -387,7 +454,7 @@ def normalize_state(st):
 
 def all_players(st): return st['starting']+st['bench']+st['extras']
 def get_dashboard(st):
-    arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(p['rating']+p.get('level',0) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
+    arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(player_upgrade_ovr(p) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
 
 def _match_player_name(p):
     return p.get('name', 'Cầu thủ') if isinstance(p, dict) else str(p).split(' - ')[0]
@@ -397,7 +464,7 @@ def _match_position(p):
 
 def _match_rating(p):
     if isinstance(p, dict):
-        return int(p.get('rating', 80)) + int(p.get('level', 0))
+        return player_upgrade_ovr(p)
     parts = str(p).split(' - ')
     try: return int(parts[2])
     except (IndexError, ValueError): return 80
