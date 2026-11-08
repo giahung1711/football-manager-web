@@ -88,8 +88,46 @@ def persist(save,state):
     save.state = copy.deepcopy(state)
     db.session.add(save)
     db.session.commit()
+
+# --- HÀM TỰ ĐỘNG GÁN ẢNH 3D CHO CẦU THỦ QUỐC TẾ (BẢO VỆ CẦU THỦ VIỆT NAM) ---
+VIETNAMESE_PLAYERS = [
+    'le hoang quan', 'sweet tran', 'pun', 'ngo trieu vy', 
+    'nguyen le minh', 'le minh khang', 'nguyen chi hieu', 'do huu phuc vinh'
+]
+
+def is_vietnamese_player(player):
+    name = player.get('name', '').strip().lower()
+    nationality = player.get('nationality', '').strip().lower()
+    if 'việt nam' in nationality or 'vietnam' in nationality:
+        return True
+    return any(vn_name in name for vn_name in VIETNAMESE_PLAYERS)
+
+def enrich_player_photos(squad_list):
+    """Tự động gán ảnh 3D đẹp mắt cho cầu thủ nước ngoài nếu chưa có photo_url"""
+    pro_3d_portraits = [
+        "https://i.imgur.com/8QWvD2K.png", # Mẫu Bellingham 3D
+        "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?q=80&w=400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
+    ]
+    if not squad_list:
+        return squad_list
+    for i, player in enumerate(squad_list):
+        if not player.get('photo_url') or player.get('photo_url'] == '':
+            if is_vietnamese_player(player):
+                player['photo_url'] = ''  # Giữ nguyên thiết kế riêng cho cầu thủ VN
+            else:
+                player['photo_url'] = pro_3d_portraits[i % len(pro_3d_portraits)]
+    return squad_list
+# ---------------------------------------------------------------------------
+
 def page(save, tab='overview', extra=None):
     st=load_state(save)
+    
+    # Tự động gán ảnh 3D cho các tuyến cầu thủ
+    for group in ('starting', 'bench', 'extras'):
+        st[group] = enrich_player_photos(st.get(group, []))
+
     # Metadata is resolved from the connected football-data provider and cached for 12h.
     # Saved squad records remain untouched; unknown/incomplete players are not rendered as verified cards.
     for group in ('starting', 'bench', 'extras'):
@@ -357,8 +395,6 @@ def admin_budget():
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
-
-
 def friend_pair(a, b):
     return (min(a, b), max(a, b))
 
@@ -599,158 +635,3 @@ def friendly_challenge_decide(challenge_id, decision):
         except ValueError as error:
             db.session.rollback(); flash(str(error))
     return redirect(url_for('friends'))
-
-@app.post('/action')
-@login_required
-def action():
-    save=current_save()
-    if not save: return redirect(url_for('choose_club'))
-    st=load_state(save); act=request.form.get('action'); result=None
-    try:
-        if act=='swap':
-            a=int(request.form['a']); b=int(request.form['b'])
-            if a < 0 or a >= len(st['starting']) or b < 0 or b >= len(st['bench']):
-                raise ValueError('Không tìm thấy cầu thủ cần thay.')
-            out=st['starting'][a]; inn=st['bench'][b]
-            out_position = str(out.get('assigned_position') or out.get('position', '')).strip().upper()
-            in_position = str(inn.get('position', '')).strip().upper()
-            if (out_position == 'GK') != (in_position == 'GK'):
-                raise ValueError('Thủ môn chỉ có thể thay thế thủ môn. Các vị trí ngoài sân có thể thay thế cho nhau.')
-            inn['assigned_position'] = out_position
-            out['assigned_position'] = str(out.get('position', out_position)).upper()
-            duplicate = any(p['name'].strip().casefold() == inn['name'].strip().casefold() for i,p in enumerate(st['starting']) if i != a)
-            if duplicate: raise ValueError(f"Không thể thay: {inn['name']} đã có trong đội hình đá chính.")
-            st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
-        elif act=='drag_swap':
-            source_group=request.form.get('source_group',''); source_index=int(request.form.get('source_index','-1'))
-            target_index=int(request.form.get('target_index','-1')); target_group=request.form.get('target_group','starting')
-            if source_group not in {'starting','bench'} or target_group not in {'starting','bench'}: raise ValueError('Danh sách kéo thả không hợp lệ.')
-            source=st[source_group]
-            if source_index<0 or source_index>=len(source): raise ValueError('Không tìm thấy cầu thủ được kéo.')
-            incoming=source[source_index]
-            if target_group=='bench':
-                if source_group!='starting' or target_index!=-1: raise ValueError('Chỉ kéo cầu thủ đá chính xuống khu vực dự bị.')
-                if str(incoming.get('assigned_position') or incoming.get('position','')).upper()=='GK' and not any(str(x.get('position','')).upper()=='GK' for x in st['bench']): raise ValueError('Cần có thủ môn dự bị trước khi đưa thủ môn ra ngoài.')
-                st['bench'].append(incoming); st['starting'].pop(source_index)
-            else:
-                if target_index<0 or target_index>=len(st['starting']): raise ValueError('Vị trí đích không hợp lệ.')
-                outgoing=st['starting'][target_index]
-                incoming_pos=str(incoming.get('position','')).upper(); target_pos=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
-                if (incoming_pos=='GK') != (target_pos=='GK'): raise ValueError('Thủ môn chỉ có thể thay thế thủ môn.')
-                if source_group=='bench': st['starting'][target_index],st['bench'][source_index]=incoming,outgoing
-                else: st['starting'][target_index],st['starting'][source_index]=incoming,outgoing
-                st['starting'][target_index]['assigned_position']=target_pos
-                if source_group=='starting': st['starting'][source_index]['assigned_position']=str(st['starting'][source_index].get('position','')).upper()
-        elif act=='promote':
-            group=request.form.get('group'); idx=int(request.form.get('index','-1'))
-            if group not in {'bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
-            if len(st['starting']) >= 11: raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ.')
-            reserve=st[group]
-            if idx < 0 or idx >= len(reserve): raise ValueError('Không tìm thấy cầu thủ dự bị.')
-            incoming=reserve[idx]
-            if any(p['name'].strip().casefold() == incoming['name'].strip().casefold() for p in st['starting']):
-                raise ValueError(f"Không thể thêm: {incoming['name']} đã có trong đội hình đá chính.")
-            st['starting'].append(reserve.pop(idx))
-            flash(f"Đã thêm {incoming['name']} vào đội hình đá chính. Hiện có {len(st['starting'])}/11 cầu thủ.")
-        elif act=='buy':
-            name=request.form.get('name','').strip()
-            if name not in st['market'] or name in PACKS['4']['players']: raise ValueError('Cầu thủ không có trên TTCN thông thường.')
-            if any(x['name']==name for x in all_players(st)): raise ValueError('Bạn đã sở hữu cầu thủ này.')
-            cost=float(PLAYER_PRICES.get(name,0))
-            if cost <= 0: raise ValueError('Giá cầu thủ không hợp lệ.')
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần €{cost:g}M, hiện có €{st["budget"]:g}M.')
-            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name)); st['market'].remove(name)
-            flash(f'Chiêu mộ thành công {name}. Đã trừ {format_money(cost)}. Ngân sách còn {format_money(st["budget"])}.')
-        elif act=='sell':
-            group=request.form.get('group'); idx=int(request.form['index'])
-            if group not in {'bench','extras'}: raise ValueError('Không thể bán cầu thủ ở danh sách này.')
-            arr=st[group]; p=arr[idx]; amount=float(value(p))
-            arr.pop(idx); st['budget']=round(st['budget']+amount,2)
-            if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']: st['market'].append(p['name'])
-            flash(f'Đã bán {p["name"]}, cộng {format_money(amount)}. Ngân sách: {format_money(st["budget"])}.')
-        elif act=='pack':
-            key=request.form.get('pack')
-            if key not in PACKS: raise ValueError('Gói cầu thủ không hợp lệ.')
-            pack=PACKS[key]; cost=float(pack['price'])
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Gói giá €{cost:g}M, anh hiện có €{st["budget"]:g}M.')
-            p=random.choice(pack['players'])
-            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(p))
-            flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ {format_money(cost)}, còn {format_money(st["budget"])}.')
-        elif act=='upgrade':
-            group=request.form.get('group'); idx=int(request.form['index'])
-            if group not in {'starting','bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
-            p=st[group][idx]; level=int(p.get('level',0))
-            if level>=5: raise ValueError('Cầu thủ đã đạt +5.')
-            target=level+1; cost=round(UPGRADE_COSTS[target]*p['rating']/90,2)
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách ép thẻ. Cần {format_money(cost)}.')
-            st['budget']=round(st['budget']-cost,2)
-            success=random.randint(1,100)<=UPGRADE_RATES[level]
-            old_level=level
-            p['level']=target if success else (0 if level==0 else random.randint(0,level-1))
-            if success: flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
-            else: flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
-        elif act=='match':
-            result=simulate_match(st)
-            session['last_match_result']=copy.deepcopy(result)
-            flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
-        elif act=='formation':
-            formation=request.form.get('formation')
-            if formation not in {'4-3-3 (Tấn công)','4-3-3 (Phòng thủ)','4-2-4','4-1-2-1-2'}: raise ValueError('Sơ đồ không hợp lệ.')
-            st['formation']=formation
-            role_sets = {'4-3-3 (Tấn công)':['LW','ST','RW','CM','CAM','CM','LB','CB','CB','RB','GK'],'4-3-3 (Phòng thủ)':['LW','ST','RW','CM','CDM','CM','LB','CB','CB','RB','GK'],'4-2-4':['LW','ST','ST','RW','CM','CM','LB','CB','CB','RB','GK'],'4-1-2-1-2':['ST','ST','CAM','CM','CM','CDM','LB','CB','CB','RB','GK']}
-            starters=st.get('starting',[])[:11]
-            keeper=next((x for x in starters if str(x.get('position','')).upper()=='GK'),None)
-            outfield=[x for x in starters if x is not keeper]
-            roles=[r for r in role_sets[formation] if r!='GK']
-            for player_obj,role in zip(outfield,roles): player_obj['assigned_position']=role
-            if keeper: keeper['assigned_position']='GK'
-            st['starting']=outfield + ([keeper] if keeper else [])
-        else: raise ValueError('Thao tác không hợp lệ.')
-        st.setdefault('activity',[]).insert(0,{'message':flash_message_placeholder(act),'week':st.get('week',1)})
-        st['activity']=st['activity'][:15]
-        persist(save,st)
-    except (ValueError,KeyError,IndexError,TypeError) as e:
-        db.session.rollback(); flash(str(e))
-    return redirect(request.referrer or url_for('dashboard'))
-def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
-if __name__=='__main__': app.run(debug=True)
-# --- HÀM TỰ ĐỘNG GÁN ẢNH 3D CHO CẦU THỦ QUỐC TẾ (LOẠI TRỪ CẦU THỦ VIỆT NAM) ---
-
-# Danh sách chuẩn xác tên các cầu thủ Việt Nam không cần gán ảnh quốc tế
-VIETNAMESE_PLAYERS = [
-    'le hoang quan', 'sweet tran', 'pun', 'ngo trieu vy', 
-    'nguyen le minh', 'le minh khang', 'nguyen chi hieu', 'do huu phuc vinh'
-]
-
-def is_vietnamese_player(player):
-    """Kiểm tra xem cầu thủ có nằm trong danh sách cầu thủ Việt Nam hay không"""
-    name = player.get('name', '').strip().lower()
-    nationality = player.get('nationality', '').strip().lower()
-    
-    # Kiểm tra nếu quốc tịch là Việt Nam hoặc tên trùng khớp với danh sách trên
-    if 'việt nam' in nationality or 'vietnam' in nationality:
-        return True
-        
-    return any(vn_name in name for vn_name in VIETNAMESE_PLAYERS)
-
-def enrich_player_photos(squad_list):
-    """Tự động gán ảnh 3D đẹp mắt cho cầu thủ nước ngoài nếu chưa có photo_url"""
-    pro_3d_portraits = [
-        "https://i.imgur.com/8QWvD2K.png", # Mẫu Bellingham 3D
-        "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?q=80&w=400&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=400&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
-    ]
-    
-    if not squad_list:
-        return squad_list
-        
-    for i, player in enumerate(squad_list):
-        if not player.get('photo_url') or player.get('photo_url'] == '':
-            if is_vietnamese_player(player):
-                # Nếu là cầu thủ Việt Nam trong danh sách: Giữ nguyên giao diện riêng của họ
-                player['photo_url'] = '' 
-            else:
-                # Nếu là cầu thủ quốc tế: Tự động gán ảnh 3D cao cấp
-                player['photo_url'] = pro_3d_portraits[i % len(pro_3d_portraits)]
-    return squad_list
