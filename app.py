@@ -6,7 +6,7 @@ from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChalle
 from player_metadata import enrich_player, get_player_metadata
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, value, player, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deploying')
@@ -80,6 +80,8 @@ def load_state(save):
     # Always detach JSON state before mutation; SQLAlchemy JSON does not track in-place edits.
     original = copy.deepcopy(save.state or {})
     state = normalize_state(copy.deepcopy(original))
+    state.setdefault('inventory', {})
+    state.setdefault('upgrade_history', [])
     if state != original:
         save.state = copy.deepcopy(state)
         db.session.commit()
@@ -252,6 +254,41 @@ def admin_gift():
         persist(save, state)
         flash(f'Đã gửi gói {name} vào hòm thư của {recipient.username}.')
     except (ValueError, TypeError) as error:
+        flash(str(error))
+    return redirect(url_for('admin_panel'))
+
+@app.post('/admin/gift-item')
+@admin_required
+def admin_gift_item():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        quantity = int(request.form.get('quantity', '0'))
+        recipient = db.session.get(User, user_id)
+        if not recipient or recipient.is_admin:
+            raise ValueError('Tài khoản nhận không hợp lệ.')
+        if quantity < 1 or quantity > 100000:
+            raise ValueError('Số lượng vật phẩm phải từ 1 đến 100.000.')
+        item_name = request.form.get('item_name', '').strip()
+        if item_name != 'Thẻ bảo vệ':
+            raise ValueError('Vật phẩm không hợp lệ.')
+        save = GameSave.query.filter_by(user_id=recipient.id).first()
+        if not save:
+            raise ValueError('Tài khoản này chưa có dữ liệu game.')
+        state = load_state(save)
+        inventory = state.setdefault('inventory', {})
+        inventory[item_name] = int(inventory.get(item_name, 0)) + quantity
+        state.setdefault('activity', []).insert(0, {
+            'message': f'Admin tặng {quantity} {item_name}',
+            'week': state.get('week', 1)
+        })
+        state['activity'] = state['activity'][:15]
+        persist(save, state)
+        flash(f'Đã tặng {quantity} {item_name} cho {recipient.username}.')
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
@@ -677,18 +714,79 @@ def action():
             st['budget']=round(st['budget']-cost,2); st['bench'].append(player(p))
             flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ {format_money(cost)}, còn {format_money(st["budget"])}.')
         elif act=='upgrade':
-            group=request.form.get('group'); idx=int(request.form['index'])
-            if group not in {'starting','bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
-            p=st[group][idx]; level=int(p.get('level',0))
-            if level>=5: raise ValueError('Cầu thủ đã đạt +5.')
-            target=level+1; cost=round(UPGRADE_COSTS[target]*p['rating']/90,2)
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách ép thẻ. Cần {format_money(cost)}.')
-            st['budget']=round(st['budget']-cost,2)
-            success=random.randint(1,100)<=UPGRADE_RATES[level]
-            old_level=level
-            p['level']=target if success else (0 if level==0 else random.randint(0,level-1))
-            if success: flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
-            else: flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{p["level"]}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
+            group = request.form.get('group')
+            idx = int(request.form.get('index', '-1'))
+            if group not in {'starting', 'bench', 'extras'}:
+                raise ValueError('Danh sách cầu thủ không hợp lệ.')
+            if idx < 0 or idx >= len(st[group]):
+                raise ValueError('Không tìm thấy cầu thủ cần ép thẻ.')
+            p = st[group][idx]
+            level = int(p.get('level', 0))
+            if level < 0 or level >= MAX_UPGRADE_LEVEL:
+                raise ValueError('Cầu thủ đã đạt cấp ép tối đa +8 hoặc dữ liệu cấp thẻ không hợp lệ.')
+
+            target = level + 1
+            cost = upgrade_cost(p, target)
+            if st['budget'] + 1e-9 < cost:
+                raise ValueError(f'Không đủ ngân sách ép thẻ. Cần {format_money(cost)}.')
+
+            protection_requested = request.form.get('protection') in {'1', 'on', 'true', 'yes'}
+            inventory = st.setdefault('inventory', {})
+            protection_count = int(inventory.get('Thẻ bảo vệ', 0) or 0)
+            if protection_requested and level != 7:
+                raise ValueError('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.')
+            if protection_requested and protection_count < 1:
+                raise ValueError('Bạn không có Thẻ bảo vệ.')
+
+            old_level = level
+            st['budget'] = round(st['budget'] - cost, 2)
+            if protection_requested:
+                inventory['Thẻ bảo vệ'] = protection_count - 1
+
+            success = random.randint(1, 100) <= UPGRADE_RATES[level]
+            if success:
+                new_level = target
+            elif protection_requested:
+                new_level = 7
+            else:
+                distribution = UPGRADE_FAILURE_DISTRIBUTION[level]
+                new_level = random.choices(
+                    population=list(distribution.keys()),
+                    weights=list(distribution.values()),
+                    k=1
+                )[0]
+
+            p['level'] = new_level
+            event = {
+                'player': p.get('name', 'Unknown'),
+                'from_level': old_level,
+                'target_level': target,
+                'result_level': new_level,
+                'success': bool(success),
+                'protected': bool(protection_requested),
+                'cost': cost,
+                'week': st.get('week', 1),
+                'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S'),
+            }
+            p.setdefault('upgrade_history', []).insert(0, copy.deepcopy(event))
+            p['upgrade_history'] = p['upgrade_history'][:50]
+            st.setdefault('upgrade_history', []).insert(0, event)
+            st['upgrade_history'] = st['upgrade_history'][:200]
+
+            player_events = [x for x in st['upgrade_history'] if x.get('player') == p.get('name')]
+            total_attempts = len(player_events)
+            total_successes = sum(1 for x in player_events if x.get('success'))
+            total_spent = sum(float(x.get('cost', 0)) for x in player_events)
+            if success:
+                flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{new_level}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
+            elif protection_requested:
+                flash(f'ÉP THẺ THẤT BẠI! {p["name"]} giữ nguyên +7 nhờ Thẻ bảo vệ. Đã tiêu hao 1 Thẻ bảo vệ và trừ {format_money(cost)}.')
+            else:
+                flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{new_level}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
+            st['last_upgrade_summary'] = {
+                'player': p.get('name'), 'attempts': total_attempts,
+                'successes': total_successes, 'spent': round(total_spent, 2)
+            }
         elif act=='match':
             result=simulate_match(st)
             session['last_match_result']=copy.deepcopy(result)
