@@ -120,7 +120,7 @@
       <div class="upgrade-next"><div><b>Ép lên +{{lv+1}}</b><span>Tỉ lệ thành công: {{success_rates[lv]}}% · Chi phí: {{cost_rates[lv+1]}}% giá trị gốc</span><small>{{downgrade_text[lv]}}</small></div>
         <form method="post" action="{{url_for('action')}}" class="upgrade-form confirm-action" data-confirm="Xác nhận ép {{p.name}} từ +{{lv}} lên +{{lv+1}}? Tỉ lệ thành công: {{success_rates[lv]}}%. Chi phí: {{(base_value * cost_rates[lv+1] / 100)|money}}. Tiền vẫn bị trừ nếu thất bại.">
           <input type="hidden" name="action" value="upgrade"><input type="hidden" name="group" value="{{group}}"><input type="hidden" name="index" value="{{loop.index0}}">
-          {% if lv == 7 %}<label class="protection-toggle"><input type="checkbox" name="use_protection" value="1"><span>Dùng 1 Thẻ bảo vệ</span></label>{% endif %}
+          {% if lv == 7 %}<label class="protection-toggle"><input type="checkbox" name="protection" value="1"><span>Dùng 1 Thẻ bảo vệ</span></label>{% endif %}
           <button class="button primary" type="submit">Ép +{{lv+1}}</button>
         </form>
       </div>
