@@ -714,3 +714,43 @@ def action():
     return redirect(request.referrer or url_for('dashboard'))
 def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
 if __name__=='__main__': app.run(debug=True)
+# --- HÀM TỰ ĐỘNG GÁN ẢNH 3D CHO CẦU THỦ QUỐC TẾ (LOẠI TRỪ CẦU THỦ VIỆT NAM) ---
+
+# Danh sách chuẩn xác tên các cầu thủ Việt Nam không cần gán ảnh quốc tế
+VIETNAMESE_PLAYERS = [
+    'le hoang quan', 'sweet tran', 'pun', 'ngo trieu vy', 
+    'nguyen le minh', 'le minh khang', 'nguyen chi hieu', 'do huu phuc vinh'
+]
+
+def is_vietnamese_player(player):
+    """Kiểm tra xem cầu thủ có nằm trong danh sách cầu thủ Việt Nam hay không"""
+    name = player.get('name', '').strip().lower()
+    nationality = player.get('nationality', '').strip().lower()
+    
+    # Kiểm tra nếu quốc tịch là Việt Nam hoặc tên trùng khớp với danh sách trên
+    if 'việt nam' in nationality or 'vietnam' in nationality:
+        return True
+        
+    return any(vn_name in name for vn_name in VIETNAMESE_PLAYERS)
+
+def enrich_player_photos(squad_list):
+    """Tự động gán ảnh 3D đẹp mắt cho cầu thủ nước ngoài nếu chưa có photo_url"""
+    pro_3d_portraits = [
+        "https://i.imgur.com/8QWvD2K.png", # Mẫu Bellingham 3D
+        "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?q=80&w=400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
+    ]
+    
+    if not squad_list:
+        return squad_list
+        
+    for i, player in enumerate(squad_list):
+        if not player.get('photo_url') or player.get('photo_url'] == '':
+            if is_vietnamese_player(player):
+                # Nếu là cầu thủ Việt Nam trong danh sách: Giữ nguyên giao diện riêng của họ
+                player['photo_url'] = '' 
+            else:
+                # Nếu là cầu thủ quốc tế: Tự động gán ảnh 3D cao cấp
+                player['photo_url'] = pro_3d_portraits[i % len(pro_3d_portraits)]
+    return squad_list
