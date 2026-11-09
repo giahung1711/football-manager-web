@@ -3,12 +3,14 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
+from marketplace import player_market_bp
 from player_metadata import enrich_player, get_player_metadata
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
+app.register_blueprint(player_market_bp)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deploying')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///football_manager.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
