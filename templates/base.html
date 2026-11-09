@@ -18,6 +18,9 @@
     <a href="{{ url_for('mailbox') }}">Hòm thư</a>
     {% endif %}
     <a href="{{ url_for('game_tab', tab='squad') }}">Đội hình</a>
+    {% if not current_user.is_admin %}
+    <a href="{{ url_for('player_market.player_market') }}">Chợ cầu thủ</a>
+    {% endif %}
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin_panel') }}">Admin</a>
     {% endif %}
