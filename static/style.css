@@ -1458,7 +1458,52 @@
     gap: 10px;
     cursor: pointer;
 }
+/* PLAYER-TO-PLAYER MARKET */
 
+.market-own-player {
+    align-items: center;
+    gap: 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+}
+
+.market-own-player:last-child {
+    border-bottom: 0;
+}
+
+.market-list-form {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: min(100%, 320px);
+}
+
+.market-list-form label {
+    width: 100%;
+    color: var(--muted, #aab2c0);
+    font-size: .85rem;
+}
+
+.market-list-form input[type="number"] {
+    width: 130px;
+    max-width: 100%;
+}
+
+.market-list-form .button {
+    white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+    .market-own-player {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .market-list-form {
+        min-width: 0;
+    }
+}
 .forge-protection span {
     display: inline-block;
 }
