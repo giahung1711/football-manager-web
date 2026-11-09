@@ -48,3 +48,42 @@ class FriendlyChallenge(db.Model):
     status = db.Column(db.String(16), nullable=False, default="pending")
     result_json = db.Column(JSON, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+class PlayerMarketListing(db.Model):
+    __tablename__ = "player_market_listing"
+
+    id = db.Column(db.Integer, primary_key=True)
+    seller_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id"),
+        nullable=False,
+        index=True
+    )
+    buyer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id"),
+        nullable=True,
+        index=True
+    )
+    player_name = db.Column(
+        db.String(100),
+        nullable=False,
+        index=True
+    )
+    player_data = db.Column(JSON, nullable=False)
+    player_group = db.Column(
+        db.String(16),
+        nullable=False,
+        default="bench"
+    )
+    asking_price = db.Column(db.Float, nullable=False)
+    status = db.Column(
+        db.String(16),
+        nullable=False,
+        default="active",
+        index=True
+    )
+    created_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now()
+    )
+    sold_at = db.Column(db.DateTime, nullable=True)
