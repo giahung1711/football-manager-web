@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Chợ cầu thủ · FOOTBALL MANAGER{% endblock %}
+{% block content %}
+
+<section class="page-heading">
+  <p class="eyebrow">PLAYER-TO-PLAYER TRANSFER MARKET</p>
+  <h1>CHỢ <span>CẦU THỦ</span></h1>
+  <p class="muted">
+    Mua bán cầu thủ trực tiếp giữa những người chơi.
+    Cầu thủ giữ nguyên toàn bộ chỉ số và cấp thẻ.
+  </p>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>Tiền chờ nhận</h2>
+      <p class="muted">
+        Tiền bán cầu thủ sẽ nằm ở đây cho đến khi bạn tự nhận.
+      </p>
+    </div>
+
+    <div>
+      <strong>{{ state.pending_market_money|default(0)|money }}</strong>
+
+      <form method="post"
+            action="{{ url_for('player_market.player_market_claim') }}">
+        <button class="button primary"
+                type="submit"
+                {% if state.pending_market_money|default(0)|float <= 0 %}
+                disabled
+                {% endif %}>
+          Nhận tiền
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Đăng bán cầu thủ của tôi</h2>
+
+  <p class="muted">
+    Chỉ đăng được cầu thủ trong mục Dự bị hoặc Cầu thủ khác.
+    Khi đăng bán, cầu thủ sẽ tạm rời khỏi đội bóng và không thể
+    thi đấu, nâng cấp hay sử dụng cho đến khi thu hồi hoặc bán thành công.
+  </p>
+
+  {% if own_players %}
+    {% for item in own_players %}
+
+      <div class="section-head market-own-player">
+        <div>
+          <strong>{{ item.player.name }}</strong>
+
+          <p class="muted">
+            {{ item.player.position }}
+            · OVR {{ item.ovr }}
+            · +{{ item.player.level|default(0) }}
+            · Giá trị {{ item.value|money }}
+          </p>
+
+          <p class="muted">
+            Giá được phép:
+            {{ item.minimum|money }} – {{ item.maximum|money }}
+            · {{ item.requirement }}
+          </p>
+        </div>
+
+        {% if item.eligible %}
+
+          <form method="post"
+                action="{{ url_for('player_market.player_market_list') }}"
+                class="market-list-form">
+
+            <input type="hidden"
+                   name="group"
+                   value="{{ item.group }}">
+
+            <input type="hidden"
+                   name="index"
+                   value="{{ item.index }}">
+
+            <label>Giá bán (M€)</label>
+
+            <input type="number"
+                   name="asking_price"
+                   min="{{ '%.2f'|format(item.minimum) }}"
+                   max="{{ '%.2f'|format(item.maximum) }}"
+                   step="0.01"
+                   value="{{ '%.2f'|format(item.value) }}"
+                   required>
+
+            <button class="button" type="submit">
+              Đăng bán
+            </button>
+          </form>
+
+        {% else %}
+
+          <span class="muted">
+            Chưa đủ điều kiện đăng bán
+          </span>
+
+        {% endif %}
+      </div>
+
+    {% endfor %}
+  {% else %}
+
+    <p class="muted">
+      Bạn chưa có cầu thủ trong mục Dự bị hoặc Cầu thủ khác để đăng bán.
+    </p>
+
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Cầu thủ đang được rao bán</h2>
+
+  {% if listings %}
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cầu thủ</th>
+            <th>Vị trí</th>
+            <th>OVR</th>
+            <th>Cấp thẻ</th>
+            <th>Người bán</th>
+            <th>Giá</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for listing in listings %}
+
+            <tr>
+              <td>
+                <strong>{{ listing.player_name }}</strong>
+              </td>
+
+              <td>{{ listing.player_data.position }}</td>
+
+              <td>
+                {{ listing.player_data.rating
+                   + [0,1,2,3,4,6,8,10,13][listing.player_data.level|int] }}
+              </td>
+
+              <td>
+                +{{ listing.player_data.level|default(0) }}
+              </td>
+
+              <td>
+                {{ sellers.get(listing.seller_id, 'Người chơi') }}
+              </td>
+
+              <td>
+                {{ listing.asking_price|money }}
+              </td>
+
+              <td>
+                {% if listing.seller_id == current_user.id %}
+
+                  <form method="post"
+                        action="{{ url_for(
+                          'player_market.player_market_withdraw',
+                          listing_id=listing.id
+                        ) }}">
+
+                    <button class="button" type="submit">
+                      Thu hồi
+                    </button>
+                  </form>
+
+                {% else %}
+
+                  <form method="post"
+                        action="{{ url_for(
+                          'player_market.player_market_buy',
+                          listing_id=listing.id
+                        ) }}"
+                        class="confirm-action"
+                        data-confirm="Mua {{ listing.player_name }} với giá {{ listing.asking_price|money }}?">
+
+                    <button class="button primary" type="submit">
+                      Mua
+                    </button>
+                  </form>
+
+                {% endif %}
+              </td>
+            </tr>
+
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+
+    <p class="muted">
+      Hiện chưa có cầu thủ nào được đăng bán.
+    </p>
+
+  {% endif %}
+
+  <p class="muted">
+    OVR, cấp thẻ, giá trị gốc và dữ liệu cầu thủ được chuyển nguyên vẹn.
+    Mỗi tin đăng chỉ có thể được mua một lần.
+  </p>
+</section>
+
+{% endblock %}
