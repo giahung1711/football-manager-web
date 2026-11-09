@@ -391,67 +391,111 @@ def normalize_state(st):
     # Migrate legacy saves without resetting progress or existing owned players.
     if not isinstance(st, dict):
         st = {}
+
     club = st.get('club')
+
     if 'starting' not in st:
         old = st.pop('players', []) or []
         st['starting'] = old[:11]
         st['bench'] = old[11:]
+
     st.setdefault('starting', [])
+
     # Migrate legacy entries and enforce one copy of each player across the whole club.
-    # Keep the first copy (starting XI has priority), so a duplicate cannot silently
-    # occupy two slots or block match validation.
     seen_names = set()
+
     def clean_players(items):
         cleaned = []
+
         for item in (items or []):
             try:
                 record = player(item) if isinstance(item, str) else copy.deepcopy(item)
+
                 if not isinstance(record, dict) or not record.get('name'):
                     continue
+
                 name = str(record['name']).strip()
+
                 if not name or name.casefold() in seen_names:
                     continue
+
                 record['name'] = name
                 seen_names.add(name.casefold())
                 cleaned.append(record)
+
             except (TypeError, KeyError, ValueError):
                 continue
+
         return cleaned
+
     st['starting'] = clean_players(st.get('starting'))
     st['bench'] = clean_players(st.get('bench'))
     st['extras'] = clean_players(st.get('extras'))
-    # Add default substitutes only when they are not already owned in any group.
-    owned_names = {p['name'] for group in ('starting', 'bench', 'extras') for p in st[group]}
+
+    # Add default substitutes only when they are not already owned.
+    owned_names = {
+        p['name']
+        for group in ('starting', 'bench', 'extras')
+        for p in st[group]
+    }
+
     default_bench = [player(x) for x in BENCH.get(club, [])]
-    st['bench'].extend(p for p in default_bench if p['name'] not in owned_names)
+    st['bench'].extend(
+        p for p in default_bench if p['name'] not in owned_names
+    )
+
     st.setdefault('extras', [])
     st.setdefault('market', copy.deepcopy(TRANSFER_MARKET))
+
     # GOAT players are pack-only, not part of the ordinary transfer market.
     goat_names = set(PACKS['4']['players'])
     st['market'] = [n for n in st['market'] if n not in goat_names]
+
     # Preserve a valid saved balance; repair only legacy saves with no balance.
     if 'budget' not in st or st['budget'] is None:
-        st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
+        st['budget'] = next(
+            (b for _, (n, b) in CLUB_OPTIONS.items() if n == club),
+            0
+        )
+
     try:
         st['budget'] = round(max(0.0, float(st['budget'])), 2)
+
         # Match the original Python game: a new Real Madrid save starts at 300 M€.
-        # One-time correction for the current save that was initialized at 180 M€.
         if club == 'Real Madrid' and st['budget'] == 180.0:
             st['budget'] = 300.0
+
         # Legacy repair: balances are stored in million euros (M€).
-        # Older saves may contain the same balance as raw euros by mistake.
         if st['budget'] > 100_000:
             st['budget'] = round(st['budget'] / 1_000_000, 2)
-    except (TypeError, ValueError):
-        st['budget'] = next((b for _, (n, b) in CLUB_OPTIONS.items() if n == club), 0)
-    st.setdefault('season', 1); st.setdefault('week', 1)
-    st.setdefault('points', 0); st.setdefault('wins', 0); st.setdefault('draws', 0); st.setdefault('losses', 0)
-    st.setdefault('formation', '4-3-3 (Tấn công)');
-    if st.get('formation') == '4-3-3': st['formation'] = '4-3-3 (Tấn công)'; st.setdefault('activity', []); st.setdefault('match_history', [])
-    if not isinstance(st['match_history'], list): st['match_history'] = []
-    st['match_history'] = st['match_history'][:5]
-    return st
 
+    except (TypeError, ValueError):
+        st['budget'] = next(
+            (b for _, (n, b) in CLUB_OPTIONS.items() if n == club),
+            0
+        )
+
+    st.setdefault('season', 1)
+    st.setdefault('week', 1)
+    st.setdefault('points', 0)
+    st.setdefault('wins', 0)
+    st.setdefault('draws', 0)
+    st.setdefault('losses', 0)
+    st.setdefault('formation', '4-3-3 (Tấn công)')
+
+    if st.get('formation') == '4-3-3':
+        st['formation'] = '4-3-3 (Tấn công)'
+
+    # Always initialize these fields, including for older saves.
+    st.setdefault('activity', [])
+    st.setdefault('match_history', [])
+
+    if not isinstance(st['match_history'], list):
+        st['match_history'] = []
+
+    st['match_history'] = st['match_history'][:5]
+
+    return st
 def all_players(st): return st['starting']+st['bench']+st['extras']
 def get_dashboard(st):
     arr=st['starting']; return {"club":st['club'],"budget":st['budget'],"season":st['season'],"week":st['week'],"points":st['points'],"wins":st['wins'],"draws":st['draws'],"losses":st['losses'],"formation":st['formation'],"squad_size":len(all_players(st)),"average_rating":round(sum(player_upgrade_ovr(p) for p in arr)/max(1,len(arr)),1),"total_value":round(sum(value(p) for p in all_players(st)),2)}
