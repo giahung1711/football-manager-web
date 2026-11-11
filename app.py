@@ -61,8 +61,8 @@ def admin_required(view):
     return wrapped
 
 def format_money(amount):
-    euros = int(round(float(amount or 0) * 1_000_000))
-    return f"{euros:,}".replace(',', '.') + ' €'
+    pc_units = int(round(float(amount or 0) * 1_000_000))
+    return f"🪙 {pc_units:,}".replace(',', '.') + ' PC'
 
 app.jinja_env.filters['money'] = format_money
 
@@ -83,6 +83,10 @@ def load_state(save):
     original = copy.deepcopy(save.state or {})
     state = normalize_state(copy.deepcopy(original))
     state.setdefault('inventory', {})
+    try:
+        state['pg_balance'] = max(0, int(state.get('pg_balance', 0) or 0))
+    except (TypeError, ValueError):
+        state['pg_balance'] = 0
     state.setdefault('upgrade_history', [])
     if state != original:
         save.state = copy.deepcopy(state)
@@ -111,9 +115,13 @@ def page(save, tab='overview', extra=None):
                 continue
             market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
     match_popup=session.pop('last_match_result', None)
+    ballon_reveal = st.pop('ballon_reveal', None)
+    ballon_reveal_meta = enrich_player(ballon_reveal) if ballon_reveal else None
+    if ballon_reveal:
+        persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
                            prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
-                           market=st['market'], market_items=market_items, upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
+                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
 @app.route('/')
 def home():
@@ -165,14 +173,6 @@ def dashboard():
 def game_tab(tab):
     if tab not in {'squad','transfers','shop','upgrade','tactics','finance','matches'}: return redirect(url_for('dashboard'))
     save=current_save(); return redirect(url_for('choose_club')) if not save else page(save,tab)
-
-
-@app.route('/match-3d-demo')
-@login_required
-def match_3d_demo():
-    # Isolated visual prototype: does not modify match results or saved club data.
-    return render_template('match_3d.html')
-
 @app.route('/admin', methods=['GET'])
 @admin_required
 def admin_panel():
@@ -434,15 +434,42 @@ def admin_budget():
             raise ValueError('Không tìm thấy dữ liệu game của tài khoản này.')
         state = load_state(save)
         state['budget'] = round(float(state.get('budget', 0)) + amount, 2)
-        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng €{amount:g}M', 'week': state.get('week', 1)})
+        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng 🪙 {amount:g}M PC', 'week': state.get('week', 1)})
         state['activity'] = state['activity'][:15]
         persist(save, state)
-        flash(f'Đã tặng €{amount:g}M cho tài khoản {recipient.username}.')
+        flash(f'Đã tặng 🪙 {amount:g}M PC cho tài khoản {recipient.username}.')
     except (ValueError, TypeError) as error:
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
 
+
+
+@app.post('/admin/pg')
+@admin_required
+def admin_pg():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        amount = int(request.form.get('amount', '0'))
+        if amount <= 0 or amount > 1_000_000_000:
+            raise ValueError('Số PG phải là số nguyên dương hợp lệ.')
+        recipient = db.session.get(User, user_id)
+        save = GameSave.query.filter_by(user_id=user_id).first()
+        if not recipient or recipient.is_admin or not save:
+            raise ValueError('Không tìm thấy tài khoản người chơi hợp lệ.')
+        state = load_state(save)
+        state['pg_balance'] = int(state.get('pg_balance', 0)) + amount
+        state.setdefault('activity', []).insert(0, {'message': f'Admin tặng 💎 {amount:,} PG', 'week': state.get('week', 1)})
+        state['activity'] = state['activity'][:15]
+        persist(save, state)
+        flash(f'Đã tặng {amount:,} PG cho tài khoản {recipient.username}.')
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
+        flash(str(error))
+    return redirect(url_for('admin_panel'))
 
 def friend_pair(a, b):
     return (min(a, b), max(a, b))
@@ -688,7 +715,7 @@ def friendly_challenge_decide(challenge_id, decision):
 @app.post('/action')
 @login_required
 def action():
-    save=current_save()
+    save=GameSave.query.filter_by(user_id=current_user.id).with_for_update().first()
     if not save: return redirect(url_for('choose_club'))
     st=load_state(save); act=request.form.get('action'); result=None
     try:
@@ -785,7 +812,7 @@ def action():
             if any(x['name']==name for x in all_players(st)): raise ValueError('Bạn đã sở hữu cầu thủ này.')
             cost=float(PLAYER_PRICES.get(name,0))
             if cost <= 0: raise ValueError('Giá cầu thủ không hợp lệ.')
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần €{cost:g}M, hiện có €{st["budget"]:g}M.')
+            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần 🪙 {cost:g}M PC, hiện có 🪙 {st["budget"]:g}M PC.')
             st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name)); st['market'].remove(name)
             flash(f'Chiêu mộ thành công {name}. Đã trừ {format_money(cost)}. Ngân sách còn {format_money(st["budget"])}.')
         elif act=='sell':
@@ -795,11 +822,76 @@ def action():
             arr.pop(idx); st['budget']=round(st['budget']+amount,2)
             if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']: st['market'].append(p['name'])
             flash(f'Đã bán {p["name"]}, cộng {format_money(amount)}. Ngân sách: {format_money(st["budget"])}.')
+
+        elif act=='ballon_pack':
+            # Server-side one-time token prevents a browser double-submit from charging twice.
+            request_id = request.form.get('request_id', '').strip()
+            if not request_id or len(request_id) > 100:
+                raise ValueError('Yêu cầu mở gói không hợp lệ. Hãy tải lại trang.')
+            processed = st.setdefault('processed_ballon_requests', [])
+            if request_id in processed:
+                flash('Gói này đã được xử lý trước đó.')
+                persist(save, st)
+                return redirect(url_for('game_tab', tab='shop'))
+            cost_pg = 2000
+            if int(st.get('pg_balance', 0)) < cost_pg:
+                raise ValueError(f'Không đủ PG. Ballon D’or Pack giá {cost_pg:,} PG; bạn hiện có {int(st.get("pg_balance", 0)):,} PG.')
+            pool_a = [
+                ('Lionel Messi','RW',102,8), ('C. Ronaldo','LW',102,8),
+                ('Zinedine Zidane','CAM',101,14), ('Franz Beckenbauer','CB',101,14),
+                ('Ronaldo Nazário','ST',101,14), ('Ruud Gullit','CM',101,14),
+                ('Lothar Matthäus','CDM',101,14), ('Lev Yashin','GK',101,14)
+            ]
+            pool_b = [
+                ('Neymar Junior','LW',100,2.4), ('R. Lewandowski','ST',100,2.4),
+                ('Van Dijk','CB',99,4), ('Paolo Maldini','CB',100,2.4),
+                ('Kylian Mbappe','ST',99,4), ('Sadio Mané','LW',99,4),
+                ('Gareth Bale','RW',98,8), ('Mohamed Salah','RW',98,8),
+                ('Baresi','CB',99,4), ('Xavi','CM',99,4), ('David Beckham','CM',99,4),
+                ('Toni Kroos','CAM',98,8), ('KDB','CAM',99,4),
+                ('Frank Rijkaard','CDM',100,2.4), ("N'Golo Kanté",'CDM',98,8),
+                ('G. Buffon','GK',100,2.4), ('M. Neuer','GK',99,4),
+                ('Achraf Hakimi','RB',98,8), ('Philipp Lahm','RB',99,4),
+                ('Roberto Carlos','LB',99,4), ('Nuno Mendes','LB',98,8)
+            ]
+            selected_pool = 'A' if random.random() < .20 else 'B'
+            pool = pool_a if selected_pool == 'A' else pool_b
+            names, weights = zip(*[(x, x[3]) for x in pool])
+            name, position, rating, _weight = random.choices(names, weights=weights, k=1)[0]
+            awarded = {'name': name, 'position': position, 'rating': rating, 'level': 0,
+                       'event_card': 'ballon_dor', 'original_rating': rating,
+                       'card_season': 'Ballon D’or'}
+            st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
+            st.setdefault('bench', []).append(awarded)
+            processed.append(request_id)
+            st['processed_ballon_requests'] = processed[-100:]
+            flags = {
+                'Lionel Messi':'🇦🇷','C. Ronaldo':'🇵🇹','Zinedine Zidane':'🇫🇷',
+                'Franz Beckenbauer':'🇩🇪','Ronaldo Nazário':'🇧🇷','Ruud Gullit':'🇳🇱',
+                'Lothar Matthäus':'🇩🇪','Lev Yashin':'🇷🇺','Neymar Junior':'🇧🇷',
+                'R. Lewandowski':'🇵🇱','Van Dijk':'🇳🇱','Paolo Maldini':'🇮🇹',
+                'Kylian Mbappe':'🇫🇷','Sadio Mané':'🇸🇳','Gareth Bale':'🇬🇧',
+                'Mohamed Salah':'🇪🇬','Baresi':'🇮🇹','Xavi':'🇪🇸',
+                'David Beckham':'🇬🇧','Toni Kroos':'🇩🇪','KDB':'🇧🇪',
+                'Frank Rijkaard':'🇳🇱',"N'Golo Kanté":'🇫🇷','G. Buffon':'🇮🇹',
+                'M. Neuer':'🇩🇪','Achraf Hakimi':'🇲🇦','Philipp Lahm':'🇩🇪',
+                'Roberto Carlos':'🇧🇷','Nuno Mendes':'🇵🇹'
+            }
+            st['ballon_reveal'] = {
+                'id': request_id, 'name': name, 'position': position, 'rating': rating,
+                'pool': selected_pool, 'country_flag': flags.get(name, '🌍')
+            }
+            st.setdefault('activity', []).insert(0, {
+                'message': f'Mở Ballon D’or Pack: nhận {name} OVR {rating} (-2.000 PG)',
+                'week': st.get('week', 1)
+            })
+            flash(f'Đã mở Ballon D’or Pack và nhận {name} OVR {rating}!')
+
         elif act=='pack':
             key=request.form.get('pack')
             if key not in PACKS: raise ValueError('Gói cầu thủ không hợp lệ.')
             pack=PACKS[key]; cost=float(pack['price'])
-            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Gói giá €{cost:g}M, anh hiện có €{st["budget"]:g}M.')
+            if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Gói giá 🪙 {cost:g}M PC, bạn hiện có 🪙 {st["budget"]:g}M PC.')
             p=random.choice(pack['players'])
             st['budget']=round(st['budget']-cost,2); st['bench'].append(player(p))
             flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ {format_money(cost)}, còn {format_money(st["budget"])}.')
@@ -900,5 +992,5 @@ def action():
     except (ValueError,KeyError,IndexError,TypeError) as e:
         db.session.rollback(); flash(str(e))
     return redirect(request.referrer or url_for('dashboard'))
-def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
+def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
 if __name__=='__main__': app.run(debug=True)

@@ -1507,3 +1507,73 @@
 .forge-protection span {
     display: inline-block;
 }
+
+/* Ballon D'or event pack */
+.ballon-pack-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:26px;padding:24px;border:1px solid rgba(220,180,85,.55);border-radius:20px;background:radial-gradient(circle at 85% 15%,rgba(224,180,74,.2),transparent 36%),linear-gradient(135deg,#171717,#292116);box-shadow:0 16px 44px rgba(0,0,0,.22)}
+.ballon-pack-card h2{margin:4px 0 8px;color:#f5d98b}.ballon-price{display:inline-block;color:#c7a7ff;font-size:1.2rem;margin:8px 0}
+.ballon-reveal-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:18px;background:radial-gradient(circle,rgba(110,77,22,.84),rgba(4,5,10,.97));backdrop-filter:blur(10px)}
+.ballon-reveal-stage{position:relative;width:min(520px,100%);min-height:470px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;border:1px solid rgba(255,220,130,.4);border-radius:26px;padding:30px;background:linear-gradient(145deg,#17130b,#090a10);box-shadow:0 0 70px rgba(234,190,86,.22);overflow:hidden}
+.ballon-reveal-stage:before{content:"";position:absolute;inset:-50%;background:conic-gradient(from 0deg,transparent,rgba(244,207,120,.14),transparent 35%);animation:ballonSpin 8s linear infinite;pointer-events:none}
+.ballon-reveal-stage>*{position:relative}.ballon-skip{position:absolute;right:18px;top:16px;z-index:2;border:1px solid #bca66e;border-radius:20px;padding:8px 14px;color:#f8e6b6;background:#292216;cursor:pointer}
+.ballon-reveal-flag{font-size:76px;margin:28px 0;animation:ballonPulse 1.1s infinite}.ballon-reveal-position,.ballon-reveal-club{font-size:44px;font-weight:900;color:#f7d77f;opacity:0;transform:scale(.6);transition:.45s}.ballon-reveal-club{font-size:66px;margin:14px}
+.ballon-reveal-position.shown,.ballon-reveal-club.shown{opacity:1;transform:scale(1)}.ballon-reveal-flag.hidden,.ballon-reveal-position.hidden,.ballon-reveal-club.hidden{display:none}
+.ballon-reveal-card{display:none;width:min(300px,100%);padding:26px 20px;border:2px solid #e6c36e;border-radius:22px;background:radial-gradient(circle at 50% 0,rgba(255,221,133,.28),transparent 42%),linear-gradient(155deg,#29200f,#090a10);box-shadow:0 0 42px rgba(244,204,107,.35);animation:ballonCardIn .7s cubic-bezier(.2,.8,.2,1)}
+.ballon-reveal-card.shown{display:block}.ballon-reveal-card h2{color:#ffe5a1;margin:12px 0}.ballon-reveal-card strong{display:block;font-size:2rem;color:#f6d47d}.ballon-reveal-card span{display:block;margin-top:8px;color:#d5d0c3}
+.ballon-card-orb{font-size:58px;filter:drop-shadow(0 0 14px #d9ac46)}#revealStatus{margin-top:18px;color:#f4e4b8}
+@keyframes ballonSpin{to{transform:rotate(360deg)}}@keyframes ballonPulse{50%{transform:scale(1.12);filter:drop-shadow(0 0 22px #eac15d)}}@keyframes ballonCardIn{from{opacity:0;transform:rotateY(90deg) scale(.65)}to{opacity:1;transform:rotateY(0) scale(1)}}
+@media(max-width:600px){.ballon-pack-card{align-items:flex-start;flex-direction:column}.ballon-pack-card form,.ballon-pack-card button{width:100%}.ballon-reveal-stage{min-height:420px;padding:20px}}
+
+.ballon-reveal-club img{width:78px;height:78px;object-fit:contain;background:transparent;border:0;box-shadow:none}
+.special-emblem{display:inline-flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:24px;font-size:.85rem;font-weight:950;letter-spacing:1px;border:2px solid #d6b45f;background:linear-gradient(145deg,#f7df9a,#6c4d19 55%,#17130b);color:#241a08;box-shadow:0 0 25px #d5ad4a66}
+.heroes-emblem{border-color:#7eb4ed;background:linear-gradient(145deg,#b8d8ff,#234c80 60%,#111d35);color:#fff}
+.metadata-pending{font-size:.85rem;color:#bdb4a0;max-width:240px}
+
+.ballon-controls{position:absolute;top:14px;left:14px;right:110px;display:flex;justify-content:flex-start}
+.ballon-sound{border:1px solid rgba(255,220,130,.55);border-radius:20px;padding:8px 12px;color:#f8e6b6;background:#292216;cursor:pointer}
+
+
+/* BALLON D'OR seasonal card frame — overrides base rarity frame, not player OVR. */
+.pitch-positioned .pitch-player-card.ornate-card.card-ballon-dor{
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse at 50% 12%,rgba(255,246,197,.72),transparent 34%),
+    linear-gradient(150deg,#fff9d9 0%,#e8c45e 12%,#9c6b19 28%,#3e2708 58%,#130e08 86%,#f0cc68 100%);
+  border:0;
+  filter:drop-shadow(0 0 7px rgba(255,210,92,.65)) drop-shadow(0 8px 9px #000c);
+  animation:ballonFrameShine 3.8s ease-in-out infinite;
+}
+.pitch-positioned .pitch-player-card.ornate-card.card-ballon-dor:before{
+  inset:2px 3px 4px;
+  border:3px double #fff0a6;
+  box-shadow:inset 0 0 13px #ffe69a99,0 0 10px #ffd65a99;
+  background:linear-gradient(135deg,#fff9d633,transparent 42%,#10090055);
+}
+.pitch-positioned .pitch-player-card.ornate-card.card-ballon-dor:after{
+  inset:7px 8px 10px;
+  border:1px solid #fff0bdcc;
+  box-shadow:inset 0 0 10px #ffe6a233;
+}
+.pitch-positioned .card-ballon-dor .event-card-label{
+  position:absolute;left:50%;top:48px;transform:translateX(-50%);z-index:5;
+  padding:2px 7px;border:1px solid #fff0a8;border-radius:10px;
+  background:linear-gradient(90deg,#4b3008,#d9ad42 48%,#4b3008);
+  color:#fff8d9;font:1000 7px/1.2 Inter,Arial,sans-serif;letter-spacing:1px;
+  white-space:nowrap;text-shadow:0 1px 3px #3b2100;
+  box-shadow:0 0 9px #ffdb72a8;
+}
+.pitch-positioned .card-ballon-dor .player-ovr,
+.pitch-positioned .card-ballon-dor .player-position,
+.pitch-positioned .card-ballon-dor strong{color:#fff6d6;text-shadow:0 2px 4px #160d02,0 0 7px #9d6b17}
+.pitch-positioned .card-ballon-dor .upgrade-badge{border-color:#fff0b8;box-shadow:0 0 8px #ffd76d88}
+.ballon-reveal-ballon-dor{
+  position:relative;isolation:isolate;overflow:hidden;
+  border:3px double #ffe7a0!important;border-radius:24px!important;
+  background:radial-gradient(ellipse at 50% 0,#ffe7a055,transparent 45%),linear-gradient(145deg,#fff4c4 0%,#bd8a2d 13%,#39250a 43%,#0b0a0b 78%,#d2a342 100%)!important;
+  box-shadow:0 0 0 5px #8c642b88,0 0 55px #f3c75d88,inset 0 0 25px #ffe6a244!important;
+}
+.ballon-reveal-ballon-dor:before{content:"";position:absolute;inset:8px;border:1px solid #fff0bd;border-radius:17px;pointer-events:none;box-shadow:inset 0 0 20px #ffdf7b33}
+.ballon-reveal-ballon-dor .ballon-card-orb{color:#ffe49a;text-shadow:0 0 15px #ffd45a}
+.ballon-reveal-ballon-dor p,.ballon-reveal-ballon-dor h2,.ballon-reveal-ballon-dor strong,.ballon-reveal-ballon-dor span{position:relative;z-index:1}
+@keyframes ballonFrameShine{0%,100%{filter:drop-shadow(0 0 6px #d8a43d88) drop-shadow(0 8px 9px #000c)}50%{filter:drop-shadow(0 0 13px #ffe18dcc) drop-shadow(0 8px 9px #000c)}}
+@media(max-width:700px){.pitch-positioned .card-ballon-dor .event-card-label{top:37px;font-size:5px;padding:1px 4px}}
+@media(prefers-reduced-motion:reduce){.pitch-positioned .pitch-player-card.ornate-card.card-ballon-dor{animation:none}}

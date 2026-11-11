@@ -178,7 +178,7 @@ def player_market_list():
         if asking_price < minimum - 1e-8 or asking_price > maximum + 1e-8:
             raise ValueError(
                 f"Giá bán phải nằm trong khoảng "
-                f"{minimum:.2f}–{maximum:.2f} M€ (90%–110% giá trị hiện tại)."
+                f"{minimum:.2f}–{maximum:.2f} M PC (90%–110% giá trị hiện tại)."
             )
 
         already_listed = PlayerMarketListing.query.filter_by(
@@ -208,7 +208,7 @@ def player_market_list():
         db.session.commit()
 
         flash(
-            f"Đã đăng bán {p['name']} với giá {asking_price:.2f} M€."
+            f"Đã đăng bán {p['name']} với giá {asking_price:.2f} M PC."
         )
 
     except ValueError as exc:
@@ -465,7 +465,7 @@ def player_market_claim():
         db.session.commit()
 
         flash(
-            f"Đã nhận {pending:.2f} M€ vào ngân sách CLB."
+            f"Đã nhận {pending:.2f} M PC vào ngân sách CLB."
         )
 
     except ValueError as exc:

@@ -520,6 +520,7 @@ def create_new_game(club):
 
     return {
         "club": club,
+        "pg_balance": 0,
         "budget": next(
             budget
             for _, (name, budget) in CLUB_OPTIONS.items()
@@ -687,6 +688,10 @@ def normalize_state(st):
 
     st.setdefault('activity', [])
     st.setdefault('match_history', [])
+    try:
+        st['pg_balance'] = max(0, int(st.get('pg_balance', 0) or 0))
+    except (TypeError, ValueError):
+        st['pg_balance'] = 0
 
     if not isinstance(st['match_history'], list):
         st['match_history'] = []

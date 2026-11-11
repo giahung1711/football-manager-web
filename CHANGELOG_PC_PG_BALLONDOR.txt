@@ -1,0 +1,14 @@
+FOOTBALL MANAGER - PC / PG / BALLON D'OR UPDATE
+
+- Existing club budget remains stored in GameSave.state['budget']; all displayed currency labels now use P Coin (PC).
+- Added separate GameSave.state['pg_balance']; existing saves migrate to 0 PG automatically.
+- Admin can grant PG from the Admin panel.
+- Ballon D'or Pack costs 2,000 PG, rolls Pool A at 20% / Pool B at 80%, then selects within the pool using the specified tier rates.
+- The awarded player is added to the bench exactly once; a per-request token is persisted to reject duplicate submissions.
+- The reveal is a presentation of the already-awarded player. Refreshing the page cannot reroll the pack.
+- Current club / ICON / HEROES reveal logos use the existing verified player metadata integration. If metadata is unavailable or a retired player's ICON/HEROES classification is not configured, the reveal intentionally shows a verification message rather than inventing a club or card type.
+- New accounts start with 0 PG. Use Admin > Tặng P Gems to grant PG.
+
+IMPORTANT:
+- This source package intentionally excludes the uploaded instance/football_manager.db and __pycache__ files. It does not contain or replace production account data.
+- No deployment has been performed.

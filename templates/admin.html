@@ -180,7 +180,7 @@
     <input type="url" name="metadata_source_url" maxlength="500"
            placeholder="https://...">
 
-    <label>Giá trị chuyển nhượng (triệu €)</label>
+    <label>Giá trị chuyển nhượng (triệu PC)</label>
     <input type="number" name="transfer_value"
            min="0" step="any" value="100" required>
 
@@ -257,7 +257,7 @@
       {% endfor %}
     </select>
 
-    <label>Số tiền (triệu €, tự do)</label>
+    <label>Số tiền (triệu PC, tự do)</label>
     <input type="number" name="amount"
            min="0.000001" step="any" placeholder="Ví dụ: 100" required>
 
@@ -266,4 +266,22 @@
     </button>
   </form>
 </section>
+
+
+<section class="panel admin-panel">
+  <p class="eyebrow">P GEMS · PREMIUM CURRENCY</p>
+  <h2>Tặng P Gems (PG)</h2>
+  <form method="post" action="{{ url_for('admin_pg') }}" class="admin-form">
+    <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+    <label>Tài khoản người nhận</label>
+    <select name="user_id" required>
+      {% for user in users if not user.is_admin %}
+      <option value="{{user.id}}">{{user.username}}</option>
+      {% endfor %}
+    </select>
+    <label>Số lượng PG</label><input type="number" name="amount" min="1" step="1" required placeholder="Ví dụ: 2000">
+    <button class="button primary" type="submit">Tặng PG</button>
+  </form>
+</section>
+
 {% endblock %}

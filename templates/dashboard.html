@@ -2,7 +2,7 @@
 {% block content %}
 <div class="welcome"><div><p class="eyebrow">MANAGER DESK · SEASON {{ data.season }}</p><h1>{{ data.club }}</h1><p class="muted">Xin chào, {{ username }}. Sẵn sàng dẫn dắt đội bóng chưa?</p></div><div class="club-mark large">{{ data.club[0] }}</div></div>
 <div class="stats">
-  <div class="stat"><span>Ngân sách</span><strong>€{{ '{:,.0f}'.format(data.budget) }}</strong></div>
+  <div class="stat"><span>Ngân sách</span><strong>🪙 {{ '{:,.0f}'.format(data.budget * 1000000) }} PC</strong></div>
   <div class="stat"><span>Điểm số</span><strong>{{ data.points }}</strong></div>
   <div class="stat"><span>Đội hình</span><strong>{{ data.squad_size }} cầu thủ</strong></div>
   <div class="stat"><span>OVR trung bình</span><strong>{{ data.average_rating }}</strong></div>
