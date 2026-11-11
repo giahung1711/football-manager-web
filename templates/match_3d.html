@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Demo sân 3D · FOOTBALL MANAGER{% endblock %}
+{% block content %}
+<section class="match3d-page">
+  <div class="match3d-heading">
+    <div>
+      <p class="eyebrow">FBM 3D · STYLE C · PROTOTYPE 01</p>
+      <h1>Sân vận động 3D</h1>
+      <p class="muted">Bản thử nghiệm đầu tiên · Sân bóng, ánh sáng và camera Broadcast</p>
+    </div>
+    <a class="button" href="{{ url_for('dashboard') }}">Quay lại FBM</a>
+  </div>
+  <div class="match3d-stage">
+    <div class="match3d-score"><span>HOME</span><strong>0 - 0</strong><span>AWAY</span><small>00:00 · DEMO</small></div>
+    <div id="fbm3d-canvas" aria-label="Sân bóng 3D"></div>
+    <div class="match3d-hint">Kéo chuột để xoay góc nhìn · Cuộn để phóng to/thu nhỏ</div>
+    <div class="match3d-error" id="fbm3d-error" hidden>Không tải được thư viện đồ họa 3D. Hãy kiểm tra kết nối mạng rồi tải lại trang.</div>
+  </div>
+</section>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/match3d.css') }}">
+<script type="module" src="{{ url_for('static', filename='js/match3d/main.js') }}"></script>
+{% endblock %}

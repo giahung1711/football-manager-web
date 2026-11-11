@@ -165,6 +165,14 @@ def dashboard():
 def game_tab(tab):
     if tab not in {'squad','transfers','shop','upgrade','tactics','finance','matches'}: return redirect(url_for('dashboard'))
     save=current_save(); return redirect(url_for('choose_club')) if not save else page(save,tab)
+
+
+@app.route('/match-3d-demo')
+@login_required
+def match_3d_demo():
+    # Isolated visual prototype: does not modify match results or saved club data.
+    return render_template('match_3d.html')
+
 @app.route('/admin', methods=['GET'])
 @admin_required
 def admin_panel():
