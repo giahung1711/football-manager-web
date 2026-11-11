@@ -28,10 +28,39 @@ def _write_state(save, state):
     db.session.add(save)
 
 
+def _market_removed_names(state):
+    names = state.get("market_removed_players", [])
+    if not isinstance(names, list):
+        names = []
+    state["market_removed_players"] = names
+    return names
+
+
+def _mark_market_removed(state, player_name):
+    names = _market_removed_names(state)
+    key = str(player_name).strip().casefold()
+
+    if key and not any(
+        str(name).strip().casefold() == key
+        for name in names
+    ):
+        names.append(str(player_name).strip())
+
+
+def _unmark_market_removed(state, player_name):
+    key = str(player_name).strip().casefold()
+
+    state["market_removed_players"] = [
+        name for name in _market_removed_names(state)
+        if str(name).strip().casefold() != key
+    ]
+
+
 @player_market_bp.get("/player-market")
 @login_required
 def player_market():
     save = _get_save(current_user.id)
+
     if not save:
         return redirect(url_for("choose_club"))
 
@@ -170,8 +199,9 @@ def player_market_list():
             status="active",
         )
 
-        # Đưa cầu thủ ra khỏi đội bóng trong thời gian đăng bán.
+        # Đưa cầu thủ ra khỏi đội và đánh dấu đã rời CLB.
         players.pop(index)
+        _mark_market_removed(state, p["name"])
 
         _write_state(save, state)
         db.session.add(listing)
@@ -211,7 +241,7 @@ def player_market_buy(listing_id):
         if listing.seller_id == current_user.id:
             raise ValueError("Bạn không thể tự mua cầu thủ do mình đăng bán.")
 
-        # Khóa dữ liệu hai đội bóng theo thứ tự ID để giảm nguy cơ deadlock.
+        # Khóa dữ liệu hai đội bóng theo thứ tự ID.
         user_ids = sorted({listing.seller_id, current_user.id})
 
         saves = (
@@ -252,7 +282,7 @@ def player_market_buy(listing_id):
         ):
             raise ValueError("Bạn đã sở hữu cầu thủ này rồi.")
 
-        # Chỉ một giao dịch được phép chuyển trạng thái tin đăng sang sold.
+        # Chỉ một giao dịch được phép chuyển tin đăng sang sold.
         from sqlalchemy import update
 
         result = db.session.execute(
@@ -277,7 +307,10 @@ def player_market_buy(listing_id):
             2
         )
 
-        # Đưa cầu thủ vào Dự bị người mua, giữ nguyên dữ liệu.
+        # Xóa dấu rời CLB cũ nếu người mua từng bán cầu thủ cùng tên.
+        _unmark_market_removed(buyer_state, listing.player_name)
+
+        # Đưa cầu thủ vào Dự bị, giữ nguyên dữ liệu.
         buyer_state.setdefault("bench", []).append(player_record)
 
         # Tiền người bán được đưa vào mục chờ nhận.
@@ -371,6 +404,9 @@ def player_market_withdraw(listing_id):
                 "Đội bóng đã có cầu thủ cùng tên; "
                 "không thể hoàn lại để tránh trùng lặp."
             )
+
+        # Xóa dấu rời CLB trước khi trả cầu thủ về đội.
+        _unmark_market_removed(state, listing.player_name)
 
         state.setdefault(group, []).append(
             copy.deepcopy(listing.player_data)
