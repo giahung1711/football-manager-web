@@ -554,7 +554,25 @@ def normalize_state(st):
 
     st.setdefault('starting', [])
 
-    # Migrate legacy entries and enforce one copy of each player across the whole club.
+    # Những cầu thủ đã chuyển nhượng hoặc đang được rao bán.
+    # Không tự động thêm họ trở lại đội hình mặc định.
+    removed_names = st.get('market_removed_players', [])
+
+    if not isinstance(removed_names, (list, tuple, set)):
+        removed_names = []
+
+    st['market_removed_players'] = list(dict.fromkeys(
+        str(name).strip()
+        for name in removed_names
+        if name and str(name).strip()
+    ))
+
+    removed_name_keys = {
+        name.casefold()
+        for name in st['market_removed_players']
+    }
+
+    # Migrate legacy entries and enforce one copy of each player.
     seen_names = set()
 
     def clean_players(items):
@@ -589,9 +607,17 @@ def normalize_state(st):
     st['bench'] = clean_players(st.get('bench'))
     st['extras'] = clean_players(st.get('extras'))
 
-    # Add default substitutes only when they are not already owned.
+    # Loại cầu thủ đã chuyển nhượng khỏi đội bóng.
+    for group in ('starting', 'bench', 'extras'):
+        st[group] = [
+            p for p in st[group]
+            if p['name'].casefold() not in removed_name_keys
+        ]
+
+    # Add default substitutes only when they are not already owned
+    # and have not been transferred or listed on the player market.
     owned_names = {
-        p['name']
+        p['name'].casefold()
         for group in ('starting', 'bench', 'extras')
         for p in st[group]
     }
@@ -604,7 +630,10 @@ def normalize_state(st):
     st['bench'].extend(
         p
         for p in default_bench
-        if p['name'] not in owned_names
+        if (
+            p['name'].casefold() not in owned_names
+            and p['name'].casefold() not in removed_name_keys
+        )
     )
 
     st.setdefault('extras', [])
@@ -617,7 +646,7 @@ def normalize_state(st):
         if n not in goat_names
     ]
 
-    # Preserve a valid saved balance; repair only legacy saves with no balance.
+    # Preserve a valid saved balance.
     if 'budget' not in st or st['budget'] is None:
         st['budget'] = next(
             (b for _, (n, b) in CLUB_OPTIONS.items() if n == club),
@@ -630,11 +659,9 @@ def normalize_state(st):
             2
         )
 
-        # Match the original Python game: a new Real Madrid save starts at 300 M€.
         if club == 'Real Madrid' and st['budget'] == 180.0:
             st['budget'] = 300.0
 
-        # Legacy repair: balances are stored in million euros (M€).
         if st['budget'] > 100_000:
             st['budget'] = round(
                 st['budget'] / 1_000_000,
@@ -658,7 +685,6 @@ def normalize_state(st):
     if st.get('formation') == '4-3-3':
         st['formation'] = '4-3-3 (Tấn công)'
 
-    # Always initialize these fields, including for older saves.
     st.setdefault('activity', [])
     st.setdefault('match_history', [])
 
