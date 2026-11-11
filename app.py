@@ -719,15 +719,57 @@ def action():
                 st['starting'][target_index]['assigned_position']=target_pos
                 if source_group=='starting': st['starting'][source_index]['assigned_position']=str(st['starting'][source_index].get('position','')).upper()
         elif act=='promote':
-            group=request.form.get('group'); idx=int(request.form.get('index','-1'))
-            if group not in {'bench','extras'}: raise ValueError('Danh sách cầu thủ không hợp lệ.')
-            if len(st['starting']) >= 11: raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ.')
+            group=request.form.get('group')
+            idx=int(request.form.get('index','-1'))
+            if group not in {'bench','extras'}:
+                raise ValueError('Danh sách cầu thủ không hợp lệ.')
+            if len(st['starting']) >= 11:
+                raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ.')
+
             reserve=st[group]
-            if idx < 0 or idx >= len(reserve): raise ValueError('Không tìm thấy cầu thủ dự bị.')
+            if idx < 0 or idx >= len(reserve):
+                raise ValueError('Không tìm thấy cầu thủ dự bị.')
+
             incoming=reserve[idx]
-            if any(p['name'].strip().casefold() == incoming['name'].strip().casefold() for p in st['starting']):
+            incoming_pos=str(incoming.get('position','')).strip().upper()
+            has_starting_gk=any(
+                str(p.get('position','')).strip().upper() == 'GK'
+                or str(p.get('assigned_position','')).strip().upper() == 'GK'
+                for p in st['starting']
+            )
+
+            # Thủ môn chỉ được bổ sung khi đội hình đang thiếu GK.
+            # Khi đã có GK, chỉ cho bổ sung cầu thủ ngoài sân vào chỗ còn thiếu.
+            if not has_starting_gk and incoming_pos != 'GK':
+                raise ValueError('Đội hình đang thiếu thủ môn. Chỉ có thể thêm một cầu thủ GK.')
+            if has_starting_gk and incoming_pos == 'GK':
+                raise ValueError('Đội hình đã có thủ môn. Chỉ có thể thêm cầu thủ ngoài sân.')
+
+            if any(
+                str(p.get('name','')).strip().casefold()
+                == str(incoming.get('name','')).strip().casefold()
+                for p in st['starting']
+            ):
                 raise ValueError(f"Không thể thêm: {incoming['name']} đã có trong đội hình đá chính.")
-            st['starting'].append(reserve.pop(idx))
+
+            promoted=reserve.pop(idx)
+            # Giữ GK ở cuối danh sách để khớp vị trí thủ môn trên sân.
+            if incoming_pos == 'GK':
+                st['starting'].append(promoted)
+            else:
+                keeper=next(
+                    (p for p in st['starting']
+                     if str(p.get('position','')).strip().upper() == 'GK'
+                     or str(p.get('assigned_position','')).strip().upper() == 'GK'),
+                    None
+                )
+                if keeper:
+                    st['starting'].remove(keeper)
+                    st['starting'].append(promoted)
+                    st['starting'].append(keeper)
+                else:
+                    st['starting'].append(promoted)
+
             flash(f"Đã thêm {incoming['name']} vào đội hình đá chính. Hiện có {len(st['starting'])}/11 cầu thủ.")
         elif act=='buy':
             name=request.form.get('name','').strip()
