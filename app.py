@@ -259,6 +259,44 @@ def admin_gift():
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
+
+@app.post('/admin/reset-password')
+@admin_required
+def admin_reset_password():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        target = db.session.get(User, user_id)
+
+        if not target:
+            raise ValueError('Không tìm thấy tài khoản.')
+
+        if target.is_admin:
+            raise ValueError('Không thể đặt lại mật khẩu Admin.')
+
+        if len(new_password) < 8:
+            raise ValueError('Mật khẩu mới phải có ít nhất 8 ký tự.')
+
+        if new_password != confirm_password:
+            raise ValueError('Mật khẩu xác nhận không khớp.')
+
+        target.set_password(new_password)
+        db.session.commit()
+
+        flash(f'Đã đặt lại mật khẩu cho tài khoản {target.username}.')
+
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
+        flash(str(error))
+
+    return redirect(url_for('admin_panel'))
+
 @app.post('/admin/gift-item')
 @admin_required
 def admin_gift_item():
