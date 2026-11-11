@@ -1,4 +1,3 @@
-
 {% extends 'base.html' %}
 {% block title %}{{ state.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
@@ -43,10 +42,17 @@
   <div class="football-pitch pitch-positioned" id="footballPitch" aria-label="Sơ đồ cầu thủ trên sân">
     <div class="pitch-line pitch-halfway"></div><div class="pitch-circle"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
     {% set country_flags = {'Argentina':'🇦🇷','Brazil':'🇧🇷','France':'🇫🇷','Germany':'🇩🇪','Italy':'🇮🇹','Spain':'🇪🇸','Portugal':'🇵🇹','England':'🏴','Netherlands':'🇳🇱','Croatia':'🇭🇷','Vietnam':'🇻🇳','Việt Nam':'🇻🇳','Senegal':'🇸🇳','Belgium':'🇧🇪','Uruguay':'🇺🇾','Ivory Coast':'🇨🇮','Côte d’Ivoire':'🇨🇮','Cameroon':'🇨🇲','Austria':'🇦🇹','Poland':'🇵🇱','Switzerland':'🇨🇭','Norway':'🇳🇴','Egypt':'🇪🇬','Saudi Arabia':'🇸🇦','United States':'🇺🇸'} %}
+    {% set pitch_order = namespace(outfield=0) %}
     {% for p in state.starting[:11] %}
       {% if p.get('rating') is not none and p.get('position') %}
-        {% set slot = slots[loop.index0] %}
-        {% set role = p.get('assigned_position') or slot[0] %}
+        {% if p.get('position','')|upper == 'GK' or p.get('assigned_position','')|upper == 'GK' %}
+          {% set slot = slots[10] %}
+          {% set role = 'GK' %}
+        {% else %}
+          {% set slot = slots[pitch_order.outfield] %}
+          {% set role = p.get('assigned_position') or slot[0] %}
+          {% set pitch_order.outfield = pitch_order.outfield + 1 %}
+        {% endif %}
         {% set raw = p.rating + [0,1,2,3,4,6,8,10,13][p.level|int] %}
         {% set shown = raw if (p.position|upper == role|upper or p.position|upper == 'GK' and role == 'GK') else ((raw * 0.95 + 0.5)|int) %}
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
@@ -85,7 +91,67 @@
   </div>
   <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span><i class="legend-frame premium"></i>Cao cấp · 90–95</span><span><i class="legend-frame icon"></i>ICON</span><span class="muted">Khung theo OVR gốc · sai vị trí giảm 5% OVR cá nhân</span></div>
 </section>
-<section class="panel"><div class="section-head"><h2>Cầu thủ dự bị ({{state.bench|length}})</h2><span class="muted">Kéo thẻ dự bị vào sân để thay người</span></div><div class="bench-grid" id="benchDropZone">{% for p in state.bench %}{% if p.get('rating') is not none and p.get('position') %}<div class="bench-player" draggable="true" data-group="bench" data-index="{{loop.index0}}"><span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span><div><strong>{{p.name}}</strong><small>{{p.position}} · {{p.nationality}}{% if p.club %} · {{p.club}}{% elif p.get('card_type') in ['ICON','HEROES'] %} · {{p.card_type}}{% endif %} · +{{p.level}}</small></div><span class="drag-hint">⠿</span></div>{% endif %}{% endfor %}{% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}</div></section>
+<section class="panel">
+  <div class="section-head">
+    <h2>Cầu thủ dự bị ({{state.bench|length}})</h2>
+    <span class="muted">Kéo thẻ để thay người hoặc thêm vào vị trí còn thiếu</span>
+  </div>
+  <div class="bench-grid" id="benchDropZone">
+    {% for p in state.bench %}
+      {% if p.get('rating') is not none and p.get('position') %}
+        <div class="bench-player" draggable="true" data-group="bench" data-index="{{loop.index0}}">
+          <span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span>
+          <div>
+            <strong>{{p.name}}</strong>
+            <small>{{p.position}} · {{p.nationality}}{% if p.club %} · {{p.club}}{% elif p.get('card_type') in ['ICON','HEROES'] %} · {{p.card_type}}{% endif %} · +{{p.level}}</small>
+            {% if state.starting|length < 11 %}
+              {% set has_gk = state.starting|selectattr('position','equalto','GK')|list|length > 0 %}
+              {% if (not has_gk and p.position|upper == 'GK') or (has_gk and p.position|upper != 'GK') %}
+                <form method="post" action="{{url_for('action')}}" class="promote-player-form">
+                  <input type="hidden" name="action" value="promote">
+                  <input type="hidden" name="group" value="bench">
+                  <input type="hidden" name="index" value="{{loop.index0}}">
+                  <button class="button" type="submit">＋ Thêm vào đá chính</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          </div>
+          <span class="drag-hint">⠿</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+    {% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}
+  </div>
+</section>
+{% if state.extras %}
+<section class="panel">
+  <div class="section-head"><h2>Cầu thủ khác ({{state.extras|length}})</h2><span class="muted">Chỉ hiện nút thêm nếu đúng nhóm vị trí còn thiếu</span></div>
+  <div class="bench-grid">
+    {% for p in state.extras %}
+      {% if p.get('rating') is not none and p.get('position') %}
+        <div class="bench-player">
+          <span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span>
+          <div>
+            <strong>{{p.name}}</strong>
+            <small>{{p.position}} · {{p.nationality}} · +{{p.level}}</small>
+            {% if state.starting|length < 11 %}
+              {% set has_gk = state.starting|selectattr('position','equalto','GK')|list|length > 0 %}
+              {% if (not has_gk and p.position|upper == 'GK') or (has_gk and p.position|upper != 'GK') %}
+                <form method="post" action="{{url_for('action')}}" class="promote-player-form">
+                  <input type="hidden" name="action" value="promote">
+                  <input type="hidden" name="group" value="extras">
+                  <input type="hidden" name="index" value="{{loop.index0}}">
+                  <button class="button" type="submit">＋ Thêm vào đá chính</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 <form id="dragSwapForm" method="post" action="{{url_for('action')}}" hidden><input name="action" value="drag_swap"><input name="source_group"><input name="source_index"><input name="target_index"><input name="target_group" value="starting"></form>
 <script>
 (()=>{let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
@@ -129,7 +195,7 @@
         <p class="eyebrow">YOUR COLLECTION</p>
         <h2>Chọn cầu thủ</h2>
       </div>
-      <span class="forge-count">{{players|length}} cầu thủ</span>
+      <span class="forge-count">{{state.starting|length + state.bench|length + state.extras|length}} cầu thủ</span>
     </div>
 
     <div class="forge-player-list" id="forgePlayerList">
@@ -191,265 +257,176 @@
           <span class="forge-card-level" id="forgeLevel">+0</span>
           <div class="forge-card-art">
             <img id="forgePhoto" alt="" hidden>
-            <div class="forge-player-silhouette" id="forgeSilhouette">⚽</div>
+            <div class="forge-card-fallback" id="forgeFallback">
+              <span class="forge-card-head"></span>
+              <span class="forge-card-body"></span>
+            </div>
           </div>
-          <div class="forge-card-name" id="forgeName">PLAYER NAME</div>
-          <div class="forge-card-footer">FOOTBALL MANAGER</div>
+          <strong id="forgeName">PLAYER NAME</strong>
         </div>
-        <div class="forge-card-caption" id="forgeCaption">PLAYER SELECTED</div>
-      </div>
-
-      <div class="forge-result" id="forgeResult" hidden>
-        <div class="forge-result-symbol" id="forgeResultSymbol">✦</div>
-        <strong id="forgeResultTitle">THÀNH CÔNG</strong>
-        <span id="forgeResultText"></span>
       </div>
     </div>
 
-    <div class="forge-player-summary" id="forgeSummary" hidden>
-      <div><span>CẦU THỦ</span><strong id="summaryName">—</strong></div>
-      <div><span>OVR HIỆN TẠI</span><strong id="summaryOvr">—</strong></div>
-      <div><span>CẤP THẺ</span><strong id="summaryLevel">—</strong></div>
-      <div><span>GIÁ TRỊ</span><strong id="summaryValue">—</strong></div>
+    <div class="forge-details" id="forgeDetails">
+      <div><span>OVR hiện tại</span><strong id="forgeCurrentOvr">—</strong></div>
+      <div><span>Cấp thẻ</span><strong id="forgeCurrentLevel">—</strong></div>
+      <div><span>Giá trị hiện tại</span><strong id="forgeCurrentValue">—</strong></div>
     </div>
 
-    <div class="forge-upgrade-info" id="forgeUpgradeInfo" hidden>
-      <div class="forge-info-heading">
-        <span id="forgeTarget">ÉP LÊN +1</span>
-        <span id="forgeChance">TỈ LỆ 99%</span>
-      </div>
-      <div class="forge-chance-track"><i id="forgeChanceBar"></i></div>
-      <div class="forge-cost-row">
-        <span>Chi phí lần ép</span>
-        <strong id="forgeCost">—</strong>
-      </div>
-      <p class="forge-failure-rule" id="forgeFailureRule"></p>
-
+    <div class="forge-controls">
+      <label for="forgeTarget">Cấp muốn ép</label>
+      <select id="forgeTarget">
+        {% for lv in range(1,9) %}
+          <option value="{{lv}}">+{{lv}}</option>
+        {% endfor %}
+      </select>
+      <label class="forge-protect-toggle">
+        <input type="checkbox" id="forgeProtect" name="protect">
+        <span>Dùng Thẻ bảo vệ khi ép +7 lên +8</span>
+      </label>
+      <div class="forge-rate" id="forgeRate"></div>
+      <div class="forge-result" id="forgeResult"></div>
       <form method="post" action="{{url_for('action')}}" id="forgeForm">
         <input type="hidden" name="action" value="upgrade">
         <input type="hidden" name="group" id="forgeGroup">
         <input type="hidden" name="index" id="forgeIndex">
-
-        <label class="protection-toggle forge-protection" id="forgeProtection" hidden>
-          <input type="checkbox" name="protection" value="1" id="forgeProtectionCheck">
-          <span>Dùng 1 Thẻ bảo vệ khi ép +7 lên +8</span>
-        </label>
-
-        <button class="button primary forge-submit" type="submit" id="forgeSubmit" disabled>
-          <span>✦</span> ÉP THẺ
-        </button>
+        <input type="hidden" name="target_level" id="forgeTargetLevel">
+        <input type="hidden" name="protect" id="forgeProtectValue" value="0">
+        <button class="button primary" type="submit" id="forgeSubmit" disabled>Ép thẻ</button>
       </form>
-      <p class="forge-warning">Kết quả do máy chủ quyết định. Chi phí vẫn bị trừ khi ép thất bại.</p>
-    </div>
-
-    <div class="forge-max-message" id="forgeMax" hidden>
-      <span>✦</span>
-      <strong>ĐÃ ĐẠT CẤP TỐI ĐA +8</strong>
-      <small>Thẻ cầu thủ này không thể nâng cấp thêm.</small>
     </div>
   </div>
-</section>
-
-<section class="panel forge-rules-panel">
-  <div class="forge-section-title">
-    <div><p class="eyebrow">ENHANCEMENT GUIDE</p><h2>Quy tắc ép thẻ</h2></div>
-    <span class="muted">Tối đa +8 · Không giới hạn OVR 99</span>
-  </div>
-  <div class="upgrade-rules-wrap">
-    <table class="upgrade-rules">
-      <thead><tr><th>Cấp ép</th><th>Thành công</th><th>Chi phí</th><th>OVR tăng</th></tr></thead>
-      <tbody>
-      {% for n in range(8) %}
-        <tr>
-          <td>+{{n}} → +{{n+1}}</td>
-          <td>{{success_rates[n]}}%</td>
-          <td>{{cost_rates[n+1]}}% giá trị gốc</td>
-          <td>+{{[1,1,1,1,2,2,2,3][n]}}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="muted">Thẻ bảo vệ chỉ áp dụng cho +7 → +8. Khi bật bảo vệ, mỗi lần thử tiêu hao 1 thẻ dù thành công hay thất bại.</p>
 </section>
 
 <script>
-(()=>{
-  const list = document.getElementById('forgePlayerList');
-  if (!list) return;
-
-  const $ = id => document.getElementById(id);
-  const rates = [99,90,80,60,40,30,20,10];
-  const costs = [0,2,6,10,15,20,25,42,60];
-  const multipliers = [1,1.10,1.30,1.65,2.15,2.90,4.155,5.760,8.560];
-  const ovrBonuses = [0,1,2,3,4,6,8,10,13];
-  const downgrades = [
-    'Thất bại: giữ +0 (100%)',
-    'Thất bại: về +0 (100%)',
-    'Thất bại: +0 (50%) hoặc +1 (50%)',
-    'Thất bại: +0 (30%), +1 (50%), +2 (20%)',
-    'Thất bại: +0 (20%), +1 (35%), +2 (35%), +3 (10%)',
-    'Thất bại: +0 (12%), +1 (15%), +2 (30%), +3 (30%), +4 (13%)',
-    'Thất bại: +0 (6%), +1 (8%), +2 (12%), +3 (14%), +4 (40%), +5 (20%)',
-    'Thất bại: +0 (1%), +1 (2%), +2 (4%), +3 (13%), +4 (15%), +5 (45%), +6 (20%)'
-  ];
-
+(() => {
+  const options = document.querySelectorAll('.forge-player-option');
+  const target = document.getElementById('forgeTarget');
+  const protect = document.getElementById('forgeProtect');
+  const form = document.getElementById('forgeForm');
   let selected = null;
-  let busy = false;
-  const money = n => new Intl.NumberFormat('vi-VN').format(Math.round(n * 1000000)) + ' €';
 
-  function selectPlayer(button) {
-    if (busy) return;
-    selected = button;
-    list.querySelectorAll('.forge-player-option').forEach(x => x.classList.toggle('selected', x === button));
+  const rates = {{success_rates|tojson}};
+  const costs = {{cost_rates|tojson}};
+  const multipliers = {{value_multipliers|tojson}};
+  const downgrade = {{downgrade_text|tojson}};
 
-    const d = button.dataset;
-    const lv = Number(d.level);
-    const base = Number(d.base);
-    const currentValue = base * multipliers[lv];
+  const formatMoney = value => Number(value || 0).toLocaleString('vi-VN', {
+    maximumFractionDigits: 2
+  }) + ' M€';
 
-    $('forgeEmpty').hidden = true;
-    $('forgeShowcase').hidden = false;
-    $('forgeResult').hidden = true;
-    $('forgeMachine').className = 'forge-machine';
-    $('forgeCard').className = 'forge-card tier-' + d.tier;
-    $('forgeCard').style.setProperty('--forge-tier', d.tier);
-    $('forgeName').textContent = d.name;
-    $('forgeOvr').textContent = d.rating;
-    $('forgePosition').textContent = d.position;
-    $('forgeLevel').textContent = '+' + lv;
-    $('forgeCaption').textContent = d.name.toUpperCase();
+  function updateForge() {
+    if (!selected) return;
 
-    const photo = $('forgePhoto');
-    const silhouette = $('forgeSilhouette');
-    if (d.photo) {
-      photo.src = d.photo;
-      photo.hidden = false;
-      silhouette.hidden = true;
-      photo.onerror = () => { photo.hidden = true; silhouette.hidden = false; };
-    } else {
-      photo.hidden = true;
-      silhouette.hidden = false;
-    }
+    const level = Number(selected.dataset.level);
+    const next = Number(target.value);
+    const currentOvr = Number(selected.dataset.rating);
+    const baseValue = Number(selected.dataset.base);
+    const currentValue = Number(selected.dataset.value);
+    const isProtected = protect.checked && level === 7 && next === 8;
 
-    $('forgeSummary').hidden = false;
-    $('summaryName').textContent = d.name;
-    $('summaryOvr').textContent = d.rating;
-    $('summaryLevel').textContent = '+' + lv;
-    $('summaryValue').textContent = money(currentValue);
+    document.getElementById('forgeGroup').value = selected.dataset.group;
+    document.getElementById('forgeIndex').value = selected.dataset.index;
+    document.getElementById('forgeTargetLevel').value = next;
+    document.getElementById('forgeProtectValue').value = isProtected ? '1' : '0';
 
-    $('forgeMax').hidden = lv < 8;
-    $('forgeUpgradeInfo').hidden = lv >= 8;
-    $('forgeSubmit').disabled = lv >= 8;
-    $('forgeGroup').value = d.group;
-    $('forgeIndex').value = d.index;
+    document.getElementById('forgeCurrentOvr').textContent = currentOvr;
+    document.getElementById('forgeCurrentLevel').textContent = '+' + level;
+    document.getElementById('forgeCurrentValue').textContent = formatMoney(currentValue);
 
-    if (lv < 8) {
-      const chance = rates[lv];
-      const cost = base * costs[lv + 1] / 100;
-      $('forgeTarget').textContent = 'ÉP LÊN +' + (lv + 1);
-      $('forgeChance').textContent = 'TỈ LỆ ' + chance + '%';
-      $('forgeChanceBar').style.width = chance + '%';
-      $('forgeCost').textContent = money(cost);
-      $('forgeFailureRule').textContent = downgrades[lv];
-      $('forgeProtection').hidden = lv !== 7;
-      $('forgeProtectionCheck').checked = false;
-      $('forgeStatus').textContent = 'SYSTEM READY';
-    }
+    const rate = rates[Math.max(0, next - 1)] || 0;
+    const cost = costs[next] || 0;
+    const newValue = baseValue * (multipliers[next] || 1);
+
+    document.getElementById('forgeRate').textContent =
+      'Tỉ lệ thành công: ' + rate + '% · Chi phí: ' + formatMoney(cost);
+
+    document.getElementById('forgeResult').textContent =
+      'Nếu thất bại: ' + (downgrade[level] || 'Theo quy tắc ép thẻ') +
+      ' · Giá trị sau khi thành công: ' + formatMoney(newValue);
+
+    document.getElementById('forgeSubmit').disabled = next <= level;
+
+    document.getElementById('forgeStatus').textContent =
+      isProtected ? 'PROTECTION READY' : 'SYSTEM READY';
   }
 
-  list.querySelectorAll('.forge-player-option').forEach(button => {
-    button.addEventListener('click', () => selectPlayer(button));
+  options.forEach(option => {
+    option.addEventListener('click', () => {
+      selected = option;
+      options.forEach(item => item.classList.remove('selected'));
+      option.classList.add('selected');
+
+      document.getElementById('forgeEmpty').hidden = true;
+      document.getElementById('forgeShowcase').hidden = false;
+
+      document.getElementById('forgeName').textContent = option.dataset.name;
+      document.getElementById('forgePosition').textContent = option.dataset.position;
+      document.getElementById('forgeOvr').textContent = option.dataset.rating;
+      document.getElementById('forgeLevel').textContent = '+' + option.dataset.level;
+
+      const photo = document.getElementById('forgePhoto');
+      const fallback = document.getElementById('forgeFallback');
+
+      if (option.dataset.photo) {
+        photo.src = option.dataset.photo;
+        photo.hidden = false;
+        fallback.hidden = true;
+        photo.onerror = () => {
+          photo.hidden = true;
+          fallback.hidden = false;
+        };
+      } else {
+        photo.hidden = true;
+        fallback.hidden = false;
+      }
+
+      document.getElementById('forgeCard').className =
+        'forge-card card-' + option.dataset.tier;
+
+      target.value = Math.min(8, Number(option.dataset.level) + 1);
+      updateForge();
+    });
   });
 
-  const form = $('forgeForm');
+  target.addEventListener('change', updateForge);
+  protect.addEventListener('change', updateForge);
+
   form.addEventListener('submit', event => {
-    if (!selected || busy) {
+    if (!selected) {
       event.preventDefault();
+      alert('Vui lòng chọn cầu thủ trước.');
       return;
     }
-    const lv = Number(selected.dataset.level);
-    if (lv >= 8) {
+
+    if (Number(target.value) <= Number(selected.dataset.level)) {
       event.preventDefault();
+      alert('Cấp thẻ mới phải cao hơn cấp hiện tại.');
       return;
     }
-    if (lv === 7 && $('forgeProtectionCheck').checked) {
-      const count = Number({{state.get('inventory',{}).get('Thẻ bảo vệ',0)|int}});
-      if (count < 1) {
-        event.preventDefault();
-        alert('Bạn không có Thẻ bảo vệ!');
-        return;
-      }
+
+    if (protect.checked &&
+        !(Number(selected.dataset.level) === 7 && Number(target.value) === 8)) {
+      event.preventDefault();
+      alert('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.');
     }
-
-    busy = true;
-    $('forgeSubmit').disabled = true;
-    $('forgeStatus').textContent = 'ENHANCING...';
-    $('forgeMachine').classList.add('is-forging');
-    $('forgeCard').classList.add('card-shaking');
-    $('forgeCaption').textContent = 'ĐANG TIẾN HÀNH ÉP THẺ...';
-
-    try {
-      sessionStorage.setItem('fm_forge_player', selected.dataset.name);
-    } catch (e) {}
-
-    event.preventDefault();
-    setTimeout(() => form.submit(), 1500);
   });
-
-  // Khôi phục thẻ vừa ép sau khi máy chủ chuyển trang về.
-  let previousName = null;
-  try {
-    previousName = sessionStorage.getItem('fm_forge_player');
-    sessionStorage.removeItem('fm_forge_player');
-  } catch (e) {}
-
-  if (previousName) {
-    const returned = [...list.querySelectorAll('.forge-player-option')]
-      .find(x => x.dataset.name === previousName);
-
-    if (returned) {
-      selectPlayer(returned);
-
-      const pageText = document.body.innerText;
-      const success = pageText.includes('ÉP THẺ THÀNH CÔNG');
-      const failure = pageText.includes('ÉP THẺ THẤT BẠI');
-
-      if (success || failure) {
-        $('forgeResult').hidden = false;
-        $('forgeShowcase').hidden = false;
-        $('forgeEmpty').hidden = true;
-        $('forgeMachine').classList.add(success ? 'is-success' : 'is-failure');
-        $('forgeCard').classList.add(success ? 'card-success' : 'card-failure');
-        $('forgeResultSymbol').textContent = success ? '✦' : '✕';
-        $('forgeResultTitle').textContent = success ? 'ÉP THẺ THÀNH CÔNG!' : 'ÉP THẺ THẤT BẠI';
-        $('forgeResultText').textContent = success
-          ? 'Chúc mừng! Cấp thẻ và chỉ số cầu thủ đã được cập nhật.'
-          : 'Lần ép không thành công. Cấp thẻ đã được xử lý theo quy tắc.';
-        $('forgeCaption').textContent = success ? 'UPGRADE SUCCESSFUL' : 'UPGRADE FAILED';
-        $('forgeStatus').textContent = success ? 'SUCCESS' : 'FAILED';
-        if (success) {
-          $('forgeCard').classList.add('card-celebrate');
-        }
-      }
-    }
-  }
-
-  const first = list.querySelector('.forge-player-option');
-  if (!selected && first && !previousName) selectPlayer(first);
 })();
 </script>
-{% elif tab=='tactics' %}<section class="panel"><h2>Chiến thuật</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="formation"><label>Sơ đồ đội hình</label><select name="formation">{% for f in ['4-3-3 (Tấn công)','4-3-3 (Phòng thủ)','4-2-4','4-1-2-1-2'] %}<option {% if state.formation==f %}selected{% endif %}>{{f}}</option>{% endfor %}</select><button class="button primary">Lưu chiến thuật</button></form></section>
+{% elif tab=='finance' %}
+<section class="panel"><h2>Tài chính CLB</h2><div class="stats"><div class="stat"><span>Ngân sách hiện tại</span><strong>{{state.budget|money}}</strong></div><div class="stat"><span>Giá trị đội hình</span><strong>{{data.squad_value|money}}</strong></div></div></section>
 {% elif tab=='matches' %}
-<section class="panel"><div class="section-head"><div><h2>Trận đấu</h2><p class="muted">Đá giao hữu với một CLB trong game. Thắng +20M, hòa +10M, thua +5M.</p></div><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Thi đấu ngay</button></form></div></section>
-<section class="panel"><h2>Lịch sử 5 trận gần nhất</h2>
+<section class="panel"><h2>Lịch sử trận đấu</h2>
 {% if state.match_history %}
-<div class="match-history">{% for match in state.match_history[:5] %}
-<article class="match-card"><div class="match-score"><span>{{match.club}}</span><strong>{{match.score}}</strong><span>{{match.opponent}}</span></div><div class="section-head"><span class="muted">{{match.result}} · Thưởng {{match.reward|money}}</span><button class="button" type="button" onclick="const box=this.closest('.match-card').querySelector('.match-detail'); box.hidden=!box.hidden; this.textContent=box.hidden?'Chi tiết':'Thu gọn';">Chi tiết</button></div>
-<div class="match-detail" hidden><h3>Diễn biến trận đấu</h3><p class="muted">OVR trung bình: {{match.my_ovr}} - {{match.opponent_ovr}}</p>
-{% if match.events %}<ol class="match-events">{% for event in match.events %}<li><b>{{event.minute}}'</b> · {% if event.type=='goal' %}{% if event.detail=='Bàn thắng' %}⚽ {{event.player}} ghi bàn cho {{event.team}}{% elif event.detail=='Penalty' %}⚽ {{event.player}} ghi bàn penalty cho {{event.team}}{% else %}⚽ OG! {{event.player}} của {{event.detail.split(' - ')[-1]}} phản lưới, bàn thắng cho {{event.team}}{% endif %}{% else %}{{event.player}} ({{event.team}}) nhận {{event.detail}}{% endif %}</li>{% endfor %}</ol>{% else %}<p>Trận đấu không có bàn thắng hay thẻ phạt.</p>{% endif %}
-<h3>Thống kê</h3><div class="match-stats"><span>Bàn thắng: <b>{{match.stats.goals_home}} - {{match.stats.goals_away}}</b></span><span>Penalty: <b>{{match.stats.penalties}}</b></span><span>Phản lưới: <b>{{match.stats.own_goals}}</b></span><span>Thẻ vàng: <b>{{match.stats.yellow_cards}}</b></span><span>Thẻ đỏ: <b>{{match.stats.red_cards}}</b></span></div></div></article>
-{% endfor %}</div>
-{% else %}<p class="muted">Chưa có trận đấu nào. Hãy thi đấu trận đầu tiên!</p>{% endif %}</section>
-{% elif tab=='finance' %}<section class="panel"><h2>Tài chính CLB</h2><p>Ngân sách: <strong>{{ state.budget|money }}</strong></p><p>Giá trị đội hình: {{ data.total_value|money }}</p><p>Tổng cầu thủ: {{data.squad_size}}</p></section>{% endif %}
+  {% for match in state.match_history %}
+    <div class="section-head">
+      <strong>{{match.home}} {{match.home_score}} - {{match.away_score}} {{match.away}}</strong>
+      <span class="muted">{{match.result}} · Tuần {{match.week}}</span>
+    </div>
+  {% endfor %}
+{% else %}
+  <p class="muted">Chưa có trận đấu nào.</p>
+{% endif %}
+</section>
+{% endif %}
 {% endblock %}
