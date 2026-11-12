@@ -500,6 +500,12 @@ def enrich_player(record):
     """Attach verified metadata for this render without mutating the saved squad."""
     import copy
     result = copy.deepcopy(record)
+    if str(result.get("name", "")).strip().casefold() == "zidane":
+        result["name"] = "Zinedine Zidane"
+    if result.get("name") == "Zinedine Zidane":
+        result.setdefault("position", "CAM")
+        result.setdefault("rating", 101)
+        result.setdefault("level", 0)
     # Admin-gifted records carry reviewed metadata and a source URL. A fully
     # retired ICON/HEROES player needs nationality + special badge only.
     if result.get("metadata_admin_verified") and result.get("nationality"):
@@ -517,11 +523,18 @@ def enrich_player(record):
             result["is_icon"] = card_type == "ICON"
             result["is_hero"] = card_type == "HEROES"
             return result
+    # Keep game-owned card fields authoritative. Provider metadata must never
+    # overwrite the saved name, position, OVR, upgrade level, or event identity.
+    core_fields = {key: copy.deepcopy(result.get(key)) for key in (
+        "name", "position", "rating", "level", "event_card",
+        "original_rating", "card_season", "market_value", "photo_url"
+    ) if key in result}
     meta = get_player_metadata(result.get("name", ""))
     if not meta:
         result["metadata_complete"] = False
         return result
     result.update(meta)
+    result.update(core_fields)
     result["metadata_complete"] = True
     special = _special_types().get(_norm(result.get("name")))
     result["is_icon"] = bool(meta.get("is_icon")) or special == "ICON"
