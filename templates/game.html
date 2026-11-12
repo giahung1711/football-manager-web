@@ -191,7 +191,7 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
 {% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}
 <div class="ballon-pack-card">
   <div><p class="eyebrow">LIMITED EVENT · BALLON D’OR</p><h2>🏆 Ballon D'or Pack</h2><p>29 cầu thủ sự kiện · 20% Pool A · 80% Pool B</p><strong class="ballon-price">💎 2.000 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
-  <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Ballon D'or Pack với giá 2.000 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
+  <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở Ballon D'or Pack với giá 2.000 PG? Phần thưởng sẽ được trao ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="ballon_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 2000 %}disabled{% endif %}>Mở Ballon D'or Pack</button>
   </form>
@@ -200,7 +200,16 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
 {% set success_rates = [99,90,80,60,40,30,20,10] %}
 {% set cost_rates = [0,2,6,10,15,20,25,42,60] %}
 {% set value_multipliers = [1.0,1.10,1.30,1.65,2.15,2.90,4.155,5.760,8.560] %}
-
+{% set downgrade_text = [
+'Giữ +0 (100%)',
+'Về +0 (100%)',
+'+0 (50%) · +1 (50%)',
+'+0 (30%) · +1 (50%) · +2 (20%)',
+'+0 (20%) · +1 (35%) · +2 (35%) · +3 (10%)',
+'+0 (12%) · +1 (15%) · +2 (30%) · +3 (30%) · +4 (13%)',
+'+0 (6%) · +1 (8%) · +2 (12%) · +3 (14%) · +4 (40%) · +5 (20%)',
+'+0 (1%) · +1 (2%) · +2 (4%) · +3 (13%) · +4 (15%) · +5 (45%) · +6 (20%)'
+] %}
 
 <section class="panel forge-heading">
   <div>
@@ -300,17 +309,24 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
     </div>
 
     <div class="forge-controls">
-      <label class="forge-protect-toggle" id="forgeProtectionWrap" hidden>
-        <input type="checkbox" id="forgeProtect" name="protect" disabled>
+      <label for="forgeTarget">Cấp muốn ép</label>
+      <select id="forgeTarget">
+        {% for lv in range(1,9) %}
+          <option value="{{lv}}">+{{lv}}</option>
+        {% endfor %}
+      </select>
+      <label class="forge-protect-toggle">
+        <input type="checkbox" id="forgeProtect" name="protect">
         <span>Dùng Thẻ bảo vệ khi ép +7 lên +8</span>
       </label>
       <div class="forge-rate" id="forgeRate"></div>
+      <div class="forge-result" id="forgeResult"></div>
       <form method="post" action="{{url_for('action')}}" id="forgeForm">
         <input type="hidden" name="action" value="upgrade">
         <input type="hidden" name="group" id="forgeGroup">
         <input type="hidden" name="index" id="forgeIndex">
         <input type="hidden" name="target_level" id="forgeTargetLevel">
-        <input type="hidden" name="protection" id="forgeProtectValue" value="0">
+        <input type="hidden" name="protect" id="forgeProtectValue" value="0">
         <button class="button primary" type="submit" id="forgeSubmit" disabled>Ép thẻ</button>
       </form>
     </div>
@@ -320,6 +336,7 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
 <script>
 (() => {
   const options = document.querySelectorAll('.forge-player-option');
+  const target = document.getElementById('forgeTarget');
   const protect = document.getElementById('forgeProtect');
   const form = document.getElementById('forgeForm');
   let selected = null;
@@ -327,14 +344,17 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
   const rates = {{success_rates|tojson}};
   const costs = {{cost_rates|tojson}};
   const multipliers = {{value_multipliers|tojson}};
-  const formatMoney = value => Math.round(Number(value || 0) * 1000000)
-    .toLocaleString('vi-VN') + ' 🪙';
+  const downgrade = {{downgrade_text|tojson}};
+
+  const formatMoney = value => Number(value || 0).toLocaleString('vi-VN', {
+    maximumFractionDigits: 2
+  }) + ' M PC';
 
   function updateForge() {
     if (!selected) return;
 
     const level = Number(selected.dataset.level);
-    const next = Math.min(8, level + 1);
+    const next = Number(target.value);
     const currentOvr = Number(selected.dataset.rating);
     const baseValue = Number(selected.dataset.base);
     const currentValue = Number(selected.dataset.value);
@@ -350,17 +370,17 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
     document.getElementById('forgeCurrentValue').textContent = formatMoney(currentValue);
 
     const rate = rates[Math.max(0, next - 1)] || 0;
-    const cost = baseValue * (costs[next] || 0) / 100;
+    const cost = costs[next] || 0;
+    const newValue = baseValue * (multipliers[next] || 1);
 
-    document.getElementById('forgeRate').innerHTML =
-      '<span>Tỉ lệ thành công</span><strong>' + rate + '%</strong>' +
-      '<span>Chi phí ép thẻ</span><strong>' + formatMoney(cost) + '</strong>';
+    document.getElementById('forgeRate').textContent =
+      'Tỉ lệ thành công: ' + rate + '% · Chi phí: ' + formatMoney(cost);
 
-    document.getElementById('forgeSubmit').disabled = level >= 8;
-    const protectionWrap = document.getElementById('forgeProtectionWrap');
-    protectionWrap.hidden = !(level === 7 && next === 8);
-    protect.disabled = protectionWrap.hidden;
-    if (protect.disabled) protect.checked = false;
+    document.getElementById('forgeResult').textContent =
+      'Nếu thất bại: ' + (downgrade[level] || 'Theo quy tắc ép thẻ') +
+      ' · Giá trị sau khi thành công: ' + formatMoney(newValue);
+
+    document.getElementById('forgeSubmit').disabled = next <= level;
 
     document.getElementById('forgeStatus').textContent =
       isProtected ? 'PROTECTION READY' : 'SYSTEM READY';
@@ -399,13 +419,12 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
       document.getElementById('forgeCard').className =
         'forge-card card-' + option.dataset.tier;
 
-      document.getElementById('forgeProtectionWrap').hidden = Number(option.dataset.level) !== 7;
-      protect.disabled = Number(option.dataset.level) !== 7;
-      protect.checked = false;
+      target.value = Math.min(8, Number(option.dataset.level) + 1);
       updateForge();
     });
   });
 
+  target.addEventListener('change', updateForge);
   protect.addEventListener('change', updateForge);
 
   form.addEventListener('submit', event => {
@@ -415,13 +434,14 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
       return;
     }
 
-    if (Number(selected.dataset.level) >= 8) {
+    if (Number(target.value) <= Number(selected.dataset.level)) {
       event.preventDefault();
-      alert('Cầu thủ đã đạt cấp ép tối đa +8.');
+      alert('Cấp thẻ mới phải cao hơn cấp hiện tại.');
       return;
     }
 
-    if (protect.checked && Number(selected.dataset.level) !== 7) {
+    if (protect.checked &&
+        !(Number(selected.dataset.level) === 7 && Number(target.value) === 8)) {
       event.preventDefault();
       alert('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.');
     }

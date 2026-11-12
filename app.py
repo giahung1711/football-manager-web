@@ -368,14 +368,6 @@ def mailbox_open():
         flash('Thư này đã được mở trước đó.')
     elif mail.get('type') == 'player_gift':
         gifted = copy.deepcopy(mail.get('player') or {})
-        if gifted.get('rating') is None and gifted.get('ovr') is not None:
-            gifted['rating'] = gifted.get('ovr')
-        if gifted.get('name') == 'Zidane':
-            gifted['name'] = 'Zinedine Zidane'
-        if gifted.get('name') == 'Zinedine Zidane':
-            gifted.setdefault('position', 'CAM')
-            gifted.setdefault('rating', 101)
-        gifted.setdefault('level', 0)
         if not gifted.get('name'):
             flash('Gói quà trong thư không hợp lệ.')
         elif any(p.get('name') == gifted['name'] for group in ('starting','bench','extras') for p in state.get(group, [])):
@@ -407,14 +399,6 @@ def mailbox_claim_all():
         if mail.get('opened') or mail.get('type') != 'player_gift':
             continue
         gifted = copy.deepcopy(mail.get('player') or {})
-        if gifted.get('rating') is None and gifted.get('ovr') is not None:
-            gifted['rating'] = gifted.get('ovr')
-        if gifted.get('name') == 'Zidane':
-            gifted['name'] = 'Zinedine Zidane'
-        if gifted.get('name') == 'Zinedine Zidane':
-            gifted.setdefault('position', 'CAM')
-            gifted.setdefault('rating', 101)
-        gifted.setdefault('level', 0)
         if not gifted.get('name'):
             mail['opened'] = True
             continue
@@ -846,6 +830,7 @@ def action():
                 raise ValueError('Yêu cầu mở gói không hợp lệ. Hãy tải lại trang.')
             processed = st.setdefault('processed_ballon_requests', [])
             if request_id in processed:
+                flash('Gói này đã được xử lý trước đó.')
                 persist(save, st)
                 return redirect(url_for('game_tab', tab='shop'))
             cost_pg = 2000
@@ -900,7 +885,7 @@ def action():
                 'message': f'Mở Ballon D’or Pack: nhận {name} OVR {rating} (-2.000 PG)',
                 'week': st.get('week', 1)
             })
-            # Không flash thông báo kết quả: phần thưởng chỉ được công bố qua màn reveal Ballon D'or.
+            flash(f'Đã mở Ballon D’or Pack và nhận {name} OVR {rating}!')
 
         elif act=='pack':
             key=request.form.get('pack')

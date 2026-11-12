@@ -1577,15 +1577,3 @@
 @keyframes ballonFrameShine{0%,100%{filter:drop-shadow(0 0 6px #d8a43d88) drop-shadow(0 8px 9px #000c)}50%{filter:drop-shadow(0 0 13px #ffe18dcc) drop-shadow(0 8px 9px #000c)}}
 @media(max-width:700px){.pitch-positioned .card-ballon-dor .event-card-label{top:37px;font-size:5px;padding:1px 4px}}
 @media(prefers-reduced-motion:reduce){.pitch-positioned .pitch-player-card.ornate-card.card-ballon-dor{animation:none}}
-
-
-/* Forge panel: clean stats, no opaque result strip over the player card. */
-.forge-rate{display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center;margin:16px 0;padding:14px 16px;border:1px solid rgba(226,190,103,.25);border-radius:14px;background:linear-gradient(135deg,rgba(255,255,255,.055),rgba(210,164,65,.07));color:#aeb9b2;font-size:12px}
-.forge-rate strong{color:#ffe2a0;font-size:16px;text-align:right;font-variant-numeric:tabular-nums}
-.forge-protect-toggle[hidden]{display:none!important}
-.forge-controls{position:relative;display:flex;flex-direction:column;gap:10px;margin-top:18px}
-.forge-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
-.forge-details>div{min-width:0;padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:12px;background:rgba(255,255,255,.035)}
-.forge-details span{display:block;color:#9eaaa3;font-size:11px;margin-bottom:7px}
-.forge-details strong{display:block;color:#f5d991;font-size:16px;overflow-wrap:anywhere}
-@media(max-width:560px){.forge-details{grid-template-columns:1fr}.forge-rate{grid-template-columns:1fr auto;padding:12px}}
