@@ -106,9 +106,8 @@ def page(save, tab='overview', extra=None):
     # Only resolve transfer-market cards when the transfer page is requested.
     # Queueing every market player on dashboard/squad renders wastes API quota.
     if tab == 'transfers':
-        owned_names = {p['name'] for p in all_players(st)}
         for n in st['market']:
-            if n in owned_names or n in PACKS['4']['players']:
+            if n in PACKS['4']['players']:
                 continue
             meta = get_player_metadata(n)
             if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
@@ -178,12 +177,28 @@ def game_tab(tab):
 def admin_panel():
     users = User.query.order_by(User.created_at.desc()).all()
     player_names = set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET)
-    # Include players already present in any saved squad.
+    # Mùa thẻ tự lấy từ dữ liệu cầu thủ đang có trong đội hình và hòm thư.
+    card_seasons = {'Thường', 'Ballon D’or'}
     for save in GameSave.query.all():
         state = save.state or {}
         for group in ('starting', 'bench', 'extras'):
-            player_names.update(p.get('name', '') for p in state.get(group, []) if p.get('name'))
-    return render_template('admin.html', users=users, player_names=sorted(player_names))
+            for p in state.get(group, []):
+                if p.get('name'):
+                    player_names.add(p.get('name'))
+                season = str(p.get('card_season') or '').strip()
+                if season:
+                    card_seasons.add(season)
+                if p.get('event_card') == 'ballon_dor':
+                    card_seasons.add('Ballon D’or')
+        for mail in state.get('mailbox', []):
+            gifted = mail.get('player') or {}
+            season = str(gifted.get('card_season') or '').strip()
+            if season:
+                card_seasons.add(season)
+            if gifted.get('event_card') == 'ballon_dor':
+                card_seasons.add('Ballon D’or')
+    return render_template('admin.html', users=users, player_names=sorted(player_names),
+                           card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())))
 
 @app.post('/admin/gift')
 @admin_required
@@ -210,6 +225,7 @@ def admin_gift():
         club = request.form.get('player_club', '').strip()[:100]
         league = request.form.get('player_league', '').strip()[:100]
         card_type = request.form.get('card_type', 'REGULAR').upper()
+        card_season = request.form.get('card_season', 'Thường').strip() or 'Thường'
         career_status = request.form.get('career_status', 'active').lower()
         source_url = request.form.get('metadata_source_url', '').strip()[:500]
         photo_url = request.form.get('photo_url', '').strip()[:500]
@@ -239,16 +255,14 @@ def admin_gift():
             if parsed_source.scheme != 'https' or not any(host == d or host.endswith('.' + d) for d in trusted_domains):
                 raise ValueError('ICON/HEROES cần đường dẫn HTTPS từ nguồn bóng đá uy tín (FIFA, UEFA, WorldFootball, RSSSF, Transfermarkt hoặc trang giải đấu/liên đoàn chính thức).')
         state = load_state(save)
-        owned = [p for group in ('starting','bench','extras') for p in state.get(group, [])]
-        pending_names = [m.get('player', {}).get('name') for m in state.get('mailbox', []) if m.get('type') == 'player_gift' and not m.get('opened')]
-        if any(p.get('name') == name for p in owned) or name in pending_names:
-            raise ValueError(f'{recipient.username} đã sở hữu hoặc đang có thư tặng {name}.')
         gifted = {
             'name': name, 'position': position, 'rating': rating, 'level': level,
+            'card_season': card_season,
             'market_value': transfer_value, 'nationality': nationality,
             'club': club if career_status == 'active' else '',
             'league': league if career_status == 'active' else '',
             'card_type': card_type, 'career_status': career_status,
+            **({'event_card': 'ballon_dor'} if card_season.casefold() in {"ballon d’or", "ballon d'or"} else {}),
             'metadata_source_url': source_url, 'metadata_admin_verified': True,
             'photo_url': photo_url,
             'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
@@ -378,10 +392,14 @@ def mailbox_open():
         gifted.setdefault('level', 0)
         if not gifted.get('name'):
             flash('Gói quà trong thư không hợp lệ.')
-        elif any(p.get('name') == gifted['name'] for group in ('starting','bench','extras') for p in state.get(group, [])):
-            mail['opened'] = True
-            flash('Cầu thủ này đã có trong đội hình; thư được đánh dấu đã xử lý để tránh nhận trùng.')
         else:
+            # Quà mới nhận không bị danh sách cầu thủ từng bán loại bỏ.
+            gifted_key = str(gifted['name']).strip().casefold()
+            state['market_removed_players'] = [
+                n for n in state.get('market_removed_players', [])
+                if str(n).strip().casefold() != gifted_key
+            ]
+            # Mỗi lần nhận là một bản thẻ riêng; trùng tên/mùa vẫn được giữ.
             state.setdefault('bench', []).append(gifted)
             mail['opened'] = True
             state.setdefault('activity', []).insert(0, {'message': f'Đã nhận quà từ hòm thư: {gifted["name"]}', 'week': state.get('week', 1)})
@@ -418,9 +436,13 @@ def mailbox_claim_all():
         if not gifted.get('name'):
             mail['opened'] = True
             continue
-        if any(p.get('name') == gifted['name'] for group in ('starting','bench','extras') for p in state.get(group, [])):
-            mail['opened'] = True
-            continue
+        # Quà mới nhận không bị danh sách cầu thủ từng bán loại bỏ.
+        gifted_key = str(gifted['name']).strip().casefold()
+        state['market_removed_players'] = [
+            n for n in state.get('market_removed_players', [])
+            if str(n).strip().casefold() != gifted_key
+        ]
+        # Mỗi thư thêm một bản cầu thủ vào kho, kể cả trùng tên.
         state.setdefault('bench', []).append(gifted)
         mail['opened'] = True
         received.append(gifted['name'])
@@ -765,6 +787,11 @@ def action():
                 outgoing=st['starting'][target_index]
                 incoming_pos=str(incoming.get('position','')).upper(); target_pos=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
                 if (incoming_pos=='GK') != (target_pos=='GK'): raise ValueError('Thủ môn chỉ có thể thay thế thủ môn.')
+                if source_group == 'bench' and any(
+                    str(p.get('name', '')).strip().casefold() == str(incoming.get('name', '')).strip().casefold()
+                    for i, p in enumerate(st['starting']) if i != target_index
+                ):
+                    raise ValueError(f"Không thể xếp {incoming.get('name')} vì cầu thủ này đã có trong đội hình đá chính.")
                 if source_group=='bench': st['starting'][target_index],st['bench'][source_index]=incoming,outgoing
                 else: st['starting'][target_index],st['starting'][source_index]=incoming,outgoing
                 st['starting'][target_index]['assigned_position']=target_pos
@@ -825,11 +852,10 @@ def action():
         elif act=='buy':
             name=request.form.get('name','').strip()
             if name not in st['market'] or name in PACKS['4']['players']: raise ValueError('Cầu thủ không có trên TTCN thông thường.')
-            if any(x['name']==name for x in all_players(st)): raise ValueError('Bạn đã sở hữu cầu thủ này.')
             cost=float(PLAYER_PRICES.get(name,0))
             if cost <= 0: raise ValueError('Giá cầu thủ không hợp lệ.')
             if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần 🪙 {cost:g}M PC, hiện có 🪙 {st["budget"]:g}M PC.')
-            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name)); st['market'].remove(name)
+            st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name))
             flash(f'Chiêu mộ thành công {name}. Đã trừ {format_money(cost)}. Ngân sách còn {format_money(st["budget"])}.')
         elif act=='sell':
             group=request.form.get('group'); idx=int(request.form['index'])

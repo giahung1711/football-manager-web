@@ -573,40 +573,37 @@ def normalize_state(st):
         for name in st['market_removed_players']
     }
 
-    # Migrate legacy entries and enforce one copy of each player.
-    seen_names = set()
-
+    # Preserve every owned card, including duplicate names/different seasons.
+    # Only the starting XI must contain unique player names.
     def clean_players(items):
         cleaned = []
-
         for item in (items or []):
             try:
-                record = (
-                    player(item)
-                    if isinstance(item, str)
-                    else copy.deepcopy(item)
-                )
-
+                record = player(item) if isinstance(item, str) else copy.deepcopy(item)
                 if not isinstance(record, dict) or not record.get('name'):
                     continue
-
                 name = str(record['name']).strip()
-
-                if not name or name.casefold() in seen_names:
+                if not name:
                     continue
-
                 record['name'] = name
-                seen_names.add(name.casefold())
                 cleaned.append(record)
-
             except (TypeError, KeyError, ValueError):
                 continue
-
         return cleaned
 
-    st['starting'] = clean_players(st.get('starting'))
+    raw_starting = clean_players(st.get('starting'))
     st['bench'] = clean_players(st.get('bench'))
     st['extras'] = clean_players(st.get('extras'))
+    st['starting'] = []
+    starting_names = set()
+    for record in raw_starting:
+        key = record['name'].casefold()
+        if key in starting_names:
+            # Preserve the duplicate card by moving it to reserves.
+            st['bench'].append(record)
+        else:
+            starting_names.add(key)
+            st['starting'].append(record)
 
     # Loại cầu thủ đã chuyển nhượng khỏi đội bóng.
     for group in ('starting', 'bench', 'extras'):

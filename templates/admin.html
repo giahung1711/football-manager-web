@@ -111,6 +111,12 @@
     <label>Cầu thủ</label>
     <input name="player_name" list="admin-player-list"
            placeholder="Nhập hoặc chọn cầu thủ" required>
+    <label>Mùa thẻ</label>
+    <select name="card_season" required>
+      {% for season_name in card_seasons %}
+        <option value="{{ season_name }}">{{ season_name }}</option>
+      {% endfor %}
+    </select>
     <datalist id="admin-player-list">
       {% for name in player_names %}
         <option value="{{ name }}">
@@ -198,8 +204,7 @@
   </form>
 
   <p class="muted admin-note">
-    Cầu thủ sẽ nằm trong hòm thư của người nhận. Khi mở gói,
-    cầu thủ tự động vào đội hình dự bị chính. ICON/HEROES phải
+    Cầu thủ sẽ nằm trong hòm thư của người nhận. Mỗi lần nhận sẽ thêm một bản thẻ vào đội hình dự bị, kể cả khi đã sở hữu cầu thủ cùng tên. ICON/HEROES phải
     có nguồn HTTPS từ website bóng đá uy tín; cầu thủ giải nghệ
     hoàn toàn chỉ cần quốc gia và huy hiệu đặc biệt.
   </p>
