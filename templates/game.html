@@ -439,13 +439,23 @@
     document.getElementById('forgeResult').hidden = true;
 
     try {
-      const response = await fetch(form.action, {
+      // Dùng getAttribute('action') thay vì form.action: form có input name="action",
+      // khiến thuộc tính form.action bị HTMLFormControlsCollection ghi đè thành HTMLInputElement.
+      const actionUrl = form.getAttribute('action') || window.location.pathname;
+      const response = await fetch(actionUrl, {
         method: 'POST', body: new FormData(form),
         headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'},
         credentials: 'same-origin'
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Không thể ép thẻ lúc này.');
+      // Đọc text trước để tránh lỗi JSON thô nếu máy chủ trả HTML (405/login/error page).
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (_) {
+        throw new Error('Máy chủ không trả JSON (HTTP ' + response.status + '). Hãy tải lại trang; nếu vẫn lỗi, kiểm tra phiên đăng nhập hoặc bản deploy.');
+      }
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Không thể ép thẻ lúc này (HTTP ' + response.status + ').');
 
       await new Promise(resolve => setTimeout(resolve, 1100));
       machine.classList.remove('is-forging');
