@@ -4,9 +4,53 @@
 <div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{state.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><div class="club-mark large">⚽</div></div>
 <div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
 <nav class="game-nav">
-{% for key,label in [('overview','Tổng quan'),('squad','Đội hình'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
+{% for key,label in [('overview','Tổng quan'),('daily','Nhiệm vụ ngày'),('squad','Đội hình'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
 </nav>
-{% if tab=='overview' %}
+{% if tab=='daily' %}
+<section class="panel daily-quest-hero">
+  <div>
+    <p class="eyebrow">DAILY CHALLENGES · RESET 00:00 (GMT+7)</p>
+    <h2>Nhiệm vụ ngày</h2>
+    <p class="muted">Mỗi ngày hệ thống chọn ngẫu nhiên 10 nhiệm vụ từ danh sách 40 nhiệm vụ.</p>
+  </div>
+  <div class="daily-quest-count"><strong>{{ daily_completed_count }}/10</strong><span>Nhiệm vụ đã có tiến độ</span></div>
+</section>
+{% set completed_count = daily_completed_count %}
+<section class="daily-quest-grid">
+  {% for q in daily_quests.missions %}
+    {% set done = q.progress|int >= q.target|int %}
+    <article class="panel daily-quest-card {% if done %}is-complete{% endif %}">
+      <div class="daily-quest-top"><span class="daily-quest-number">NHIỆM VỤ {{loop.index}}</span><span class="daily-quest-status">{% if q.claimed %}Đã nhận{% elif done %}Hoàn thành{% else %}Đang thực hiện{% endif %}</span></div>
+      <h3>{{q.title}}</h3>
+      <div class="daily-quest-progress"><div class="daily-quest-progress-fill" style="width: {{ [100, (q.progress|int * 100 / q.target|int)|int]|min }}%"></div></div>
+      <div class="daily-quest-meta"><span>Tiến độ: {{q.progress}}/{{q.target}}</span><span>+{{q.pc}}M PC{% if q.pg %} · {{'{:,}'.format(q.pg)}} PG{% endif %}{% if q.cards %} · {{q.cards}} Thẻ bảo vệ{% endif %}</span></div>
+      {% if done and not q.claimed %}
+        <form method="post" action="{{url_for('daily_quest_claim')}}"><input type="hidden" name="quest_id" value="{{q.id}}"><button class="button primary">Nhận thưởng</button></form>
+      {% elif q.claimed %}<span class="daily-quest-claimed">✓ Đã nhận phần thưởng</span>{% endif %}
+    </article>
+  {% endfor %}
+</section>
+<section class="panel daily-quest-bonus">
+  <div><p class="eyebrow">DAILY COMPLETION REWARD</p><h2>Phần thưởng hoàn thành 10/10</h2><p class="muted">Hoàn thành cả 10 nhiệm vụ thường để mở khóa phần thưởng tổng.</p></div>
+  <div class="daily-quest-rewards"><strong>500M PC</strong><strong>4.000 PG</strong><strong>4 Thẻ bảo vệ</strong></div>
+  {% if daily_quests.completion_claimed %}<span class="daily-quest-claimed">✓ Đã nhận thưởng tổng</span>
+  {% elif daily_completed_count == 10 %}<form method="post" action="{{url_for('daily_quest_claim_bonus')}}"><button class="button primary">Nhận thưởng 10/10</button></form>
+  {% else %}<span class="muted">Còn {{10 - daily_completed_count}} nhiệm vụ chưa hoàn thành.</span>{% endif %}
+</section>
+{% if daily_quests.special %}
+<section class="panel daily-quest-special">
+  <div class="daily-quest-top"><span class="eyebrow">SPECIAL DAILY QUEST · 20% CHANCE</span><span class="daily-quest-status">Nhiệm vụ đặc biệt</span></div>
+  <h2>{{daily_quests.special.title}}</h2>
+  <p class="muted">Nhiệm vụ đặc biệt xuất hiện ngẫu nhiên, không tính vào 10 nhiệm vụ thường.</p>
+  <div class="daily-quest-progress"><div class="daily-quest-progress-fill" style="width: {{ [100, (daily_quests.special_progress|int * 100 / daily_quests.special.target|int)|int]|min }}%"></div></div>
+  <div class="daily-quest-meta"><span>Tiến độ: {{daily_quests.special_progress}}/{{daily_quests.special.target}}</span><span>750M PC · 5.000 PG · 5 Thẻ bảo vệ</span></div>
+  {% if daily_quests.special_progress|int >= daily_quests.special.target|int and not daily_quests.special_claimed %}<form method="post" action="{{url_for('daily_quest_claim_special')}}"><button class="button primary">Nhận thưởng đặc biệt</button></form>
+  {% elif daily_quests.special_claimed %}<span class="daily-quest-claimed">✓ Đã nhận thưởng đặc biệt</span>{% endif %}
+</section>
+{% else %}
+<section class="panel daily-quest-special daily-quest-locked"><p class="eyebrow">SPECIAL DAILY QUEST</p><h2>Hôm nay không xuất hiện nhiệm vụ đặc biệt</h2><p class="muted">Bạn có 20% xác suất nhận nhiệm vụ đặc biệt vào mỗi ngày mới.</p></section>
+{% endif %}
+{% elif tab=='overview' %}
 <section class="panel overview-panel">
   <div class="overview-heading"><div><p class="eyebrow">CLUB PERFORMANCE</p><h2>Phong độ đội bóng</h2></div><span class="overview-season">MÙA {{state.season}}</span></div>
   <div class="overview-metrics">
@@ -65,7 +109,7 @@
           {% if p.get('event_card') == 'ballon_dor' %}
             <span class="event-card-label">BALLON D’OR</span>
           {% elif p.get('event_card') == 'christmas_2026' %}
-            <span class="event-card-label season-plaque season-plaque-christmas">Christmas 2026</span>
+            <span class="event-card-label">CHRISTMAS 2026</span>
           {% elif p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
@@ -174,13 +218,7 @@
   </form>
 </div>
 <div class="christmas-pack-card">
-  <div>
-    <p class="eyebrow">LIMITED EVENT · CHRISTMAS 2026</p>
-    <h2>❄️ Christmas 2026 Pack</h2>
-    <p>16 cầu thủ sự kiện · OVR 98–101</p>
-    <strong class="christmas-price">💎 1.500 PG</strong>
-    <p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p>
-  </div>
+  <div><p class="eyebrow">LIMITED EVENT · WINTER EDITION</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
   <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Christmas 2026 Pack với giá 1.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="christmas_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026</button>

@@ -1613,3 +1613,28 @@
 .christmas-reveal-stage .ballon-reveal-flag{filter:drop-shadow(0 0 14px #8ddcff)}
 .christmas-reveal-stage .ballon-reveal-position,.christmas-reveal-stage .ballon-reveal-club{color:#bdeaff}
 .christmas-reveal-stage .ballon-skip,.christmas-reveal-stage .ballon-sound{border-color:#7bcfff;color:#e3f7ff;background:#103a5b}
+
+
+/* Daily quests */
+.daily-quest-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+.daily-quest-count{min-width:130px;text-align:center;padding:14px 18px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;background:rgba(255,255,255,.035)}
+.daily-quest-count strong{display:block;font-size:28px;color:var(--accent,#d7b45a)}
+.daily-quest-count span{font-size:12px;color:var(--muted,#9aa4b2)}
+.daily-quest-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.daily-quest-card{margin:0;display:flex;flex-direction:column;gap:12px}
+.daily-quest-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.daily-quest-number,.daily-quest-status{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--muted,#9aa4b2)}
+.daily-quest-status{color:var(--accent,#d7b45a)}
+.daily-quest-card h3{font-size:17px;margin:0;min-height:42px}
+.daily-quest-progress{height:8px;background:rgba(128,140,160,.2);border-radius:99px;overflow:hidden}
+.daily-quest-progress-fill{height:100%;background:linear-gradient(90deg,#2b9c70,#75d5a8);border-radius:99px;transition:width .25s ease}
+.daily-quest-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted,#9aa4b2)}
+.daily-quest-card form,.daily-quest-bonus form,.daily-quest-special form{margin-top:auto}
+.daily-quest-card.is-complete{border-color:rgba(46,180,122,.45)}
+.daily-quest-claimed{font-size:13px;font-weight:700;color:#39b980}
+.daily-quest-bonus,.daily-quest-special{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
+.daily-quest-rewards{display:flex;gap:18px;flex-wrap:wrap;font-size:16px;color:var(--accent,#d7b45a)}
+.daily-quest-special{border:1px solid rgba(215,166,58,.55);background:linear-gradient(135deg,rgba(150,105,20,.13),rgba(20,24,34,.2))}
+.daily-quest-special h2{margin:0}
+.daily-quest-locked{border-style:dashed;opacity:.85}
+@media(max-width:720px){.daily-quest-grid{grid-template-columns:1fr}.daily-quest-hero{align-items:flex-start;flex-direction:column}.daily-quest-count{width:100%;text-align:left}}

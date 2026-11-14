@@ -5,6 +5,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
 from marketplace import player_market_bp
 from player_metadata import enrich_player, get_player_metadata
+from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
@@ -98,6 +99,8 @@ def persist(save,state):
     db.session.commit()
 def page(save, tab='overview', extra=None):
     st=load_state(save)
+    if ensure_daily_quests(st):
+        persist(save, st)
     # Metadata is resolved from the connected football-data provider and cached for 12h.
     # Saved squad records remain untouched; unknown/incomplete players are not rendered as verified cards.
     for group in ('starting', 'bench', 'extras'):
@@ -118,7 +121,7 @@ def page(save, tab='overview', extra=None):
     ballon_reveal_meta = enrich_player(ballon_reveal) if ballon_reveal else None
     if ballon_reveal:
         persist(save, st)
-    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
+    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
                            prices={p['name']:value(p) for p in all_players(st)}, player_value=value, packs=PACKS,
                            market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
@@ -170,8 +173,68 @@ def dashboard():
 @app.route('/<tab>')
 @login_required
 def game_tab(tab):
-    if tab not in {'squad','transfers','shop','upgrade','tactics','finance','matches'}: return redirect(url_for('dashboard'))
+    if tab not in {'squad','transfers','shop','upgrade','tactics','finance','matches','daily'}: return redirect(url_for('dashboard'))
     save=current_save(); return redirect(url_for('choose_club')) if not save else page(save,tab)
+@app.post('/daily-quests/claim')
+@login_required
+def daily_quest_claim():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    ensure_daily_quests(state)
+    daily = state['daily_quests']
+    quest_id = request.form.get('quest_id', '')
+    mission = next((q for q in daily.get('missions', []) if q.get('id') == quest_id), None)
+    if not mission or mission.get('claimed') or int(mission.get('progress', 0)) < int(mission.get('target', 1)):
+        flash('Nhiệm vụ chưa hoàn thành hoặc phần thưởng đã được nhận.')
+    else:
+        grant_quest_reward(state, mission)
+        mission['claimed'] = True
+        flash(f"Đã nhận thưởng nhiệm vụ: +{mission['pc']}M PC, +{mission['pg']:,} PG, +{mission['cards']} Thẻ bảo vệ.")
+    persist(save, state)
+    return redirect(url_for('game_tab', tab='daily'))
+
+
+@app.post('/daily-quests/claim-bonus')
+@login_required
+def daily_quest_claim_bonus():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    ensure_daily_quests(state)
+    daily = state['daily_quests']
+    if daily.get('completion_claimed') or not all(int(q.get('progress', 0)) >= int(q.get('target', 1)) for q in daily.get('missions', [])):
+        flash('Bạn cần hoàn thành đủ 10 nhiệm vụ thường trước khi nhận thưởng mốc ngày.')
+    else:
+        grant_quest_reward(state, DAILY_QUEST_REWARDS['completion'])
+        daily['completion_claimed'] = True
+        flash('Đã nhận thưởng hoàn thành 10/10: 500M PC, 4.000 PG và 4 Thẻ bảo vệ!')
+    persist(save, state)
+    return redirect(url_for('game_tab', tab='daily'))
+
+
+@app.post('/daily-quests/claim-special')
+@login_required
+def daily_quest_claim_special():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    ensure_daily_quests(state)
+    daily = state['daily_quests']
+    special = daily.get('special')
+    if not special or daily.get('special_claimed') or int(daily.get('special_progress', 0)) < int(special.get('target', 1)):
+        flash('Nhiệm vụ đặc biệt chưa hoàn thành hoặc phần thưởng đã được nhận.')
+    else:
+        grant_quest_reward(state, DAILY_QUEST_REWARDS['special'])
+        daily['special_claimed'] = True
+        flash('Đã nhận thưởng nhiệm vụ đặc biệt: 750M PC, 5.000 PG và 5 Thẻ bảo vệ!')
+    persist(save, state)
+    return redirect(url_for('game_tab', tab='daily'))
+
+
 @app.route('/admin', methods=['GET'])
 @admin_required
 def admin_panel():
@@ -200,21 +263,17 @@ def admin_panel():
     return render_template('admin.html', users=users, player_names=sorted(player_names),
                            card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())))
 
-
 @app.post('/admin/gift')
 @admin_required
 def admin_gift():
     if not valid_admin_csrf():
         flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
         return redirect(url_for('admin_panel'))
-
     try:
         user_id = int(request.form.get('user_id', ''))
         recipient = db.session.get(User, user_id)
-
         if not recipient:
             raise ValueError('Không tìm thấy tài khoản nhận quà.')
-
         save = GameSave.query.filter_by(user_id=recipient.id).first()
         if not save:
             raise ValueError('Tài khoản này chưa chọn CLB và chưa có dữ liệu game.')
@@ -222,106 +281,67 @@ def admin_gift():
         name = request.form.get('player_name', '').strip()
         if not name or len(name) > 80:
             raise ValueError('Tên cầu thủ không hợp lệ.')
-
         rating = int(request.form.get('rating', '80'))
         level = int(request.form.get('level', '0'))
         transfer_value = float(request.form.get('transfer_value', '0'))
-        position = request.form.get(
-            'position', PLAYER_POSITIONS.get(name, 'ST')
-        ).upper()
-
+        position = request.form.get('position', PLAYER_POSITIONS.get(name, 'ST')).upper()
         card_type = request.form.get('card_type', 'REGULAR').upper()
         card_season = request.form.get('card_season', 'Thường').strip() or 'Thường'
         source_url = request.form.get('metadata_source_url', '').strip()[:500]
         photo_url = request.form.get('photo_url', '').strip()[:500]
 
+        from urllib.parse import urlparse
         if photo_url:
-            from urllib.parse import urlparse
             parsed = urlparse(photo_url)
             if parsed.scheme != 'https' or not parsed.netloc:
                 raise ValueError('Ảnh cầu thủ phải dùng đường dẫn HTTPS hợp lệ.')
-
         if rating < 1 or level < 0 or not math.isfinite(transfer_value) or transfer_value < 0:
             raise ValueError('OVR/cấp thẻ không hợp lệ hoặc giá trị chuyển nhượng bị âm.')
-
-        if position not in {
-            'GK', 'CB', 'LB', 'RB', 'LWB', 'RWB',
-            'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'ST', 'CF'
-        }:
+        if position not in {'GK','CB','LB','RB','LWB','RWB','CDM','CM','CAM','LM','RM','LW','RW','ST','CF'}:
             raise ValueError('Vị trí cầu thủ không hợp lệ.')
-
         if card_type not in {'REGULAR', 'HEROES', 'ICON'}:
             raise ValueError('Phân loại thẻ không hợp lệ.')
-
         if card_type in {'ICON', 'HEROES'}:
-            from urllib.parse import urlparse
             parsed = urlparse(source_url)
-            trusted = (
-                'fifa.com', 'uefa.com', 'worldfootball.net', 'rsssf.org',
-                'transfermarkt.com', 'premierleague.com', 'laliga.com',
-                'bundesliga.com', 'ligue1.com', 'seriea.com', 'the-afc.com',
-                'conmebol.com', 'concacaf.com', 'cafonline.com'
-            )
+            trusted = ('fifa.com','uefa.com','worldfootball.net','rsssf.org','transfermarkt.com',
+                       'premierleague.com','laliga.com','bundesliga.com','ligue1.com','seriea.com',
+                       'the-afc.com','conmebol.com','concacaf.com','cafonline.com')
             host = (parsed.hostname or '').lower()
-            if parsed.scheme != 'https' or not any(
-                host == domain or host.endswith('.' + domain)
-                for domain in trusted
-            ):
+            if parsed.scheme != 'https' or not any(host == domain or host.endswith('.' + domain) for domain in trusted):
                 raise ValueError('ICON/HEROES cần nguồn HTTPS từ website bóng đá uy tín.')
 
         state = load_state(save)
-
         gifted = {
-            'name': name,
-            'position': position,
-            'rating': rating,
-            'level': level,
-            'card_season': card_season,
-            'market_value': transfer_value,
-            'nationality': '',
-            'club': '',
-            'league': '',
-            'card_type': card_type,
-            'metadata_source_url': source_url,
-            'metadata_admin_verified': True,
-            'metadata_complete': False,
-            'photo_url': photo_url,
-            'is_icon': card_type == 'ICON',
-            'is_hero': card_type == 'HEROES',
+            'name': name, 'position': position, 'rating': rating, 'level': level,
+            'card_season': card_season, 'market_value': transfer_value,
+            'nationality': '', 'club': '', 'league': '', 'card_type': card_type,
+            'metadata_source_url': source_url, 'metadata_admin_verified': True,
+            'metadata_complete': False, 'photo_url': photo_url,
+            'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
         }
-
         if card_season.casefold() in {"ballon d’or", "ballon d'or"}:
             gifted['event_card'] = 'ballon_dor'
         elif card_season.casefold() == 'christmas 2026':
             gifted['event_card'] = 'christmas_2026'
 
         mail = {
-            'id': secrets.token_urlsafe(12),
-            'type': 'player_gift',
-            'subject': request.form.get('mail_subject', '').strip()[:100]
-                       or 'Bạn nhận được một gói cầu thủ!',
-            'body': request.form.get('mail_body', '').strip()[:1000]
-                    or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.',
-            'player': gifted,
-            'opened': False,
+            'id': secrets.token_urlsafe(12), 'type': 'player_gift',
+            'subject': request.form.get('mail_subject', '').strip()[:100] or 'Bạn nhận được một gói cầu thủ!',
+            'body': request.form.get('mail_body', '').strip()[:1000] or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.',
+            'player': gifted, 'opened': False,
             'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M')
         }
-
         state.setdefault('mailbox', []).insert(0, mail)
         state.setdefault('activity', []).insert(0, {
             'message': f'Admin gửi thư tặng {name} OVR {rating} +{level}',
             'week': state.get('week', 1)
         })
         state['activity'] = state['activity'][:15]
-
         persist(save, state)
         flash(f'Đã gửi gói {name} vào hòm thư của {recipient.username}.')
-
     except (ValueError, TypeError) as error:
         flash(str(error))
-
     return redirect(url_for('admin_panel'))
-
 
 
 @app.post('/admin/reset-password')
@@ -797,7 +817,8 @@ def friendly_challenge_decide(challenge_id, decision):
 def action():
     save=GameSave.query.filter_by(user_id=current_user.id).with_for_update().first()
     if not save: return redirect(url_for('choose_club'))
-    st=load_state(save); act=request.form.get('action'); result=None
+    st=load_state(save); ensure_daily_quests(st); act=request.form.get('action'); result=None
+    quest_event=None; quest_data={}
     try:
         if act=='swap':
             a=int(request.form['a']); b=int(request.form['b'])
@@ -898,12 +919,14 @@ def action():
             if cost <= 0: raise ValueError('Giá cầu thủ không hợp lệ.')
             if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Cần 🪙 {cost:g}M PC, hiện có 🪙 {st["budget"]:g}M PC.')
             st['budget']=round(st['budget']-cost,2); st['bench'].append(player(name))
+            quest_event='buy'; quest_data={'pc_spent': cost}
             flash(f'Chiêu mộ thành công {name}. Đã trừ {format_money(cost)}. Ngân sách còn {format_money(st["budget"])}.')
         elif act=='sell':
             group=request.form.get('group'); idx=int(request.form['index'])
             if group not in {'bench','extras'}: raise ValueError('Không thể bán cầu thủ ở danh sách này.')
             arr=st[group]; p=arr[idx]; amount=float(value(p))
             arr.pop(idx); st['budget']=round(st['budget']+amount,2)
+            quest_event='sell'; quest_data={'sale_value': amount}
             if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']: st['market'].append(p['name'])
             flash(f'Đã bán {p["name"]}, cộng {format_money(amount)}. Ngân sách: {format_money(st["budget"])}.')
 
@@ -947,6 +970,7 @@ def action():
                        'market_value': BALLON_DOR_VALUES[name]}
             st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
             st.setdefault('bench', []).append(awarded)
+            quest_event='pack'; quest_data={'pg_spent': cost_pg, 'rating': rating}
             processed.append(request_id)
             st['processed_ballon_requests'] = processed[-100:]
             flags = {
@@ -996,6 +1020,7 @@ def action():
             }
             st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
             st.setdefault('bench', []).append(awarded)
+            quest_event='pack'; quest_data={'pg_spent': cost_pg, 'rating': rating}
             processed.append(request_id)
             st['processed_christmas_requests'] = processed[-100:]
             st['ballon_reveal'] = {
@@ -1015,6 +1040,7 @@ def action():
             if st['budget'] + 1e-9 < cost: raise ValueError(f'Không đủ ngân sách. Gói giá 🪙 {cost:g}M PC, bạn hiện có 🪙 {st["budget"]:g}M PC.')
             p=random.choice(pack['players'])
             st['budget']=round(st['budget']-cost,2); st['bench'].append(player(p))
+            quest_event='pack'; quest_data={'pc_spent': cost, 'rating': PLAYER_RATINGS.get(p, 80)}
             flash(f'Mở {pack["name"]}: nhận được {p}! Đã trừ {format_money(cost)}, còn {format_money(st["budget"])}.')
         elif act=='upgrade':
             group = request.form.get('group')
@@ -1060,6 +1086,7 @@ def action():
                 )[0]
 
             p['level'] = new_level
+            quest_event='upgrade'; quest_data={'old_level': old_level, 'new_level': new_level, 'success': bool(success), 'pc_spent': cost}
             event = {
                 'player': p.get('name', 'Unknown'),
                 'from_level': old_level,
@@ -1092,6 +1119,9 @@ def action():
             }
         elif act=='match':
             result=simulate_match(st)
+            my_goals = int(result.get('score_home', 0)); conceded = int(result.get('score_away', 0))
+            scorers = [e.get('player') for e in result.get('events', []) if e.get('type') == 'goal' and e.get('team') == st.get('club') and e.get('player') and 'OG' not in str(e.get('detail', ''))]
+            quest_event='match'; quest_data={'won': result.get('result') == 'THẮNG', 'goals': my_goals, 'conceded': conceded, 'goal_diff': my_goals-conceded, 'scorers': scorers}
             session['last_match_result']=copy.deepcopy(result)
             flash(f"{result['result']}! {st['club']} {result['score']} {result['opponent']}. Thưởng {format_money(result['reward'])}. Ngân sách: {format_money(st['budget'])}.")
         elif act=='formation':
@@ -1107,6 +1137,7 @@ def action():
             if keeper: keeper['assigned_position']='GK'
             st['starting']=outfield + ([keeper] if keeper else [])
         else: raise ValueError('Thao tác không hợp lệ.')
+        update_daily_quests(st, quest_event, quest_data)
         st.setdefault('activity',[]).insert(0,{'message':flash_message_placeholder(act),'week':st.get('week',1)})
         st['activity']=st['activity'][:15]
         persist(save,st)

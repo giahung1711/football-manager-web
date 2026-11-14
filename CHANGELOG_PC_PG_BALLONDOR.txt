@@ -21,3 +21,12 @@ UPDATE PACKS & PLAYER VALUES
 - Admin gift season selector includes Christmas 2026.
 - Upgrade transfer-value multipliers are relative to original value: +0 100%, +1 150%, +2 225%, +3 320%, +4 410%, +5 635%, +6 900%, +7 1,250%, +8 2,100%.
 - Existing forge layout and upgrade success/cost mechanics are unchanged.
+
+
+DAILY QUESTS UPDATE (2026-11-14)
+- Added 40 regular daily quests; each account receives 10 unique random quests per Vietnam calendar day.
+- Added a 20% daily chance for one special quest, selected from the six agreed challenges.
+- Added individual reward claims, the 10/10 completion reward (500M PC, 4,000 PG, 4 Protection Cards), and the special reward (750M PC, 5,000 PG, 5 Protection Cards).
+- Progress is tracked for matches, wins/streaks, goals, upgrades, transfers, packs, and PC/PG spending.
+- Added a dedicated Daily Quests tab.
+- Admin player gifts no longer require manually entering nationality, club, league, or career status.
