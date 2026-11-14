@@ -1,13 +1,11 @@
-
 {% extends 'base.html' %}
 {% block title %}{{ state.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
 <div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{state.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><div class="club-mark large">⚽</div></div>
-<div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
+<div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong data-budget-balance>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
 <nav class="game-nav">
 {% for key,label in [('overview','Tổng quan'),('daily','Nhiệm vụ ngày'),('squad','Đội hình'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
 </nav>
-
 {% if tab=='daily' %}
 <section class="panel daily-quest-hero">
   <div>
@@ -52,7 +50,6 @@
 {% else %}
 <section class="panel daily-quest-special daily-quest-locked"><p class="eyebrow">SPECIAL DAILY QUEST</p><h2>Hôm nay không xuất hiện nhiệm vụ đặc biệt</h2><p class="muted">Bạn có 20% xác suất nhận nhiệm vụ đặc biệt vào mỗi ngày mới.</p></section>
 {% endif %}
-
 {% elif tab=='overview' %}
 <section class="panel overview-panel">
   <div class="overview-heading"><div><p class="eyebrow">CLUB PERFORMANCE</p><h2>Phong độ đội bóng</h2></div><span class="overview-season">MÙA {{state.season}}</span></div>
@@ -75,7 +72,6 @@
   <div class="overview-ovr"><span class="metric-label">OVR ĐỘI HÌNH ĐÁ CHÍNH</span><strong>{{data.average_rating}}</strong><span class="ovr-caption">ĐIỂM SỨC MẠNH ĐỘI HÌNH</span></div>
 </section>
 <section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
-
 {% elif tab=='squad' %}
 {% set formations = {
 '4-3-3 (Tấn công)': [('LW',15,19),('ST',50,13),('RW',85,19),('CM',31,41),('CAM',50,32),('CM',69,41),('LB',12,67),('CB',37,70),('CB',63,70),('RB',88,67),('GK',50,87)],
@@ -208,11 +204,9 @@
 <script>
 (()=>{let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
 </script>
-
 {% elif tab=='transfers' %}
 <section class="panel"><h2>Thị trường chuyển nhượng</h2><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
 <section class="panel"><h2>Bán cầu thủ dự bị</h2>{% for p in state.bench %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section><section class="panel"><h2>Cầu thủ dự bị khác</h2>{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section>
-
 {% elif tab=='shop' %}
 <section class="panel"><h2>Cửa hàng gói cầu thủ</h2>
 {% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}
@@ -224,17 +218,17 @@
   </form>
 </div>
 <div class="christmas-pack-card">
-  <div><p class="eyebrow">LIMITED EVENT · CHRISTMAS 2026</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <div><p class="eyebrow">LIMITED EVENT · WINTER EDITION</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
   <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Christmas 2026 Pack với giá 1.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="christmas_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
-    <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026 Pack</button>
+    <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026</button>
   </form>
 </div></section>
-
 {% elif tab=='upgrade' %}
 {% set success_rates = [99,90,80,60,40,30,20,10] %}
 {% set cost_rates = [0,2,6,10,15,20,25,42,60] %}
 {% set value_multipliers = [1.0,1.50,2.25,3.20,4.10,6.35,9.00,12.50,21.00] %}
+
 
 <section class="panel forge-heading">
   <div>
@@ -325,6 +319,11 @@
           <strong id="forgeName">PLAYER NAME</strong>
         </div>
       </div>
+      <div class="forge-result" id="forgeResult" hidden>
+        <span class="forge-result-symbol" id="forgeResultSymbol">✦</span>
+        <strong id="forgeResultTitle"></strong>
+        <span id="forgeResultText"></span>
+      </div>
     </div>
 
     <div class="forge-details" id="forgeDetails">
@@ -356,209 +355,142 @@
   const options = Array.from(document.querySelectorAll('.forge-player-option'));
   const protect = document.getElementById('forgeProtect');
   const form = document.getElementById('forgeForm');
-
+  const machine = document.getElementById('forgeMachine');
+  const submit = document.getElementById('forgeSubmit');
   let selected = null;
-
-  const STORAGE_KEY = 'fmForgePendingSelection';
+  let busy = false;
 
   const rates = {{success_rates|tojson}};
   const costs = {{cost_rates|tojson}};
   const multipliers = {{value_multipliers|tojson}};
-
-  const formatMoney = value =>
-    Math.round(Number(value || 0) * 1000000).toLocaleString('vi-VN') + ' 🪙';
-
-  // Lưu thông tin cầu thủ đang chọn để khôi phục sau khi server trả trang mới.
-  function saveSelection() {
-    if (!selected) return;
-
-    const saved = {
-      group: selected.dataset.group,
-      index: selected.dataset.index,
-      name: selected.dataset.name
-    };
-
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-    } catch (error) {
-      console.warn('Không thể lưu lựa chọn cầu thủ:', error);
-    }
-  }
+  const ovrBonuses = [0,1,2,3,4,6,8,10,13];
+  const formatMoney = value => Math.round(Number(value || 0) * 1000000).toLocaleString('vi-VN') + ' 🪙';
 
   function updateForge() {
     if (!selected) return;
-
     const level = Number(selected.dataset.level);
     const next = Math.min(8, level + 1);
     const currentOvr = Number(selected.dataset.rating);
     const baseValue = Number(selected.dataset.base);
     const currentValue = Number(selected.dataset.value);
     const isProtected = protect.checked && level === 7 && next === 8;
-
     document.getElementById('forgeGroup').value = selected.dataset.group;
     document.getElementById('forgeIndex').value = selected.dataset.index;
     document.getElementById('forgeTargetLevel').value = next;
     document.getElementById('forgeProtectValue').value = isProtected ? '1' : '0';
-
     document.getElementById('forgeCurrentOvr').textContent = currentOvr;
     document.getElementById('forgeCurrentLevel').textContent = '+' + level;
     document.getElementById('forgeCurrentValue').textContent = formatMoney(currentValue);
-
     const rate = rates[Math.max(0, next - 1)] || 0;
     const cost = baseValue * (costs[next] || 0) / 100;
-
-    document.getElementById('forgeRate').innerHTML =
-      '<span>Tỉ lệ thành công</span><strong>' + rate + '%</strong>' +
-      '<span>Chi phí ép thẻ</span><strong>' + formatMoney(cost) + '</strong>';
-
-    document.getElementById('forgeSubmit').disabled = level >= 8;
-
+    document.getElementById('forgeRate').innerHTML = '<span>Tỉ lệ thành công</span><strong>' + rate + '%</strong><span>Chi phí ép thẻ</span><strong>' + formatMoney(cost) + '</strong>';
+    submit.disabled = busy || level >= 8;
     const protectionWrap = document.getElementById('forgeProtectionWrap');
     protectionWrap.hidden = !(level === 7 && next === 8);
-    protect.disabled = protectionWrap.hidden;
-
-    if (protect.disabled) {
-      protect.checked = false;
-    }
-
-    document.getElementById('forgeStatus').textContent =
-      isProtected ? 'PROTECTION READY' : 'SYSTEM READY';
+    protect.disabled = protectionWrap.hidden || busy;
+    if (protect.disabled && level !== 7) protect.checked = false;
+    document.getElementById('forgeStatus').textContent = isProtected ? 'PROTECTION READY' : 'SYSTEM READY';
   }
 
-  // Chọn cầu thủ và hiển thị thông tin lên bàn ép.
   function selectPlayer(option) {
-    if (!option) return;
-
+    if (!option || busy) return;
     selected = option;
-
-    options.forEach(item => item.classList.remove('selected'));
-    option.classList.add('selected');
-
+    options.forEach(item => item.classList.toggle('selected', item === option));
     document.getElementById('forgeEmpty').hidden = true;
     document.getElementById('forgeShowcase').hidden = false;
-
     document.getElementById('forgeName').textContent = option.dataset.name;
     document.getElementById('forgePosition').textContent = option.dataset.position;
     document.getElementById('forgeOvr').textContent = option.dataset.rating;
     document.getElementById('forgeLevel').textContent = '+' + option.dataset.level;
-
     const photo = document.getElementById('forgePhoto');
     const fallback = document.getElementById('forgeFallback');
-
     photo.onerror = null;
-
     if (option.dataset.photo) {
-      photo.src = option.dataset.photo;
-      photo.hidden = false;
-      fallback.hidden = true;
-
-      photo.onerror = () => {
-        photo.hidden = true;
-        fallback.hidden = false;
-      };
-    } else {
-      photo.removeAttribute('src');
-      photo.hidden = true;
-      fallback.hidden = false;
-    }
-
-    document.getElementById('forgeCard').className =
-      'forge-card card-' + option.dataset.tier;
-
-    // Mỗi lần chọn cầu thủ mới, trạng thái bảo vệ trở về mặc định.
+      photo.src = option.dataset.photo; photo.hidden = false; fallback.hidden = true;
+      photo.onerror = () => { photo.hidden = true; fallback.hidden = false; };
+    } else { photo.removeAttribute('src'); photo.hidden = true; fallback.hidden = false; }
+    document.getElementById('forgeCard').className = 'forge-card card-' + option.dataset.tier;
     protect.checked = false;
-
-    const isLevelSeven = Number(option.dataset.level) === 7;
-    document.getElementById('forgeProtectionWrap').hidden = !isLevelSeven;
-    protect.disabled = !isLevelSeven;
-
+    machine.classList.remove('is-success', 'is-failure', 'is-forging');
+    document.getElementById('forgeCard').classList.remove('card-shaking', 'card-success', 'card-failure', 'card-celebrate');
+    document.getElementById('forgeResult').hidden = true;
     updateForge();
   }
 
-  // Sự kiện chọn cầu thủ bằng chuột.
-  options.forEach(option => {
-    option.addEventListener('click', () => {
-      selectPlayer(option);
-    });
-  });
-
+  options.forEach(option => option.addEventListener('click', () => selectPlayer(option)));
   protect.addEventListener('change', updateForge);
 
-  // Trước khi gửi yêu cầu ép thẻ, lưu lại cầu thủ đang nằm trên bàn.
-  form.addEventListener('submit', event => {
-    if (!selected) {
-      event.preventDefault();
-      alert('Vui lòng chọn cầu thủ trước.');
-      return;
-    }
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    if (!selected) { alert('Vui lòng chọn cầu thủ trước.'); return; }
+    const level = Number(selected.dataset.level);
+    if (level >= 8) { alert('Cầu thủ đã đạt cấp ép tối đa +8.'); return; }
+    if (protect.checked && level !== 7) { alert('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.'); return; }
 
-    if (Number(selected.dataset.level) >= 8) {
-      event.preventDefault();
-      alert('Cầu thủ đã đạt cấp ép tối đa +8.');
-      return;
-    }
+    busy = true;
+    submit.disabled = true;
+    protect.disabled = true;
+    machine.classList.remove('is-success', 'is-failure');
+    machine.classList.add('is-forging');
+    const card = document.getElementById('forgeCard');
+    card.classList.add('card-shaking');
+    document.getElementById('forgeStatus').textContent = 'ENHANCING...';
+    document.getElementById('forgeResult').hidden = true;
 
-    if (protect.checked && Number(selected.dataset.level) !== 7) {
-      event.preventDefault();
-      alert('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.');
-      return;
-    }
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST', body: new FormData(form),
+        headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'},
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Không thể ép thẻ lúc này.');
 
-    // Lưu lựa chọn trước khi trình duyệt gửi POST và tải lại trang.
-    saveSelection();
+      await new Promise(resolve => setTimeout(resolve, 1100));
+      machine.classList.remove('is-forging');
+      card.classList.remove('card-shaking');
+      const success = !!data.success;
+      machine.classList.add(success ? 'is-success' : 'is-failure');
+      card.classList.add(success ? 'card-success' : 'card-failure');
+      if (success) card.classList.add('card-celebrate');
+
+      const base = Number(selected.dataset.base || 0);
+      selected.dataset.level = String(data.new_level);
+      selected.dataset.rating = String(data.base_rating + ovrBonuses[data.new_level]);
+      selected.dataset.value = String(base * multipliers[data.new_level]);
+      selected.querySelector('.forge-option-ovr').textContent = selected.dataset.rating;
+      selected.querySelector('.forge-option-info small').textContent = selected.dataset.position + ' · +' + data.new_level;
+      document.getElementById('forgeOvr').textContent = selected.dataset.rating;
+      document.getElementById('forgeLevel').textContent = '+' + data.new_level;
+      document.getElementById('forgeCurrentOvr').textContent = selected.dataset.rating;
+      document.getElementById('forgeCurrentLevel').textContent = '+' + data.new_level;
+      document.getElementById('forgeCurrentValue').textContent = formatMoney(Number(selected.dataset.value));
+      document.getElementById('forgeStatus').textContent = success ? 'UPGRADE SUCCESS' : 'UPGRADE FAILED';
+      document.getElementById('forgeResultSymbol').textContent = success ? '✦' : '✕';
+      document.getElementById('forgeResultTitle').textContent = success ? 'ÉP THẺ THÀNH CÔNG!' : 'ÉP THẺ THẤT BẠI';
+      document.getElementById('forgeResultText').textContent = data.player_name + ' · +' + data.old_level + ' → +' + data.new_level + ' · OVR ' + data.ovr + (data.protected ? ' · Đã dùng Thẻ bảo vệ' : '');
+      document.getElementById('forgeResult').hidden = false;
+      const protectionCount = document.querySelector('.forge-protection-count strong');
+      if (protectionCount) protectionCount.textContent = data.protection_count;
+      const budgetNode = document.querySelector('[data-budget-balance]');
+      if (budgetNode) budgetNode.textContent = formatMoney(data.budget);
+      busy = false;
+      updateForge();
+      if (data.new_level === 7) { protect.checked = false; updateForge(); }
+    } catch (error) {
+      machine.classList.remove('is-forging');
+      card.classList.remove('card-shaking');
+      busy = false;
+      updateForge();
+      document.getElementById('forgeStatus').textContent = 'SYSTEM READY';
+      alert(error.message || 'Có lỗi khi gửi yêu cầu ép thẻ.');
+    }
   });
-
-  // Khi trang tải lại sau khi ép, khôi phục đúng cầu thủ trước đó.
-  function restoreSelection() {
-    let saved = null;
-
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-
-      saved = JSON.parse(raw);
-    } catch (error) {
-      console.warn('Không thể đọc lựa chọn cầu thủ đã lưu:', error);
-      return;
-    }
-
-    if (!saved) return;
-
-    // Ưu tiên tìm theo nhóm và chỉ số ban đầu.
-    let option = options.find(item =>
-      item.dataset.group === String(saved.group) &&
-      item.dataset.index === String(saved.index)
-    );
-
-    // Nếu chỉ số thay đổi, tìm tiếp theo tên trong đúng nhóm.
-    if (!option && saved.name) {
-      option = options.find(item =>
-        item.dataset.group === String(saved.group) &&
-        item.dataset.name === String(saved.name)
-      );
-    }
-
-    if (option) {
-      // Dữ liệu cấp thẻ, OVR và giá trị lấy từ HTML mới do server render.
-      selectPlayer(option);
-    }
-
-    // Xóa dữ liệu chờ khôi phục sau khi đã xử lý.
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
-      console.warn('Không thể xóa lựa chọn đã lưu:', error);
-    }
-  }
-
-  // Khôi phục lựa chọn ngay khi trang ép thẻ được tải.
-  restoreSelection();
 })();
 </script>
-
 {% elif tab=='finance' %}
 <section class="panel"><h2>Tài chính CLB</h2><div class="stats"><div class="stat"><span>Ngân sách hiện tại</span><strong>{{state.budget|money}}</strong></div><div class="stat"><span>Giá trị đội hình</span><strong>{{data.squad_value|money}}</strong></div></div></section>
-
 {% elif tab=='matches' %}
 <section class="panel"><h2>Lịch sử trận đấu</h2>
 {% if state.match_history %}
@@ -573,7 +505,6 @@
 {% endif %}
 </section>
 {% endif %}
-
 {% if ballon_reveal %}
 <div class="ballon-reveal-overlay {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-overlay{% endif %}" id="ballonReveal"><div class="ballon-reveal-stage {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-stage{% endif %}">
 <div class="ballon-controls"><button type="button" class="ballon-sound" id="ballonSound">♪ Bật âm thanh</button><button type="button" class="ballon-skip" id="ballonSkip">Bỏ qua</button></div>
@@ -598,6 +529,5 @@ timers.push(setTimeout(()=>{pos.textContent={{ ballon_reveal.position|tojson }};
 timers.push(setTimeout(()=>{club.classList.add('shown');status.textContent='Huy hiệu sự kiện';},4000));
 timers.push(setTimeout(()=>{flag.classList.add('hidden');pos.classList.add('hidden');club.classList.add('hidden');card.classList.add('shown');status.textContent='Cầu thủ đã xuất hiện!';},6000));
 skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();});})();
-</script>
-{% endif %}
+</script>{% endif %}
 {% endblock %}

@@ -11,12 +11,6 @@ from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, nor
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
-@app.route('/health')
-def health():
-    return jsonify({
-        'status': 'ok',
-        'service': 'football-manager-web'
-    }), 200
 app.register_blueprint(player_market_bp)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deploying')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///football_manager.db')
@@ -819,6 +813,8 @@ def action():
     save=GameSave.query.filter_by(user_id=current_user.id).with_for_update().first()
     if not save: return redirect(url_for('choose_club'))
     st=load_state(save); ensure_daily_quests(st); act=request.form.get('action'); result=None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    upgrade_response = None
     quest_event=None; quest_data={}
     try:
         if act=='swap':
@@ -1118,6 +1114,20 @@ def action():
                 'player': p.get('name'), 'attempts': total_attempts,
                 'successes': total_successes, 'spent': round(total_spent, 2)
             }
+            ovr_bonus = [0,1,2,3,4,6,8,10,13][new_level]
+            upgrade_response = {
+                'success': bool(success), 'protected': bool(protection_requested),
+                'player_name': p.get('name', 'Unknown'), 'group': group, 'index': idx,
+                'old_level': old_level, 'target_level': target, 'new_level': new_level,
+                'ovr': int(p.get('rating', 0)) + ovr_bonus,
+                'base_rating': int(p.get('rating', 0)),
+                'base_value': float(p.get('market_value', 0) or 0),
+                'value': round(float(p.get('market_value', 0) or 0) * [1.0,1.50,2.25,3.20,4.10,6.35,9.00,12.50,21.00][new_level], 2),
+                'budget': st.get('budget', 0),
+                'protection_count': int(inventory.get('Thẻ bảo vệ', 0) or 0),
+                'cost': cost, 'rate': UPGRADE_RATES[level],
+                'message': ('ÉP THẺ THÀNH CÔNG!' if success else ('THẤT BẠI · ĐÃ BẢO VỆ THẺ!' if protection_requested else 'ÉP THẺ THẤT BẠI!'))
+            }
         elif act=='match':
             result=simulate_match(st)
             my_goals = int(result.get('score_home', 0)); conceded = int(result.get('score_away', 0))
@@ -1143,7 +1153,12 @@ def action():
         st['activity']=st['activity'][:15]
         persist(save,st)
     except (ValueError,KeyError,IndexError,TypeError) as e:
-        db.session.rollback(); flash(str(e))
+        db.session.rollback()
+        if is_ajax and act == 'upgrade':
+            return jsonify({'ok': False, 'error': str(e)}), 400
+        flash(str(e))
+    if is_ajax and act == 'upgrade' and upgrade_response:
+        return jsonify({'ok': True, **upgrade_response})
     return redirect(request.referrer or url_for('dashboard'))
 def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
 if __name__=='__main__': app.run(debug=True)

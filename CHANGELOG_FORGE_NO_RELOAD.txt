@@ -1,0 +1,13 @@
+FOOTBALL MANAGER - FORGE NO-RELOAD UPDATE
+
+Changes:
+- Forge submissions now use fetch/AJAX and return JSON from Flask for upgrade actions.
+- The upgrade page stays mounted; it does not reload after success or failure.
+- The selected player remains on the workbench and the player's level, OVR, displayed value, protection-card count, and club budget are updated in place.
+- Added success/failure result presentation using the existing forge animation styles.
+- Existing server-side success rates, costs, failure distribution, protection consumption, quest tracking, and persistence remain authoritative and unchanged.
+
+Validation performed:
+- Python syntax compilation passed for app.py.
+- JavaScript syntax check passed for the updated forge script.
+- Full Flask runtime integration test was not run in this environment because Flask dependencies are not installed here.
