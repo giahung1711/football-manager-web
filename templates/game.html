@@ -65,7 +65,7 @@
           {% if p.get('event_card') == 'ballon_dor' %}
             <span class="event-card-label">BALLON D’OR</span>
           {% elif p.get('event_card') == 'christmas_2026' %}
-            <span class="event-card-label">CHRISTMAS 2026</span>
+            <span class="event-card-label season-plaque season-plaque-christmas">Christmas 2026</span>
           {% elif p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
@@ -174,7 +174,13 @@
   </form>
 </div>
 <div class="christmas-pack-card">
-  <div><p class="eyebrow">LIMITED EVENT · WINTER EDITION</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <div>
+    <p class="eyebrow">LIMITED EVENT · CHRISTMAS 2026</p>
+    <h2>❄️ Christmas 2026 Pack</h2>
+    <p>16 cầu thủ sự kiện · OVR 98–101</p>
+    <strong class="christmas-price">💎 1.500 PG</strong>
+    <p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p>
+  </div>
   <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Christmas 2026 Pack với giá 1.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="christmas_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026</button>
