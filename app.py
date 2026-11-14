@@ -200,87 +200,128 @@ def admin_panel():
     return render_template('admin.html', users=users, player_names=sorted(player_names),
                            card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())))
 
+
 @app.post('/admin/gift')
 @admin_required
 def admin_gift():
     if not valid_admin_csrf():
         flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
         return redirect(url_for('admin_panel'))
+
     try:
         user_id = int(request.form.get('user_id', ''))
         recipient = db.session.get(User, user_id)
+
         if not recipient:
             raise ValueError('Không tìm thấy tài khoản nhận quà.')
+
         save = GameSave.query.filter_by(user_id=recipient.id).first()
         if not save:
             raise ValueError('Tài khoản này chưa chọn CLB và chưa có dữ liệu game.')
+
         name = request.form.get('player_name', '').strip()
         if not name or len(name) > 80:
             raise ValueError('Tên cầu thủ không hợp lệ.')
+
         rating = int(request.form.get('rating', '80'))
         level = int(request.form.get('level', '0'))
         transfer_value = float(request.form.get('transfer_value', '0'))
-        position = request.form.get('position', PLAYER_POSITIONS.get(name, 'ST')).upper()
-        nationality = request.form.get('nationality', '').strip()[:80]
-        club = request.form.get('player_club', '').strip()[:100]
-        league = request.form.get('player_league', '').strip()[:100]
+        position = request.form.get(
+            'position', PLAYER_POSITIONS.get(name, 'ST')
+        ).upper()
+
         card_type = request.form.get('card_type', 'REGULAR').upper()
         card_season = request.form.get('card_season', 'Thường').strip() or 'Thường'
-        career_status = request.form.get('career_status', 'active').lower()
         source_url = request.form.get('metadata_source_url', '').strip()[:500]
         photo_url = request.form.get('photo_url', '').strip()[:500]
+
         if photo_url:
             from urllib.parse import urlparse
-            parsed_photo = urlparse(photo_url)
-            if parsed_photo.scheme != 'https' or not parsed_photo.netloc:
+            parsed = urlparse(photo_url)
+            if parsed.scheme != 'https' or not parsed.netloc:
                 raise ValueError('Ảnh cầu thủ phải dùng đường dẫn HTTPS hợp lệ.')
-        allowed_types = {'REGULAR', 'HEROES', 'ICON'}
+
         if rating < 1 or level < 0 or not math.isfinite(transfer_value) or transfer_value < 0:
             raise ValueError('OVR/cấp thẻ không hợp lệ hoặc giá trị chuyển nhượng bị âm.')
-        if position not in {'GK','CB','LB','RB','LWB','RWB','CDM','CM','CAM','LM','RM','LW','RW','ST','CF'}:
+
+        if position not in {
+            'GK', 'CB', 'LB', 'RB', 'LWB', 'RWB',
+            'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'ST', 'CF'
+        }:
             raise ValueError('Vị trí cầu thủ không hợp lệ.')
-        if card_type not in allowed_types or career_status not in {'active', 'retired'}:
-            raise ValueError('Phân loại thẻ hoặc trạng thái sự nghiệp không hợp lệ.')
-        if not nationality:
-            raise ValueError('Phải nhập quốc gia đã xác minh của cầu thủ.')
-        if career_status == 'active' and (not club or not league):
-            raise ValueError('Cầu thủ còn thi đấu cấp CLB phải có CLB và giải đấu hiện tại.')
-        if career_status == 'retired' and card_type not in {'ICON', 'HEROES'}:
-            raise ValueError('Cầu thủ giải nghệ hoàn toàn phải được phân loại ICON hoặc HEROES mới được gift theo quy tắc hiện tại.')
+
+        if card_type not in {'REGULAR', 'HEROES', 'ICON'}:
+            raise ValueError('Phân loại thẻ không hợp lệ.')
+
         if card_type in {'ICON', 'HEROES'}:
             from urllib.parse import urlparse
-            parsed_source = urlparse(source_url)
-            trusted_domains = ('fifa.com', 'uefa.com', 'worldfootball.net', 'rsssf.org', 'transfermarkt.com', 'premierleague.com', 'laliga.com', 'bundesliga.com', 'ligue1.com', 'seriea.com', 'the-afc.com', 'conmebol.com', 'concacaf.com', 'cafonline.com')
-            host = (parsed_source.hostname or '').lower()
-            if parsed_source.scheme != 'https' or not any(host == d or host.endswith('.' + d) for d in trusted_domains):
-                raise ValueError('ICON/HEROES cần đường dẫn HTTPS từ nguồn bóng đá uy tín (FIFA, UEFA, WorldFootball, RSSSF, Transfermarkt hoặc trang giải đấu/liên đoàn chính thức).')
+            parsed = urlparse(source_url)
+            trusted = (
+                'fifa.com', 'uefa.com', 'worldfootball.net', 'rsssf.org',
+                'transfermarkt.com', 'premierleague.com', 'laliga.com',
+                'bundesliga.com', 'ligue1.com', 'seriea.com', 'the-afc.com',
+                'conmebol.com', 'concacaf.com', 'cafonline.com'
+            )
+            host = (parsed.hostname or '').lower()
+            if parsed.scheme != 'https' or not any(
+                host == domain or host.endswith('.' + domain)
+                for domain in trusted
+            ):
+                raise ValueError('ICON/HEROES cần nguồn HTTPS từ website bóng đá uy tín.')
+
         state = load_state(save)
+
         gifted = {
-            'name': name, 'position': position, 'rating': rating, 'level': level,
+            'name': name,
+            'position': position,
+            'rating': rating,
+            'level': level,
             'card_season': card_season,
-            'market_value': transfer_value, 'nationality': nationality,
-            'club': club if career_status == 'active' else '',
-            'league': league if career_status == 'active' else '',
-            'card_type': card_type, 'career_status': career_status,
-            **({'event_card': 'ballon_dor'} if card_season.casefold() in {"ballon d’or", "ballon d'or"} else {}),
-            **({'event_card': 'christmas_2026'} if card_season.casefold() == 'christmas 2026' else {}),
-            'metadata_source_url': source_url, 'metadata_admin_verified': True,
+            'market_value': transfer_value,
+            'nationality': '',
+            'club': '',
+            'league': '',
+            'card_type': card_type,
+            'metadata_source_url': source_url,
+            'metadata_admin_verified': True,
+            'metadata_complete': False,
             'photo_url': photo_url,
-            'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
-            'metadata_complete': True,
+            'is_icon': card_type == 'ICON',
+            'is_hero': card_type == 'HEROES',
         }
-        subject = request.form.get('mail_subject', '').strip()[:100] or 'Bạn nhận được một gói cầu thủ!'
-        body = request.form.get('mail_body', '').strip()[:1000] or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.'
-        mail = {'id': secrets.token_urlsafe(12), 'type': 'player_gift', 'subject': subject, 'body': body,
-                'player': gifted, 'opened': False, 'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M')}
+
+        if card_season.casefold() in {"ballon d’or", "ballon d'or"}:
+            gifted['event_card'] = 'ballon_dor'
+        elif card_season.casefold() == 'christmas 2026':
+            gifted['event_card'] = 'christmas_2026'
+
+        mail = {
+            'id': secrets.token_urlsafe(12),
+            'type': 'player_gift',
+            'subject': request.form.get('mail_subject', '').strip()[:100]
+                       or 'Bạn nhận được một gói cầu thủ!',
+            'body': request.form.get('mail_body', '').strip()[:1000]
+                    or 'Admin gửi tặng bạn một cầu thủ. Nhấn Mở để nhận vào đội hình dự bị.',
+            'player': gifted,
+            'opened': False,
+            'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M')
+        }
+
         state.setdefault('mailbox', []).insert(0, mail)
-        state.setdefault('activity', []).insert(0, {'message': f'Admin gửi thư tặng {name} OVR {rating} +{level}', 'week': state.get('week', 1)})
+        state.setdefault('activity', []).insert(0, {
+            'message': f'Admin gửi thư tặng {name} OVR {rating} +{level}',
+            'week': state.get('week', 1)
+        })
         state['activity'] = state['activity'][:15]
+
         persist(save, state)
         flash(f'Đã gửi gói {name} vào hòm thư của {recipient.username}.')
+
     except (ValueError, TypeError) as error:
         flash(str(error))
+
     return redirect(url_for('admin_panel'))
+
 
 
 @app.post('/admin/reset-password')
