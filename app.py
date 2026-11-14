@@ -11,6 +11,12 @@ from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, nor
                          PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
+@app.route('/health')
+def health():
+    return jsonify({
+        'status': 'ok',
+        'service': 'football-manager-web'
+    }), 200
 app.register_blueprint(player_market_bp)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deploying')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///football_manager.db')
