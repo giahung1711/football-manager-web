@@ -1104,12 +1104,6 @@ def action():
             total_attempts = len(player_events)
             total_successes = sum(1 for x in player_events if x.get('success'))
             total_spent = sum(float(x.get('cost', 0)) for x in player_events)
-            if success:
-                flash(f'🎉 ÉP THẺ THÀNH CÔNG! {p["name"]} lên +{new_level}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
-            elif protection_requested:
-                flash(f'ÉP THẺ THẤT BẠI! {p["name"]} giữ nguyên +7 nhờ Thẻ bảo vệ. Đã tiêu hao 1 Thẻ bảo vệ và trừ {format_money(cost)}.')
-            else:
-                flash(f'ÉP THẺ THẤT BẠI! {p["name"]} từ +{old_level} xuống +{new_level}. Đã trừ {format_money(cost)}; ngân sách còn {format_money(st["budget"])}.')
             st['last_upgrade_summary'] = {
                 'player': p.get('name'), 'attempts': total_attempts,
                 'successes': total_successes, 'spent': round(total_spent, 2)
