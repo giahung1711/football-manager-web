@@ -12,3 +12,12 @@ FOOTBALL MANAGER - PC / PG / BALLON D'OR UPDATE
 IMPORTANT:
 - This source package intentionally excludes the uploaded instance/football_manager.db and __pycache__ files. It does not contain or replace production account data.
 - No deployment has been performed.
+
+UPDATE PACKS & PLAYER VALUES
+- Ballon D’or player base values updated to the approved schedule (all above 400M PC).
+- Added Christmas 2026 pack for 1,500 PG with 16 event players.
+- Christmas player weights use 2/4/6/8 by OVR tier; the current roster counts produce exactly 100 total weight (1×2 + 3×4 + 5×6 + 7×8).
+- Christmas 2026 cards use an icy blue frame and CHRISTMAS 2026 label; Ballon D’or gold frame remains unchanged.
+- Admin gift season selector includes Christmas 2026.
+- Upgrade transfer-value multipliers are relative to original value: +0 100%, +1 150%, +2 225%, +3 320%, +4 410%, +5 635%, +6 900%, +7 1,250%, +8 2,100%.
+- Existing forge layout and upgrade success/cost mechanics are unchanged.

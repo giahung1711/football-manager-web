@@ -1,30 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{{ state.club }} · FOOTBALL MANAGER{% if ballon_reveal %}
-<div class="ballon-reveal-overlay" id="ballonReveal"><div class="ballon-reveal-stage">
-<div class="ballon-controls"><button type="button" class="ballon-sound" id="ballonSound">♪ Bật âm thanh</button><button type="button" class="ballon-skip" id="ballonSkip">Bỏ qua</button></div>
-<p class="eyebrow">BALLON D’OR EVENT</p><div class="ballon-reveal-flag" id="revealFlag">{{ballon_reveal.country_flag}}</div>
-<div class="ballon-reveal-position" id="revealPosition"></div>
-<div class="ballon-reveal-club" id="revealClub">
-{% if ballon_reveal_meta and ballon_reveal_meta.metadata_complete %}
-  {% if ballon_reveal_meta.is_icon %}<span class="special-emblem icon-emblem">ICON</span>
-  {% elif ballon_reveal_meta.is_hero %}<span class="special-emblem heroes-emblem">HEROES</span>
-  {% elif ballon_reveal_meta.club_logo_url %}<img src="{{ballon_reveal_meta.club_logo_url}}" alt="{{ballon_reveal_meta.club}} logo">
-  {% else %}<span>{{ballon_reveal_meta.club}}</span>{% endif %}
-{% else %}<span class="metadata-pending">Đang xác minh huy hiệu CLB / ICON / HEROES</span>{% endif %}
-</div>
-<div class="ballon-reveal-card ballon-reveal-ballon-dor" id="revealCard"><div class="ballon-card-orb">🏆</div><p>BALLON D’OR · SPECIAL SEASON</p>
-<h2>{{ballon_reveal.name}}</h2><strong>OVR {{ballon_reveal.rating}}</strong><span>{{ballon_reveal.position}} · Pool {{ballon_reveal.pool}}</span></div>
-<p id="revealStatus">Đang mở gói...</p></div></div>
-<script>
-(()=>{const overlay=document.getElementById('ballonReveal');if(!overlay)return;
-const sound=document.getElementById('ballonSound');let audioContext=null;const playTone=(freq,duration,delay=0)=>{if(!audioContext)return;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,audioContext.currentTime+delay);gain.gain.exponentialRampToValueAtTime(.08,audioContext.currentTime+delay+.03);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+delay+duration);osc.connect(gain);gain.connect(audioContext.destination);osc.start(audioContext.currentTime+delay);osc.stop(audioContext.currentTime+delay+duration+.02);};sound.addEventListener('click',()=>{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioContext=audioContext||new AC();audioContext.resume();[392,523,659,784].forEach((n,i)=>playTone(n,.35,i*.18));sound.textContent='♪ Âm thanh đã bật';});const flag=document.getElementById('revealFlag'),pos=document.getElementById('revealPosition'),club=document.getElementById('revealClub'),card=document.getElementById('revealCard'),status=document.getElementById('revealStatus'),skip=document.getElementById('ballonSkip');
-let timers=[],done=false;const finish=()=>{if(done)return;done=true;timers.forEach(clearTimeout);flag.classList.add('hidden');pos.classList.add('hidden');club.classList.add('hidden');card.classList.add('shown');status.textContent='Đã nhận cầu thủ vào đội hình dự bị.';skip.textContent='Đóng';};
-timers.push(setTimeout(()=>{pos.textContent={{ ballon_reveal.position|tojson }};pos.classList.add('shown');status.textContent='Vị trí';},2000));
-timers.push(setTimeout(()=>{club.classList.add('shown');status.textContent='Huy hiệu sự kiện';},4000));
-timers.push(setTimeout(()=>{flag.classList.add('hidden');pos.classList.add('hidden');club.classList.add('hidden');card.classList.add('shown');status.textContent='Cầu thủ đã xuất hiện!';},6000));
-skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();});})();
-</script>{% endif %}
-{% endblock %}
+{% block title %}{{ state.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
 <div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{state.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><div class="club-mark large">⚽</div></div>
 <div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
@@ -83,12 +58,14 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
           <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
           {% if p.get('event_card') == 'ballon_dor' %}
             <span class="event-card-label">BALLON D’OR</span>
+          {% elif p.get('event_card') == 'christmas_2026' %}
+            <span class="event-card-label">CHRISTMAS 2026</span>
           {% elif p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
@@ -185,7 +162,7 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
 </script>
 {% elif tab=='transfers' %}
 <section class="panel"><h2>Thị trường chuyển nhượng</h2><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
-<section class="panel"><h2>Bán cầu thủ dự bị</h2>{% for p in state.bench %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section><section class="panel"><h2>Cầu thủ dự bị khác</h2>{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ prices.get(p.name,0)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section>
+<section class="panel"><h2>Bán cầu thủ dự bị</h2>{% for p in state.bench %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="bench"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section><section class="panel"><h2>Cầu thủ dự bị khác</h2>{% for p in state.extras %}<div class="section-head"><span>{{p.name}} · {{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</span><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="sell"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button">Bán</button></form></div>{% endfor %}</section>
 {% elif tab=='shop' %}
 <section class="panel"><h2>Cửa hàng gói cầu thủ</h2>
 {% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}
@@ -195,11 +172,18 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
     <input type="hidden" name="action" value="ballon_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 2000 %}disabled{% endif %}>Mở Ballon D'or Pack</button>
   </form>
+</div>
+<div class="christmas-pack-card">
+  <div><p class="eyebrow">LIMITED EVENT · WINTER EDITION</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Christmas 2026 Pack với giá 1.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
+    <input type="hidden" name="action" value="christmas_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
+    <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026</button>
+  </form>
 </div></section>
 {% elif tab=='upgrade' %}
 {% set success_rates = [99,90,80,60,40,30,20,10] %}
 {% set cost_rates = [0,2,6,10,15,20,25,42,60] %}
-{% set value_multipliers = [1.0,1.10,1.30,1.65,2.15,2.90,4.155,5.760,8.560] %}
+{% set value_multipliers = [1.0,1.50,2.25,3.20,4.10,6.35,9.00,12.50,21.00] %}
 
 
 <section class="panel forge-heading">
@@ -445,9 +429,9 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
 </section>
 {% endif %}
 {% if ballon_reveal %}
-<div class="ballon-reveal-overlay" id="ballonReveal"><div class="ballon-reveal-stage">
+<div class="ballon-reveal-overlay {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-overlay{% endif %}" id="ballonReveal"><div class="ballon-reveal-stage {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-stage{% endif %}">
 <div class="ballon-controls"><button type="button" class="ballon-sound" id="ballonSound">♪ Bật âm thanh</button><button type="button" class="ballon-skip" id="ballonSkip">Bỏ qua</button></div>
-<p class="eyebrow">BALLON D’OR EVENT</p><div class="ballon-reveal-flag" id="revealFlag">{{ballon_reveal.country_flag}}</div>
+<p class="eyebrow">{{ 'CHRISTMAS 2026 EVENT' if ballon_reveal.event_type == 'christmas_2026' else 'BALLON D’OR EVENT' }}</p><div class="ballon-reveal-flag" id="revealFlag">{{ballon_reveal.country_flag}}</div>
 <div class="ballon-reveal-position" id="revealPosition"></div>
 <div class="ballon-reveal-club" id="revealClub">
 {% if ballon_reveal_meta and ballon_reveal_meta.metadata_complete %}
@@ -457,7 +441,7 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
   {% else %}<span>{{ballon_reveal_meta.club}}</span>{% endif %}
 {% else %}<span class="metadata-pending">Đang xác minh huy hiệu CLB / ICON / HEROES</span>{% endif %}
 </div>
-<div class="ballon-reveal-card ballon-reveal-ballon-dor" id="revealCard"><div class="ballon-card-orb">🏆</div><p>BALLON D’OR · SPECIAL SEASON</p>
+<div class="ballon-reveal-card {% if ballon_reveal.event_type == 'christmas_2026' %}ballon-reveal-christmas{% else %}ballon-reveal-ballon-dor{% endif %}" id="revealCard"><div class="ballon-card-orb">{{ '❄️' if ballon_reveal.event_type == 'christmas_2026' else '🏆' }}</div><p>{{ ballon_reveal.season_label|default('BALLON D’OR · SPECIAL SEASON') }}</p>
 <h2>{{ballon_reveal.name}}</h2><strong>OVR {{ballon_reveal.rating}}</strong><span>{{ballon_reveal.position}} · Pool {{ballon_reveal.pool}}</span></div>
 <p id="revealStatus">Đang mở gói...</p></div></div>
 <script>

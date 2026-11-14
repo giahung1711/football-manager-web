@@ -7,7 +7,7 @@ from marketplace import player_market_bp
 from player_metadata import enrich_player, get_player_metadata
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
 app.register_blueprint(player_market_bp)
@@ -119,7 +119,7 @@ def page(save, tab='overview', extra=None):
     if ballon_reveal:
         persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup,
-                           prices={p['name']:value(p) for p in all_players(st)}, packs=PACKS,
+                           prices={p['name']:value(p) for p in all_players(st)}, player_value=value, packs=PACKS,
                            market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
 @app.route('/')
@@ -178,7 +178,7 @@ def admin_panel():
     users = User.query.order_by(User.created_at.desc()).all()
     player_names = set(PLAYER_RATINGS) | set(PLAYER_POSITIONS) | set(TRANSFER_MARKET)
     # Mùa thẻ tự lấy từ dữ liệu cầu thủ đang có trong đội hình và hòm thư.
-    card_seasons = {'Thường', 'Ballon D’or'}
+    card_seasons = set(CARD_SEASON_OPTIONS)
     for save in GameSave.query.all():
         state = save.state or {}
         for group in ('starting', 'bench', 'extras'):
@@ -263,6 +263,7 @@ def admin_gift():
             'league': league if career_status == 'active' else '',
             'card_type': card_type, 'career_status': career_status,
             **({'event_card': 'ballon_dor'} if card_season.casefold() in {"ballon d’or", "ballon d'or"} else {}),
+            **({'event_card': 'christmas_2026'} if card_season.casefold() == 'christmas 2026' else {}),
             'metadata_source_url': source_url, 'metadata_admin_verified': True,
             'photo_url': photo_url,
             'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
@@ -901,7 +902,8 @@ def action():
             name, position, rating, _weight = random.choices(names, weights=weights, k=1)[0]
             awarded = {'name': name, 'position': position, 'rating': rating, 'level': 0,
                        'event_card': 'ballon_dor', 'original_rating': rating,
-                       'card_season': 'Ballon D’or'}
+                       'card_season': 'Ballon D’or',
+                       'market_value': BALLON_DOR_VALUES[name]}
             st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
             st.setdefault('bench', []).append(awarded)
             processed.append(request_id)
@@ -927,6 +929,43 @@ def action():
                 'week': st.get('week', 1)
             })
             # Không flash thông báo kết quả: phần thưởng chỉ được công bố qua màn reveal Ballon D'or.
+
+        elif act=='christmas_pack':
+            request_id = request.form.get('request_id', '').strip()
+            if not request_id or len(request_id) > 100:
+                raise ValueError('Yêu cầu mở gói không hợp lệ. Hãy tải lại trang.')
+            processed = st.setdefault('processed_christmas_requests', [])
+            if request_id in processed:
+                persist(save, st)
+                return redirect(url_for('game_tab', tab='shop'))
+            cost_pg = 1500
+            if int(st.get('pg_balance', 0)) < cost_pg:
+                raise ValueError(f'Không đủ PG. Christmas 2026 Pack giá {cost_pg:,} PG; bạn hiện có {int(st.get("pg_balance", 0)):,} PG.')
+            # Weights 2/4/6/8 are normalized by random.choices over the total weight 100.
+            name, position, rating, _weight, base_value, country_flag = random.choices(
+                CHRISTMAS_2026_PLAYERS,
+                weights=[entry[3] for entry in CHRISTMAS_2026_PLAYERS],
+                k=1
+            )[0]
+            awarded = {
+                'name': name, 'position': position, 'rating': rating, 'level': 0,
+                'event_card': 'christmas_2026', 'original_rating': rating,
+                'card_season': 'Christmas 2026', 'market_value': base_value,
+                'country_flag': country_flag
+            }
+            st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
+            st.setdefault('bench', []).append(awarded)
+            processed.append(request_id)
+            st['processed_christmas_requests'] = processed[-100:]
+            st['ballon_reveal'] = {
+                'id': request_id, 'name': name, 'position': position, 'rating': rating,
+                'pool': 'Christmas 2026', 'country_flag': country_flag,
+                'event_type': 'christmas_2026', 'season_label': 'CHRISTMAS 2026'
+            }
+            st.setdefault('activity', []).insert(0, {
+                'message': f'Mở Christmas 2026 Pack: nhận {name} OVR {rating} (-1.500 PG)',
+                'week': st.get('week', 1)
+            })
 
         elif act=='pack':
             key=request.form.get('pack')

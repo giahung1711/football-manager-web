@@ -342,16 +342,51 @@ UPGRADE_OVR_BONUS = {
 
 # Hệ số giá trị cộng dồn; mọi mức đều tính từ giá trị gốc.
 CARD_VALUE_RATES = {
-    0: 1.000,
-    1: 1.100,
-    2: 1.300,
-    3: 1.650,
-    4: 2.150,
-    5: 2.900,
-    6: 4.155,
-    7: 5.760,
-    8: 8.560
+    0: 1.00,
+    1: 1.50,
+    2: 2.25,
+    3: 3.20,
+    4: 4.10,
+    5: 6.35,
+    6: 9.00,
+    7: 12.50,
+    8: 21.00
 }
+
+# Giá trị gốc của thẻ sự kiện, đơn vị triệu PC. Mỗi cấp ép tính trực tiếp từ mức gốc này.
+BALLON_DOR_VALUES = {
+    'Lionel Messi': 667, 'C. Ronaldo': 650, 'Zinedine Zidane': 625,
+    'Ronaldo Nazário': 598, 'Franz Beckenbauer': 570, 'Ruud Gullit': 585,
+    'Lothar Matthäus': 555, 'Lev Yashin': 530, 'Neymar Junior': 500,
+    'R. Lewandowski': 510, 'Van Dijk': 475, 'Paolo Maldini': 545,
+    'Kylian Mbappe': 520, 'Sadio Mané': 455, 'Gareth Bale': 445,
+    'Mohamed Salah': 485, 'Baresi': 470, 'Xavi': 490,
+    'David Beckham': 500, 'Toni Kroos': 460, 'KDB': 505,
+    'Frank Rijkaard': 515, "N'Golo Kanté": 450, 'G. Buffon': 520,
+    'M. Neuer': 510, 'Achraf Hakimi': 430, 'Philipp Lahm': 520,
+    'Roberto Carlos': 510, 'Nuno Mendes': 410
+}
+
+CHRISTMAS_2026_PLAYERS = [
+    ('Jairzinho', 'RW', 101, 2, 576, '🇧🇷'),
+    ('Kylian Mbappe', 'LW', 100, 4, 555, '🇫🇷'),
+    ('Karim Benzema', 'ST', 99, 6, 525, '🇫🇷'),
+    ('Raheem Sterling', 'LW', 98, 8, 470, '🏴'),
+    ('Michael Owen', 'ST', 98, 8, 490, '🏴'),
+    ('John Terry', 'CB', 99, 6, 530, '🏴'),
+    ('Alexis Sánchez', 'LW', 98, 8, 465, '🇨🇱'),
+    ('David Villa', 'ST', 98, 8, 485, '🇪🇸'),
+    ('Ashley Cole', 'LB', 100, 4, 540, '🏴'),
+    ('Michael Olise', 'CAM', 98, 8, 475, '🇫🇷'),
+    ('Jorginho', 'CDM', 100, 4, 520, '🇮🇹'),
+    ('Martin Ødegaard', 'CAM', 98, 8, 480, '🇳🇴'),
+    ('Bixente Lizarazu', 'LB', 99, 6, 490, '🇫🇷'),
+    ('Mats Hummels', 'CB', 98, 8, 455, '🇩🇪'),
+    ('Michael Essien', 'CDM', 99, 6, 515, '🇬🇭'),
+    ('Reece James', 'RB', 99, 6, 505, '🏴')
+]
+
+CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026')
 
 MAX_UPGRADE_LEVEL = 8
 
