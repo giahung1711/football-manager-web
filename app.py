@@ -4,7 +4,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
 from marketplace import player_market_bp
-from player_metadata import enrich_player, get_player_metadata
+from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
@@ -101,21 +101,16 @@ def page(save, tab='overview', extra=None):
     st=load_state(save)
     if ensure_daily_quests(st):
         persist(save, st)
-    # Metadata is resolved from the connected football-data provider and cached for 12h.
-    # Saved squad records remain untouched; unknown/incomplete players are not rendered as verified cards.
+    # Player metadata is local/Admin-curated only; no external football API is called.
     for group in ('starting', 'bench', 'extras'):
         st[group] = [enrich_player(p) for p in st.get(group, [])]
     market_items=[]
-    # Only resolve transfer-market cards when the transfer page is requested.
-    # Queueing every market player on dashboard/squad renders wastes API quota.
+    # Transfer-market listings use the game's built-in data and do not depend on an external API.
     if tab == 'transfers':
-        for n in st['market']:
+        for n in st.get('market', []):
             if n in PACKS['4']['players']:
                 continue
-            meta = get_player_metadata(n)
-            if not meta or not all(meta.get(k) for k in ('nationality','club','league')):
-                continue
-            market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0), **meta})
+            market_items.append({'name':n,'position':PLAYER_POSITIONS.get(n,'ST'),'rating':PLAYER_RATINGS.get(n,80),'price':PLAYER_PRICES.get(n,0)})
     match_popup=session.pop('last_match_result', None)
     ballon_reveal = st.pop('ballon_reveal', None)
     ballon_reveal_meta = enrich_player(ballon_reveal) if ballon_reveal else None
