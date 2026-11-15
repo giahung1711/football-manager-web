@@ -1,20 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Demo sân 3D · FOOTBALL MANAGER{% endblock %}
+{% block title %}Trận đấu 3D · FOOTBALL MANAGER{% endblock %}
 {% block content %}
 <section class="match3d-page">
-  <div class="match3d-heading">
-    <div>
-      <p class="eyebrow">FBM 3D · STYLE C · PROTOTYPE 01</p>
-      <h1>Sân vận động 3D</h1>
-      <p class="muted">Bản thử nghiệm đầu tiên · Sân bóng, ánh sáng và camera Broadcast</p>
-    </div>
-    <a class="button" href="{{ url_for('dashboard') }}">Quay lại FBM</a>
-  </div>
+  <div class="match3d-heading"><div><p class="eyebrow">FOOTBALL MANAGER · REAL TIME</p><h1>Trận đấu 3D</h1><p class="muted">Điều khiển cầu thủ trực tiếp · Bản thử nghiệm gameplay</p></div><a class="button" href="{{ url_for('dashboard') }}">Quay lại FBM</a></div>
   <div class="match3d-stage">
-    <div class="match3d-score"><span>HOME</span><strong>0 - 0</strong><span>AWAY</span><small>00:00 · DEMO</small></div>
-    <div id="fbm3d-canvas" aria-label="Sân bóng 3D"></div>
-    <div class="match3d-hint">Kéo chuột để xoay góc nhìn · Cuộn để phóng to/thu nhỏ</div>
-    <div class="match3d-error" id="fbm3d-error" hidden>Không tải được thư viện đồ họa 3D. Hãy kiểm tra kết nối mạng rồi tải lại trang.</div>
+    <div class="match3d-score"><span>HOME</span><strong id="fbm3d-score-value">0 - 0</strong><span>AWAY</span><small id="fbm3d-clock">00:00</small></div>
+    <div id="fbm3d-canvas" aria-label="Trận đấu bóng đá 3D"></div>
+    <div class="match3d-status" id="fbm3d-status">ĐANG TẢI TRẬN ĐẤU...</div>
+    <div class="match3d-error" id="fbm3d-error" hidden>Không tải được thư viện 3D. Hãy kiểm tra kết nối mạng rồi tải lại trang.</div>
+  </div>
+  <div class="match3d-toolbar"><div class="match3d-help"><b>Di chuyển:</b> WASD / phím mũi tên <span>·</span> <b>J:</b> chuyền <span>·</span> <b>K:</b> sút <span>·</span> <b>L:</b> tranh bóng</div><div class="match3d-tools"><button class="button secondary" id="fbm3d-pause" type="button">TẠM DỪNG</button><button class="button" id="fbm3d-restart" type="button">ĐÁ LẠI</button></div></div>
+  <div class="match3d-mobile-controls">
+    <div class="match3d-dpad"><button id="fbm-left" aria-label="Sang trái">◀</button><button id="fbm-up" aria-label="Đi lên">▲</button><button id="fbm-down" aria-label="Đi xuống">▼</button><button id="fbm-right" aria-label="Sang phải">▶</button></div>
+    <div class="match3d-actions"><button id="fbm-tackle" class="tackle" type="button">CƯỚP BÓNG</button><button id="fbm-pass" class="pass" type="button">CHUYỀN</button><button id="fbm-shoot" class="shoot" type="button">SÚT</button></div>
   </div>
 </section>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/match3d.css') }}">

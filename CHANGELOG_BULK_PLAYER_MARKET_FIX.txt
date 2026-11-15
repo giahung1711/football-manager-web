@@ -1,0 +1,5 @@
+FIX: ĐĂNG BÁN CẦU THỦ HÀNG LOẠT
+
+- Bổ sung import math trong marketplace.py.
+- Luồng đăng bán nhiều cầu thủ sử dụng math.isfinite() để kiểm tra giá; thiếu import math khiến thao tác hàng loạt rơi vào lỗi chung và không tạo tin đăng.
+- Không thay đổi điều kiện đủ tiêu chuẩn, giới hạn giá 90%–110%, hay cơ chế xóa cầu thủ khỏi đội hình sau khi đăng bán thành công.

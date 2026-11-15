@@ -13,6 +13,7 @@
   {% if current_user.is_authenticated %}
   <nav>
     <a href="{{ url_for('dashboard') }}">Tổng quan</a>
+    <a href="{{ url_for('match_3d') }}">Trận đấu 3D</a>
     {% if not current_user.is_admin %}
     <a href="{{ url_for('leaderboard') }}">BXH toàn server</a>
     <a href="{{ url_for('friends') }}">Bạn bè</a>

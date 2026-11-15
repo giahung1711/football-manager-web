@@ -1435,4 +1435,9 @@ def action():
         return jsonify({'ok': True, **upgrade_response})
     return redirect(request.referrer or url_for('dashboard'))
 def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
+@app.route('/match-3d')
+@login_required
+def match_3d():
+    return render_template('match_3d.html')
+
 if __name__=='__main__': app.run(debug=True)

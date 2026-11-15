@@ -1,0 +1,12 @@
+FOOTBALL MANAGER - PLAYABLE 3D MATCH PROTOTYPE
+
+- Added authenticated /match-3d route and navigation link.
+- Added a Three.js 3D pitch, stadium, goals, 22 stylized players and ball.
+- Added real-time player movement with WASD / arrow keys and on-screen touch controls.
+- Added passing (J / CHUYỀN), shooting (K / SÚT), tackling (L / CƯỚP BÓNG), pause and restart.
+- Added simple teammate/opponent movement, ball possession, goals and match clock.
+
+Notes:
+- This is an isolated playable prototype; it does not yet write results to the existing league match history or consume the user's saved lineup.
+- Three.js is loaded from jsDelivr CDN, so the browser needs internet access.
+- Test route: /match-3d after signing in.
