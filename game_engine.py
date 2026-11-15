@@ -386,7 +386,29 @@ CHRISTMAS_2026_PLAYERS = [
     ('Reece James', 'RB', 99, 6, 505, '🏴')
 ]
 
-CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026')
+SWEET_CANDY_PLAYERS = [
+    ('Iker Casillas', 'GK', 101, 4.5, 575, '🇪🇸'),
+    ('Petr Čech', 'GK', 100, 6.5, 500, '🇨🇿'),
+    ('Alessandro Nesta', 'CB', 100, 6.5, 525, '🇮🇹'),
+    ('Patrice Evra', 'LB', 101, 4.5, 525, '🇫🇷'),
+    ('Sergio Ramos', 'CB', 103, 1.5, 700, '🇪🇸'),
+    ('Marcelo', 'LB', 102, 2.5, 640, '🇧🇷'),
+    ('Dani Alves', 'RB', 100, 6.5, 550, '🇧🇷'),
+    ('Jay-Jay Okocha', 'CAM', 100, 6.5, 475, '🇳🇬'),
+    ('Claude Makélélé', 'CDM', 100, 6.5, 500, '🇫🇷'),
+    ('Patrick Vieira', 'CDM', 101, 4.5, 600, '🇫🇷'),
+    ('Santi Cazorla', 'CM', 99, 10, 425, '🇪🇸'),
+    ('Isco', 'CAM', 99, 10, 450, '🇪🇸'),
+    ('Arjen Robben', 'RW', 101, 4.5, 575, '🇳🇱'),
+    ('Dimitar Berbatov', 'ST', 100, 6.5, 475, '🇧🇬'),
+    ('Ricardo Quaresma', 'RW', 100, 6.5, 450, '🇵🇹'),
+    ('Erling Haaland', 'ST', 99, 10, 550, '🇳🇴'),
+    ('Luis Suárez', 'ST', 102, 2.5, 647, '🇺🇾'),
+]
+
+SWEET_CANDY_VALUES = {entry[0]: entry[4] for entry in SWEET_CANDY_PLAYERS}
+
+CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026', 'Sweet Candy')
 
 MAX_UPGRADE_LEVEL = 8
 

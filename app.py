@@ -8,7 +8,7 @@ from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
 
 app = Flask(__name__)
 app.register_blueprint(player_market_bp)
@@ -118,7 +118,7 @@ def page(save, tab='overview', extra=None):
         persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
                            prices={p['name']:value(p) for p in all_players(st)}, player_value=value, packs=PACKS,
-                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
+                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
 @app.route('/')
 def home():
@@ -1027,6 +1027,41 @@ def action():
             }
             st.setdefault('activity', []).insert(0, {
                 'message': f'Mở Christmas 2026 Pack: nhận {name} OVR {rating} (-1.500 PG)',
+                'week': st.get('week', 1)
+            })
+
+        elif act=='sweet_candy_pack':
+            request_id = request.form.get('request_id', '').strip()
+            if not request_id or len(request_id) > 100:
+                raise ValueError('Yêu cầu mở gói không hợp lệ. Hãy tải lại trang.')
+            processed = st.setdefault('processed_sweet_candy_requests', [])
+            if request_id in processed:
+                persist(save, st)
+                return redirect(url_for('game_tab', tab='shop'))
+            cost_pg = 2500
+            if int(st.get('pg_balance', 0)) < cost_pg:
+                raise ValueError(f'Sweet Candy Pack giá {cost_pg:,} PG; bạn hiện có {int(st.get("pg_balance", 0)):,} PG.')
+            name, position, rating, chance, base_value, country_flag = random.choices(
+                SWEET_CANDY_PLAYERS, weights=[entry[3] for entry in SWEET_CANDY_PLAYERS], k=1
+            )[0]
+            awarded = {
+                'name': name, 'position': position, 'rating': rating, 'level': 0,
+                'event_card': 'sweet_candy', 'original_rating': rating,
+                'card_season': 'Sweet Candy', 'market_value': base_value,
+                'country_flag': country_flag
+            }
+            st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
+            st.setdefault('bench', []).append(awarded)
+            quest_event='pack'; quest_data={'pg_spent': cost_pg, 'rating': rating}
+            processed.append(request_id)
+            st['processed_sweet_candy_requests'] = processed[-100:]
+            st['ballon_reveal'] = {
+                'id': request_id, 'name': name, 'position': position, 'rating': rating,
+                'pool': 'Sweet Candy', 'country_flag': country_flag,
+                'event_type': 'sweet_candy', 'season_label': 'SWEET CANDY'
+            }
+            st.setdefault('activity', []).insert(0, {
+                'message': f'Mở Sweet Candy Pack: nhận {name} OVR {rating} (-2.500 PG)',
                 'week': st.get('week', 1)
             })
 

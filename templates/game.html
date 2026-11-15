@@ -102,7 +102,7 @@
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
           <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
@@ -110,6 +110,8 @@
             <span class="event-card-label">BALLON D’OR</span>
           {% elif p.get('event_card') == 'christmas_2026' %}
             <span class="event-card-label">CHRISTMAS 2026</span>
+          {% elif p.get('event_card') == 'sweet_candy' %}
+            <span class="event-card-label">SWEET CANDY</span>
           {% elif p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
@@ -212,6 +214,7 @@
 {% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}
 <div class="ballon-pack-card">
   <div><p class="eyebrow">LIMITED EVENT · BALLON D’OR</p><h2>🏆 Ballon D'or Pack</h2><p>29 cầu thủ sự kiện · 20% Pool A · 80% Pool B</p><strong class="ballon-price">💎 2.000 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <button type="button" class="pack-info-button" data-pack-info="ballonInfo" aria-label="Xem danh sách cầu thủ Ballon D’or">⌕</button>
   <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Ballon D'or Pack với giá 2.000 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="ballon_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 2000 %}disabled{% endif %}>Mở Ballon D'or Pack</button>
@@ -219,11 +222,29 @@
 </div>
 <div class="christmas-pack-card">
   <div><p class="eyebrow">LIMITED EVENT · WINTER EDITION</p><h2>❄️ Christmas 2026</h2><p>16 cầu thủ sự kiện · OVR 98–101</p><strong class="christmas-price">💎 1.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <button type="button" class="pack-info-button" data-pack-info="christmasInfo" aria-label="Xem danh sách cầu thủ Christmas 2026">⌕</button>
   <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Christmas 2026 Pack với giá 1.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG ngay sau khi xác nhận.">
     <input type="hidden" name="action" value="christmas_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
     <button class="button primary" {% if state.pg_balance|default(0) < 1500 %}disabled{% endif %}>Mở Christmas 2026</button>
   </form>
-</div></section>
+</div>
+<div class="sweet-candy-pack-card">
+  <div><p class="eyebrow">LIMITED EVENT · PINK CANDY EDITION</p><h2>🍬 Sweet Candy Pack</h2><p>17 cầu thủ độc quyền · OVR 99–103</p><strong class="sweet-candy-price">💎 2.500 PG</strong><p class="muted">Số dư hiện tại: {{state.pg_balance|default(0)}} PG</p></div>
+  <button type="button" class="pack-info-button" data-pack-info="sweetCandyInfo" aria-label="Xem danh sách cầu thủ Sweet Candy">⌕</button>
+  <form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mở Sweet Candy Pack với giá 2.500 PG? Gói sẽ chọn ngẫu nhiên 1 cầu thủ và trừ PG sau khi xác nhận.">
+    <input type="hidden" name="action" value="sweet_candy_pack"><input type="hidden" name="request_id" value="{{ballon_request_id}}">
+    <button class="button primary" {% if state.pg_balance|default(0) < 2500 %}disabled{% endif %}>Mở Sweet Candy Pack</button>
+  </form>
+</div>
+<div class="pack-info-modal" id="ballonInfo" hidden><div class="pack-info-dialog"><button type="button" class="pack-info-close" aria-label="Đóng">×</button><h2>🏆 Ballon D’or Pack</h2><div class="table-wrap"><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Xác suất</th></tr></thead><tbody>
+<tr><td>Lionel Messi</td><td>RW</td><td>102</td><td>1,6%</td></tr><tr><td>C. Ronaldo</td><td>LW</td><td>102</td><td>1,6%</td></tr><tr><td>Zinedine Zidane</td><td>CAM</td><td>101</td><td>2,8%</td></tr><tr><td>Franz Beckenbauer</td><td>CB</td><td>101</td><td>2,8%</td></tr><tr><td>Ronaldo Nazário</td><td>ST</td><td>101</td><td>2,8%</td></tr><tr><td>Ruud Gullit</td><td>CM</td><td>101</td><td>2,8%</td></tr><tr><td>Lothar Matthäus</td><td>CDM</td><td>101</td><td>2,8%</td></tr><tr><td>Lev Yashin</td><td>GK</td><td>101</td><td>2,8%</td></tr>
+<tr><td>Neymar Junior</td><td>LW</td><td>100</td><td>1,92%</td></tr><tr><td>R. Lewandowski</td><td>ST</td><td>100</td><td>1,92%</td></tr><tr><td>Van Dijk</td><td>CB</td><td>99</td><td>3,2%</td></tr><tr><td>Paolo Maldini</td><td>CB</td><td>100</td><td>1,92%</td></tr><tr><td>Kylian Mbappe</td><td>ST</td><td>99</td><td>3,2%</td></tr><tr><td>Sadio Mané</td><td>LW</td><td>99</td><td>3,2%</td></tr><tr><td>Gareth Bale</td><td>RW</td><td>98</td><td>6,4%</td></tr><tr><td>Mohamed Salah</td><td>RW</td><td>98</td><td>6,4%</td></tr><tr><td>Baresi</td><td>CB</td><td>99</td><td>3,2%</td></tr><tr><td>Xavi</td><td>CM</td><td>99</td><td>3,2%</td></tr><tr><td>David Beckham</td><td>CM</td><td>99</td><td>3,2%</td></tr><tr><td>Toni Kroos</td><td>CAM</td><td>98</td><td>6,4%</td></tr><tr><td>KDB</td><td>CAM</td><td>99</td><td>3,2%</td></tr><tr><td>Frank Rijkaard</td><td>CDM</td><td>100</td><td>1,92%</td></tr><tr><td>N'Golo Kanté</td><td>CDM</td><td>98</td><td>6,4%</td></tr><tr><td>G. Buffon</td><td>GK</td><td>100</td><td>1,92%</td></tr><tr><td>M. Neuer</td><td>GK</td><td>99</td><td>3,2%</td></tr><tr><td>Achraf Hakimi</td><td>RB</td><td>98</td><td>6,4%</td></tr><tr><td>Philipp Lahm</td><td>RB</td><td>99</td><td>3,2%</td></tr><tr><td>Roberto Carlos</td><td>LB</td><td>99</td><td>3,2%</td></tr><tr><td>Nuno Mendes</td><td>LB</td><td>98</td><td>6,4%</td></tr>
+</tbody></table></div></div></div>
+<div class="pack-info-modal" id="sweetCandyInfo" hidden><div class="pack-info-dialog"><button type="button" class="pack-info-close" aria-label="Đóng">×</button><h2>🍬 Sweet Candy Pack</h2><div class="table-wrap"><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Xác suất</th></tr></thead><tbody>{% for p in sweet_candy_players %}<tr><td>{{p[0]}}</td><td>{{p[1]}}</td><td>{{p[2]}}</td><td>{{p[3]}}%</td></tr>{% endfor %}</tbody></table></div></div></div>
+<div class="pack-info-modal" id="christmasInfo" hidden><div class="pack-info-dialog"><button type="button" class="pack-info-close" aria-label="Đóng">×</button><h2>❄️ Christmas 2026</h2><div class="table-wrap"><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Xác suất</th></tr></thead><tbody>{% for p in christmas_players %}<tr><td>{{p[0]}}</td><td>{{p[1]}}</td><td>{{p[2]}}</td><td>{{p[3]}}%</td></tr>{% endfor %}</tbody></table></div></div></div>
+<script>
+(()=>{document.querySelectorAll('[data-pack-info]').forEach(btn=>btn.addEventListener('click',()=>{const modal=document.getElementById(btn.dataset.packInfo);if(modal)modal.hidden=false;}));document.querySelectorAll('.pack-info-modal').forEach(modal=>{modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('.pack-info-close'))modal.hidden=true;});});})();
+</script></section>
 {% elif tab=='upgrade' %}
 {% set success_rates = [99,90,80,60,40,30,20,10] %}
 {% set cost_rates = [0,2,6,10,15,20,25,42,60] %}
@@ -516,9 +537,9 @@
 </section>
 {% endif %}
 {% if ballon_reveal %}
-<div class="ballon-reveal-overlay {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-overlay{% endif %}" id="ballonReveal"><div class="ballon-reveal-stage {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-stage{% endif %}">
+<div class="ballon-reveal-overlay {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-overlay{% elif ballon_reveal.event_type == 'sweet_candy' %}sweet-candy-reveal-overlay{% endif %}" id="ballonReveal"><div class="ballon-reveal-stage {% if ballon_reveal.event_type == 'christmas_2026' %}christmas-reveal-stage{% elif ballon_reveal.event_type == 'sweet_candy' %}sweet-candy-reveal-stage{% endif %}">
 <div class="ballon-controls"><button type="button" class="ballon-sound" id="ballonSound">♪ Bật âm thanh</button><button type="button" class="ballon-skip" id="ballonSkip">Bỏ qua</button></div>
-<p class="eyebrow">{{ 'CHRISTMAS 2026 EVENT' if ballon_reveal.event_type == 'christmas_2026' else 'BALLON D’OR EVENT' }}</p><div class="ballon-reveal-flag" id="revealFlag">{{ballon_reveal.country_flag}}</div>
+<p class="eyebrow">{{ 'CHRISTMAS 2026 EVENT' if ballon_reveal.event_type == 'christmas_2026' else 'SWEET CANDY EVENT' if ballon_reveal.event_type == 'sweet_candy' else 'BALLON D’OR EVENT' }}</p><div class="ballon-reveal-flag" id="revealFlag">{{ballon_reveal.country_flag}}</div>
 <div class="ballon-reveal-position" id="revealPosition"></div>
 <div class="ballon-reveal-club" id="revealClub">
 {% if ballon_reveal_meta and ballon_reveal_meta.metadata_complete %}
@@ -528,7 +549,7 @@
   {% else %}<span>{{ballon_reveal_meta.club}}</span>{% endif %}
 {% else %}<span class="metadata-pending">Đang xác minh huy hiệu CLB / ICON / HEROES</span>{% endif %}
 </div>
-<div class="ballon-reveal-card {% if ballon_reveal.event_type == 'christmas_2026' %}ballon-reveal-christmas{% else %}ballon-reveal-ballon-dor{% endif %}" id="revealCard"><div class="ballon-card-orb">{{ '❄️' if ballon_reveal.event_type == 'christmas_2026' else '🏆' }}</div><p>{{ ballon_reveal.season_label|default('BALLON D’OR · SPECIAL SEASON') }}</p>
+<div class="ballon-reveal-card {% if ballon_reveal.event_type == 'christmas_2026' %}ballon-reveal-christmas{% else %}ballon-reveal-ballon-dor{% endif %}" id="revealCard"><div class="ballon-card-orb">{{ '❄️' if ballon_reveal.event_type == 'christmas_2026' else '🍬' if ballon_reveal.event_type == 'sweet_candy' else '🏆' }}</div><p>{{ ballon_reveal.season_label|default('BALLON D’OR · SPECIAL SEASON') }}</p>
 <h2>{{ballon_reveal.name}}</h2><strong>OVR {{ballon_reveal.rating}}</strong><span>{{ballon_reveal.position}} · Pool {{ballon_reveal.pool}}</span></div>
 <p id="revealStatus">Đang mở gói...</p></div></div>
 <script>
