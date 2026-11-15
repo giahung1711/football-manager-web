@@ -1,0 +1,6 @@
+MATCH 3D TACTICAL AI V2
+- Expanded pitch to 180 x 112 with matching markings, goals, bounds and camera framing.
+- Reworked AI into possession / defensive-block behaviors.
+- Role-based GK, DEF, MID and FWD positioning with wide lanes, midfield support and striker runs.
+- Only two nearest outfield players per defending side press the ball; teammates maintain shape.
+- Increased match viewport height.

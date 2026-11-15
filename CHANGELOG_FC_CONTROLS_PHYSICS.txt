@@ -1,0 +1,10 @@
+FOOTBALL MANAGER 3D - FC STYLE CONTROL UPDATE
+
+- Added mobile action buttons: short pass, through ball, long/high pass, shoot, tackle, sprint.
+- Added keyboard mappings J/I/O/K/L and Shift sprint.
+- Added player acceleration, deceleration and turning inertia.
+- Added ball gravity, bounce, rolling friction and spin.
+- Added basic player body collision.
+- Kept the tactical wide pitch and fixed-angle lateral-follow camera from the previous build.
+
+This is an arcade-style prototype, not a full FC Online physics/animation engine. Three.js is still loaded from jsDelivr CDN.
