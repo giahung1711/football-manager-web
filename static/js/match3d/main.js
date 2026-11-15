@@ -33,9 +33,8 @@ try {
   const goalMat=new THREE.MeshStandardMaterial({color:0xf0f2ed,metalness:.2,roughness:.45});
   function makeGoal(x){const g=new THREE.Group();g.position.x=x;scene.add(g);const width=7.32,height=2.45,depth=3.2;for(const z of [-width/2,width/2]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,height,10),goalMat);p.position.set(0,height/2,z);g.add(p);}const bar=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,width,10),goalMat);bar.rotation.x=Math.PI/2;bar.position.y=height;g.add(bar);const net=new THREE.Mesh(new THREE.BoxGeometry(depth,height,width),new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.18}));net.position.set(x<0?-depth/2:depth/2,height/2,0);g.add(net);}
   makeGoal(-90);makeGoal(90);
-  const standMat=new THREE.MeshStandardMaterial({color:0x405964,roughness:.9});
-  for(const [x,z,rot] of [[0,-74,0],[0,74,Math.PI],[-102,0,-Math.PI/2],[102,0,Math.PI/2]]){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);for(let i=0;i<5;i++){const s=new THREE.Mesh(new THREE.BoxGeometry(x===0?150+i*3:24,1.7,x===0?24:100+i*3),standMat);s.position.set(0,1+i*1.55,0);g.add(s);}}
-  const crowdGeo=new THREE.BufferGeometry(),crowd=[];for(let i=0;i<1500;i++){const side=i%4,t=Math.random();let x,z;if(side<2){x=(t-.5)*180;z=side===0?-74:74;}else{x=side===2?-102:102;z=(t-.5)*120;}crowd.push(x,2+Math.random()*7,z);}crowdGeo.setAttribute('position',new THREE.Float32BufferAttribute(crowd,3));scene.add(new THREE.Points(crowdGeo,new THREE.PointsMaterial({color:0xe1e6e2,size:.55})));
+  // Keep the playable camera view clean: no oversized stands or crowd meshes overlapping the pitch.
+
 
   // Lightweight stylized players: 11 per side, with a clearly marked controlled player.
   const players=[];
@@ -58,19 +57,19 @@ try {
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.48,20,16),new THREE.MeshStandardMaterial({color:0xf7f7f2,roughness:.5}));ball.position.set(controlledPlayer.group.position.x+.9,.48,controlledPlayer.group.position.z);ball.castShadow=true;scene.add(ball);
   const ballShadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),new THREE.MeshBasicMaterial({color:0x07130c,transparent:true,opacity:.28}));ballShadow.rotation.x=-Math.PI/2;ballShadow.position.y=.025;scene.add(ballShadow);
 
-  let paused=false,seconds=0,homeGoals=0,awayGoals=0,ballOwner=controlledPlayer,ballVel=new THREE.Vector3(),ballSpin=0,kickTimer=0,gameOver=false,sprintHeld=false,lastTouchTeam=0;
+  let paused=false,seconds=0,homeGoals=0,awayGoals=0,ballOwner=controlledPlayer,ballVel=new THREE.Vector3(),ballSpin=0,kickTimer=0,gameOver=false,sprintHeld=false,lastTouchTeam=0,ballPickupCooldown=0;
   const keys=new Set();const move=new THREE.Vector2();let lastFrame=performance.now();
   const camTarget=new THREE.Vector3();
-  function updateCamera(dt){const focus=ballOwner?ballOwner.group.position:ball.position;const followX=THREE.MathUtils.clamp(focus.x*.72,-58,58);const fixedX=THREE.MathUtils.damp(camera.position.x,followX,2.2,dt);camera.position.set(fixedX,98,132);camTarget.set(fixedX,0,0);camera.lookAt(camTarget);}
-  camera.position.set(0,98,132);camera.lookAt(0,0,0);
+  function updateCamera(dt){const focus=ballOwner?ballOwner.group.position:(ball.position.y>1?ball.position:controlledPlayer.group.position);const attackDir=(ballOwner?ballOwner.team:lastTouchTeam)===0?1:-1;const tx=THREE.MathUtils.clamp(focus.x,-78,78),tz=THREE.MathUtils.clamp(focus.z,-43,43);const desiredX=THREE.MathUtils.clamp(tx-attackDir*24,-84,84),desiredZ=THREE.MathUtils.clamp(tz+34,-50,50);camera.position.x=THREE.MathUtils.damp(camera.position.x,desiredX,4.5,dt);camera.position.y=THREE.MathUtils.damp(camera.position.y,34,4.5,dt);camera.position.z=THREE.MathUtils.damp(camera.position.z,desiredZ,4.5,dt);camTarget.set(THREE.MathUtils.clamp(tx+attackDir*12,-86,86),0,THREE.MathUtils.clamp(tz,-50,50));camera.lookAt(camTarget);}
+  camera.position.set(-44,34,34);camera.lookAt(-8,0,0);
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);}new ResizeObserver(resize).observe(mount);resize();
   function setStatus(s){statusEl.textContent=s;}
   function updateScore(){scoreEl.textContent=`${homeGoals} - ${awayGoals}`;}
-  function resetPositions(){players.forEach(p=>{p.group.position.copy(p.home);p.velocity.set(0,0,0);});controlledPlayer=players[9];players.forEach(p=>{p.controlled=false;p.marker.visible=false;});controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;controlledPlayer.group.position.set(-20,0,0);ballOwner=controlledPlayer;ballVel.set(0,0,0);ball.position.set(-19.1,.48,0);}
+  function resetPositions(){players.forEach(p=>{p.group.position.copy(p.home);p.velocity.set(0,0,0);});controlledPlayer=players[9];players.forEach(p=>{p.controlled=false;p.marker.visible=false;});controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;controlledPlayer.group.position.set(-20,0,0);ballOwner=controlledPlayer;ballVel.set(0,0,0);ballPickupCooldown=0;ball.position.set(-19.1,.48,0);}
   function score(team){if(team===0)homeGoals++;else awayGoals++;updateScore();setStatus(team===0?'VÀO!!! BÀN THẮNG CHO HOME':'ĐỐI THỦ GHI BÀN');resetPositions();kickTimer=1.4;}
   function facing(){const v=new THREE.Vector3(Math.cos(controlledPlayer.group.rotation.y),0,Math.sin(controlledPlayer.group.rotation.y));if(Math.abs(v.x)+Math.abs(v.z)<.01)v.set(1,0,0);return v.normalize();}
-  function kickBall(direction,speed,lift=1.2,spin=0){ballOwner=null;ballVel.copy(direction.clone().normalize().multiplyScalar(speed));ballVel.y=lift;ballSpin=spin;lastTouchTeam=0;}
-  function passBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const mates=players.filter(p=>p.team===0&&p!==controlledPlayer&&p.index!==0).map(p=>({p,score:p.group.position.distanceTo(controlledPlayer.group.position)+Math.max(0,-p.group.position.x-controlledPlayer.group.position.x)*.35})).sort((a,b)=>a.score-b.score);const mate=mates[0]?.p;if(!mate)return;const dir=mate.group.position.clone().sub(ball.position);dir.y=0;kickBall(dir,20,1.0);setStatus('CHUYỀN NGẮN');}
+  function kickBall(direction,speed,lift=1.2,spin=0){const dir=direction.clone();dir.y=0;if(dir.lengthSq()<0.001)dir.copy(facing());dir.normalize();ballOwner=null;ball.position.addScaledVector(dir,1.35);ball.position.y=.62;ballVel.copy(dir.multiplyScalar(speed));ballVel.y=lift;ballSpin=spin;lastTouchTeam=0;ballPickupCooldown=.48;}
+  function passBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const mates=players.filter(p=>p.team===0&&p!==controlledPlayer&&p.index!==0).map(p=>({p,score:p.group.position.distanceTo(controlledPlayer.group.position)+Math.max(0,controlledPlayer.group.position.x-p.group.position.x)*.8})).sort((a,b)=>a.score-b.score);const mate=mates[0]?.p;if(!mate)return;const dir=mate.group.position.clone().sub(ball.position);dir.y=0;kickBall(dir,20,1.0);setStatus('CHUYỀN NGẮN');}
   function throughBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const forward=facing();const runners=players.filter(p=>p.team===0&&p!==controlledPlayer&&p.index>=8).sort((a,b)=>b.group.position.x-a.group.position.x);const runner=runners[0];let target=runner?runner.group.position.clone().add(new THREE.Vector3(8,0,runner.velocity.z*1.2)):controlledPlayer.group.position.clone().addScaledVector(forward,24);const dir=target.sub(ball.position);dir.y=0;kickBall(dir,27,1.35);setStatus('CHỌC KHE!');}
   function longBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const dir=facing();dir.z+= (Math.random()-.5)*.18;kickBall(dir,32,8.5,.08);setStatus('CHUYỀN DÀI');}
   function shootBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const goal=new THREE.Vector3(90,0,0);const dir=goal.sub(ball.position);dir.z+=controlledPlayer.group.position.z*.10;kickBall(dir,42,4.8,.12);setStatus('SÚT!!!');}
@@ -84,7 +83,7 @@ try {
 
   function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-lastFrame)/1000,.04);lastFrame=now;
     if(!paused&&!gameOver){seconds+=dt*4;const mm=String(Math.floor(seconds/60)).padStart(2,'0'),ss=String(Math.floor(seconds%60)).padStart(2,'0');clockEl.textContent=`${mm}:${ss}`;if(seconds>=90){gameOver=true;setStatus('HẾT GIỜ');}
-      if(kickTimer>0)kickTimer-=dt;
+      if(kickTimer>0)kickTimer-=dt;if(ballPickupCooldown>0)ballPickupCooldown=Math.max(0,ballPickupCooldown-dt);
       const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);
       const side=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
       const direction=new THREE.Vector3(side,0,-forward).normalize();
@@ -163,7 +162,7 @@ try {
       // Player-to-player body contact prevents players simply passing through one another.
       for(let i=0;i<players.length;i++){for(let j=i+1;j<players.length;j++){const a=players[i],b=players[j];const dx=b.group.position.x-a.group.position.x,dz=b.group.position.z-a.group.position.z,dist=Math.hypot(dx,dz);if(dist>0&&dist<1.25){const push=(1.25-dist)*.5, nx=dx/dist,nz=dz/dist;a.group.position.x-=nx*push;a.group.position.z-=nz*push;b.group.position.x+=nx*push;b.group.position.z+=nz*push;}}}
 
-      if(!ballOwner){const nearest=players.filter(p=>p.index!==0).sort((a,b)=>a.group.position.distanceTo(ball.position)-b.group.position.distanceTo(ball.position))[0];if(nearest&&nearest.group.position.distanceTo(ball.position)<1.8){ballOwner=nearest;setStatus(nearest.team===0?'ĐỘI NHÀ GIỮ BÓNG':'ĐỐI THỦ GIỮ BÓNG');}}
+      if(!ballOwner&&ballPickupCooldown<=0){const nearest=players.filter(p=>p.index!==0).sort((a,b)=>a.group.position.distanceTo(ball.position)-b.group.position.distanceTo(ball.position))[0];if(nearest&&nearest.group.position.distanceTo(ball.position)<1.25){ballOwner=nearest;ballVel.set(0,0,0);setStatus(nearest.team===0?'ĐỘI NHÀ GIỮ BÓNG':'ĐỐI THỦ GIỮ BÓNG');}}
       const opponent=players.filter(p=>p.team===1).sort((a,b)=>a.group.position.distanceTo(ball.position)-b.group.position.distanceTo(ball.position))[0];if(opponent&&opponent.group.position.distanceTo(ball.position)<1.35&&ballOwner?.team===0){ballOwner=opponent;setStatus('ĐỐI THỦ CƯỚP BÓNG');}
       if(ballOwner?.team===1){const closest=players.filter(p=>p.team===0&&p.index!==0).sort((a,b)=>a.group.position.distanceTo(ballOwner.group.position)-b.group.position.distanceTo(ballOwner.group.position))[0];if(closest&&closest!==controlledPlayer){controlledPlayer.controlled=false;controlledPlayer.marker.visible=false;controlledPlayer=closest;controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;setStatus('TỰ ĐỘNG ĐỔI SANG CẦU THỦ GẦN BÓNG NHẤT');}}
     }

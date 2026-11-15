@@ -1,0 +1,13 @@
+FOOTBALL MANAGER - MATCH 3D CAMERA / GOALS / BALL FIX
+
+Changes:
+- Removed oversized stadium stand and crowd meshes that visually intruded into the pitch and looked like duplicate large objects.
+- Reworked the perspective camera to follow the active ball carrier (or the controlled player while the ball is airborne), with a lower, closer broadcast-style angle and bounded target coordinates.
+- Kept the 180 x 112 pitch, with both goal frames and nets retained at the end lines.
+- Fixed pass/shot perception: kicked ball is moved clear of the player's feet, receives velocity immediately, and has a short pickup cooldown so it cannot be instantly re-attached to the kicker.
+- Tightened ball pickup distance to reduce accidental snapping back to a player's feet.
+- Improved short-pass target scoring to prefer a useful forward/nearby teammate.
+
+Validation:
+- JavaScript syntax check passed with node --check.
+- Browser gameplay and deployment have not been tested in this environment.
