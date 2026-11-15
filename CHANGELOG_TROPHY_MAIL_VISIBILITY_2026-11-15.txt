@@ -1,0 +1,10 @@
+CAP NHAT DANH HIEU HO SO - 15/11/2026
+
+1. Admin khong them danh hieu truc tiep vao ho so nua. Admin tao danh hieu, chon mau khung, tieu de/noi dung thu va gui vao Hom thu cua nguoi choi.
+2. Nguoi choi nhan danh hieu bang nut Mo trong Hom thu. Nut Nhan tat ca cung nhan duoc ca thu danh hieu va thu tang cau thu.
+3. Danh hieu chi duoc them vao kho sau khi nguoi choi nhan thu; khung mau, mo ta va ngay trao duoc giu nguyen.
+4. Nguoi choi co the an/hien danh hieu tren ho so. An chi an khoi ho so cua minh va ho so ban be; khong xoa danh hieu da nhan.
+5. Mac dinh ho so hien thi danh hieu de giu tuong thich voi du lieu cu.
+
+Kiem tra: Python compile va parse tat ca Jinja templates thanh cong.
+Chua chay Flask integration test/ket noi database va chua deploy.

@@ -5,7 +5,7 @@
 <section class="admin-header">
   <p class="eyebrow">PRIVATE CONTROL ROOM</p>
   <h1>ADMIN <span>PANEL</span></h1>
-  <p class="muted">Quản lý tài khoản và gửi quà trực tiếp vào kho của người chơi.</p>
+  <p class="muted">Quản lý tài khoản và gửi quà vào Hòm thư để người chơi tự nhận.</p>
 </section>
 
 <section class="panel admin-panel">
@@ -219,6 +219,28 @@
     Mỗi lần bật bảo vệ khi ép từ +7 lên +8 sẽ tiêu hao
     đúng 1 thẻ, dù thành công hay thất bại.
   </p>
+</section>
+
+<section class="panel admin-panel">
+  <p class="eyebrow">PREMIUM PROFILE AWARD</p>
+  <h2>🏆 Gửi danh hiệu qua Hòm thư</h2>
+  <form method="post" action="{{ url_for('admin_gift_trophy') }}" class="admin-form">
+    <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+    <label>Tài khoản nhận</label>
+    <select name="user_id" required>{% for user in users if not user.is_admin %}<option value="{{ user.id }}">{{ user.username }}</option>{% endfor %}</select>
+    <label>Tên danh hiệu</label><input name="trophy_name" maxlength="48" required placeholder="Ví dụ: Huyền thoại sân cỏ">
+    <label>Mô tả / ghi chú</label><input name="trophy_desc" maxlength="100" placeholder="Ví dụ: Danh hiệu đặc biệt từ Admin">
+    <label>Khung danh hiệu</label>
+    <select name="frame_style" required>
+      <option value="gold">Vàng Hoàng Gia – Gold</option><option value="diamond">Kim Cương – Diamond</option><option value="ruby">Hồng Ngọc – Ruby</option><option value="amethyst">Tím Huyền Bí – Amethyst</option><option value="emerald">Ngọc Lục Bảo – Emerald</option><option value="obsidian">Hắc Kim – Obsidian</option>
+    </select>
+    <label>Tiêu đề thư</label>
+    <input name="trophy_mail_subject" maxlength="100" placeholder="Ví dụ: Phần thưởng đặc biệt từ Admin">
+    <label>Lời nhắn trong thư</label>
+    <textarea name="trophy_mail_body" rows="3" maxlength="1000" placeholder="Nhấn Mở trong Hòm thư để nhận danh hiệu vào hồ sơ."></textarea>
+    <button class="button primary" type="submit">📨 Gửi danh hiệu vào Hòm thư</button>
+  </form>
+  <p class="muted admin-note">Danh hiệu chưa được thêm thẳng vào hồ sơ. Người chơi phải tự mở thư hoặc chọn Nhận tất cả trong Hòm thư để nhận.</p>
 </section>
 
 <section class="panel admin-panel">

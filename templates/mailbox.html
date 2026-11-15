@@ -19,7 +19,7 @@
         <input id="mail-{{ loop.index }}" type="radio" name="mail_id" value="{{ mail.id }}" {% if mail.opened %}disabled{% endif %}>
         <div class="mail-icon">{% if mail.opened %}✓{% else %}🎁{% endif %}</div>
         <div class="mail-copy"><div class="mail-title-row"><strong>{{ mail.subject }}</strong><span class="mail-status">{{ 'Đã mở' if mail.opened else 'Mới' }}</span></div><p>{{ mail.body }}</p>
-          {% if mail.player %}<div class="mail-player-preview">{{ mail.player.name }} · {{ mail.player.position }} · OVR {{ mail.player.rating + mail.player.level }} · +{{ mail.player.level }}</div>{% endif %}
+          {% if mail.player %}<div class="mail-player-preview">{{ mail.player.name }} · {{ mail.player.position }} · OVR {{ mail.player.rating + mail.player.level }} · +{{ mail.player.level }}</div>{% elif mail.trophy %}<div class="mail-player-preview">🏆 {{ mail.trophy.name }} · Khung {{ mail.trophy.frame_label or 'Danh hiệu' }}</div>{% endif %}
           <small>{{ mail.created_at or 'Thư từ Admin' }}</small>
         </div>
       </label>

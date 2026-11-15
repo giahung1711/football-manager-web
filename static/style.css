@@ -1667,15 +1667,15 @@
 /* Player profile modal and circular account avatar */
 .profile-avatar-trigger{padding:0;overflow:hidden;flex:0 0 auto;cursor:pointer;box-shadow:0 0 24px #a5d98a33}
 .profile-avatar-trigger img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.profile-modal{z-index:10050;overflow-y:auto;align-items:flex-start}
-.profile-dialog{position:relative;width:min(680px,100%);max-height:calc(100vh - 32px);overflow:auto;margin:auto;padding:28px;border:1px solid #789dce66;border-radius:22px;background:radial-gradient(circle at 90% 0%,#33316c 0,transparent 36%),linear-gradient(145deg,#151d38,#0c1224 75%);color:#f4f6ff;box-shadow:0 22px 80px #000a}
+.profile-modal{z-index:10050;overflow-y:auto;align-items:center;padding:16px}
+.profile-dialog{position:relative;width:min(1040px,100%);max-height:calc(100vh - 32px);overflow:auto;margin:auto;padding:28px;border:1px solid #789dce66;border-radius:22px;background:radial-gradient(circle at 90% 0%,#33316c 0,transparent 36%),linear-gradient(145deg,#151d38,#0c1224 75%);color:#f4f6ff;box-shadow:0 22px 80px #000a}
 .profile-close{position:absolute;right:16px;top:14px;width:36px;height:36px;border:1px solid #ffffff30;border-radius:50%;background:#ffffff12;color:white;font-size:25px;cursor:pointer}
 .profile-identity{display:flex;align-items:center;gap:16px;margin:12px 0 22px}
 .profile-identity h2{font-size:30px;margin:0 0 4px}
 .profile-identity p{margin:0}
 .profile-avatar{width:82px;height:82px;flex:0 0 82px;display:grid;place-items:center;overflow:hidden;border-radius:50%;border:2px solid #a8c8ff;background:linear-gradient(145deg,#414b82,#202b50);font-size:42px;box-shadow:0 0 24px #8baaff55}
 .profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0 22px}
+.profile-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 22px}
 .profile-stats>div{min-width:0;padding:14px;border:1px solid #8baaff30;border-radius:12px;background:#ffffff08}
 .profile-stats span{display:block;margin-bottom:7px;color:#aebde5;font-size:10px;font-weight:800;letter-spacing:1px}
 .profile-stats strong{display:block;overflow-wrap:anywhere;color:#e8edff;font:700 21px 'Barlow Condensed',sans-serif}
@@ -1689,8 +1689,15 @@
 .profile-section small{display:block;width:100%;color:#9eacd0;font-size:11px;margin-top:-5px}
 .profile-section .button{flex:0 0 auto}
 .trophy-placeholder{min-height:95px}
-@media(max-width:520px){.profile-dialog{padding:22px 17px}.profile-stats{grid-template-columns:1fr 1fr}.profile-stats>div{padding:11px}.profile-stats strong{font-size:18px}.profile-identity h2{font-size:25px}}
+@media(min-width:760px){.profile-dialog{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;align-content:start}.profile-dialog>.eyebrow,.profile-dialog>.profile-identity,.profile-dialog>.profile-stats{grid-column:1/-1}.profile-dialog>.profile-section{min-width:0}.profile-dialog>.trophy-placeholder{grid-column:1/-1}}
+@media(max-width:759px){.profile-modal{align-items:flex-start}.profile-dialog{padding:22px 17px}.profile-stats{grid-template-columns:1fr 1fr}.profile-stats>div{padding:11px}.profile-stats strong{font-size:18px}.profile-identity h2{font-size:25px}}
 
 .friend-avatar{overflow:hidden}.friend-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 
 .friend-profile-heading{display:flex;align-items:center;gap:14px}.friend-profile-avatar{width:62px;height:62px;flex:0 0 62px;font-size:24px}.friend-profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+/* Premium player-profile trophy frames */
+.profile-trophies{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.profile-trophy{min-width:180px;max-width:260px;flex:1;padding:13px 15px;border:2px solid #d8b65a;border-radius:14px;background:linear-gradient(135deg,#5a4218aa,#171326 70%);box-shadow:0 0 18px #d8b65a33,inset 0 0 16px #fff1}
+.profile-trophy strong{display:block;font-size:16px;color:#fff4cc}.profile-trophy small{display:block;color:#d9d5e8;margin-top:4px}.profile-trophy.trophy-diamond{border-color:#8cecff;background:linear-gradient(135deg,#14506aaa,#171326 75%);box-shadow:0 0 20px #55dfff44}.profile-trophy.trophy-ruby{border-color:#ff719b;background:linear-gradient(135deg,#6e173faa,#171326 75%);box-shadow:0 0 20px #ff548a44}.profile-trophy.trophy-amethyst{border-color:#c28aff;background:linear-gradient(135deg,#49206eaa,#171326 75%);box-shadow:0 0 20px #a65cff44}.profile-trophy.trophy-emerald{border-color:#5df0b0;background:linear-gradient(135deg,#14543eaa,#171326 75%);box-shadow:0 0 20px #42e69b44}.profile-trophy.trophy-obsidian{border-color:#a9b0c5;background:linear-gradient(135deg,#34394aaa,#090b13 75%);box-shadow:0 0 20px #c5cbe044}
+.friend-profile-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}.friend-profile-main{display:flex;gap:16px;align-items:center}.friend-profile-main .friend-avatar{width:82px;height:82px;flex:0 0 82px}.friend-profile-main .friend-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}.friend-profile-trophies{margin-top:16px}.friend-readonly-note{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:760px){.friend-profile-layout{grid-template-columns:1fr}}

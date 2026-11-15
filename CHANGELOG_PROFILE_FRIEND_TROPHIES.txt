@@ -1,0 +1,9 @@
+FOOTBALL MANAGER - PROFILE / FRIENDS / ADMIN TROPHIES UPDATE
+
+1. Player profile dialog is now a wide horizontal layout on desktop, with responsive vertical stacking on smaller screens.
+2. Friend profile mirrors the player's profile information in read-only mode: avatar, account name, club, OVR, squad value, win rate, match count, note, recent form, and trophy display.
+3. Friend squad page now shows only the starting XI (up to 11 players); substitutes and extras are hidden.
+4. Admin panel now includes a trophy-gifting form. Admin chooses recipient, trophy title, optional description, and one of six premium frame styles: Gold, Diamond, Ruby, Amethyst, Emerald, Obsidian.
+5. Awarded trophies are saved in the recipient's game state and shown on both their own profile and friend-facing profile.
+
+No production database or hosting environment was changed. Deploy manually after backing up the current project/database.

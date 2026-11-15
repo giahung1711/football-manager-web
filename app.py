@@ -460,6 +460,57 @@ def admin_gift():
     return redirect(url_for('admin_panel'))
 
 
+@app.post('/admin/gift-trophy')
+@admin_required
+def admin_gift_trophy():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    try:
+        user_id = int(request.form.get('user_id', ''))
+        recipient = db.session.get(User, user_id)
+        if not recipient or recipient.is_admin:
+            raise ValueError('Không tìm thấy tài khoản người chơi hợp lệ.')
+        save = GameSave.query.filter_by(user_id=recipient.id).first()
+        if not save:
+            raise ValueError('Tài khoản này chưa có dữ liệu game.')
+        title = request.form.get('trophy_name', '').strip()[:48]
+        subtitle = request.form.get('trophy_desc', '').strip()[:100]
+        frame = request.form.get('frame_style', 'gold').strip().lower()
+        styles = {
+            'gold': {'label':'Vàng Hoàng Gia','class':'trophy-gold'},
+            'diamond': {'label':'Kim Cương','class':'trophy-diamond'},
+            'ruby': {'label':'Hồng Ngọc','class':'trophy-ruby'},
+            'amethyst': {'label':'Tím Huyền Bí','class':'trophy-amethyst'},
+            'emerald': {'label':'Ngọc Lục Bảo','class':'trophy-emerald'},
+            'obsidian': {'label':'Hắc Kim','class':'trophy-obsidian'},
+        }
+        if not title:
+            raise ValueError('Tên danh hiệu không được để trống.')
+        if frame not in styles:
+            raise ValueError('Kiểu khung danh hiệu không hợp lệ.')
+        state = load_state(save)
+        trophy = {'id': secrets.token_urlsafe(8), 'name': title, 'description': subtitle,
+                  'frame_style': frame, 'frame_class': styles[frame]['class'],
+                  'frame_label': styles[frame]['label'],
+                  'awarded_at': datetime.utcnow().strftime('%d/%m/%Y')}
+        mail = {
+            'id': secrets.token_urlsafe(12), 'type': 'trophy_gift',
+            'subject': request.form.get('trophy_mail_subject', '').strip()[:100] or 'Bạn nhận được một danh hiệu mới!',
+            'body': request.form.get('trophy_mail_body', '').strip()[:1000] or 'Admin gửi tặng bạn một danh hiệu. Nhấn Mở trong Hòm thư để nhận và thêm vào hồ sơ.',
+            'trophy': trophy, 'opened': False,
+            'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M')
+        }
+        state.setdefault('mailbox', []).insert(0, mail)
+        state.setdefault('activity', []).insert(0, {'message': f'Admin gửi thư tặng danh hiệu: {title}', 'week': state.get('week', 1)})
+        state['activity'] = state['activity'][:15]
+        persist(save, state)
+        flash(f'Đã gửi thư danh hiệu “{title}” vào Hòm thư của {recipient.username}.')
+    except (ValueError, TypeError) as error:
+        flash(str(error))
+    return redirect(url_for('admin_panel'))
+
+
 @app.post('/admin/reset-password')
 @admin_required
 def admin_reset_password():
@@ -558,6 +609,19 @@ def mailbox_open():
         flash('Không tìm thấy thư đã chọn.')
     elif mail.get('opened'):
         flash('Thư này đã được mở trước đó.')
+    elif mail.get('type') == 'trophy_gift':
+        trophy = copy.deepcopy(mail.get('trophy') or {})
+        if not trophy.get('name'):
+            flash('Danh hiệu trong thư không hợp lệ.')
+        else:
+            owned = state.setdefault('profile_trophies', [])
+            if not any(t.get('id') == trophy.get('id') for t in owned):
+                owned.insert(0, trophy)
+                state['profile_trophies'] = owned[:30]
+            mail['opened'] = True
+            state.setdefault('activity', []).insert(0, {'message': f'Đã nhận danh hiệu: {trophy["name"]}', 'week': state.get('week', 1)})
+            state['activity'] = state['activity'][:15]
+            flash(f'Đã nhận danh hiệu “{trophy["name"]}” vào hồ sơ!')
     elif mail.get('type') == 'player_gift':
         gifted = copy.deepcopy(mail.get('player') or {})
         if gifted.get('rating') is None and gifted.get('ovr') is not None:
@@ -600,7 +664,19 @@ def mailbox_claim_all():
     state = load_state(save)
     received = []
     for mail in state.setdefault('mailbox', []):
-        if mail.get('opened') or mail.get('type') != 'player_gift':
+        if mail.get('opened'):
+            continue
+        if mail.get('type') == 'trophy_gift':
+            trophy = copy.deepcopy(mail.get('trophy') or {})
+            if trophy.get('name'):
+                owned = state.setdefault('profile_trophies', [])
+                if not any(t.get('id') == trophy.get('id') for t in owned):
+                    owned.insert(0, trophy)
+                    state['profile_trophies'] = owned[:30]
+                mail['opened'] = True
+                received.append(f'Danh hiệu: {trophy["name"]}')
+            continue
+        if mail.get('type') != 'player_gift':
             continue
         gifted = copy.deepcopy(mail.get('player') or {})
         if gifted.get('rating') is None and gifted.get('ovr') is not None:
@@ -625,9 +701,9 @@ def mailbox_claim_all():
         mail['opened'] = True
         received.append(gifted['name'])
     if received:
-        state.setdefault('activity', []).insert(0, {'message': f'Nhận {len(received)} cầu thủ từ hòm thư', 'week': state.get('week', 1)})
+        state.setdefault('activity', []).insert(0, {'message': f'Đã nhận {len(received)} phần quà từ hòm thư', 'week': state.get('week', 1)})
         state['activity'] = state['activity'][:15]
-        flash('Đã nhận: ' + ', '.join(received) + ' vào đội hình dự bị.')
+        flash('Đã nhận: ' + ', '.join(received) + '.')
     else:
         flash('Không có gói cầu thủ mới để nhận.')
     persist(save, state)
@@ -687,6 +763,23 @@ def admin_pg():
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
+@app.post('/profile/trophies-visibility')
+@login_required
+def profile_trophies_visibility():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('dashboard'))
+    state = load_state(save)
+    visible = request.form.get('visible') == '1'
+    state['profile_trophies_visible'] = visible
+    persist(save, state)
+    flash('Đã bật hiển thị danh hiệu trên hồ sơ.' if visible else 'Đã ẩn danh hiệu khỏi hồ sơ. Danh hiệu vẫn được giữ trong kho.')
+    return redirect(url_for('dashboard'))
+
+
 def friend_pair(a, b):
     return (min(a, b), max(a, b))
 
@@ -708,7 +801,7 @@ def get_user_profile(user):
             'club_name': state.get('custom_club_name') or state.get('club', 'Chưa chọn'),
             'matches': int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0),
             'win_rate': round(100*int(state.get('wins', 0) or 0)/max(1,int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0)),1),
-            'ovr': ovr_average, 'online': online}
+            'ovr': ovr_average, 'online': online, 'squad_value': float(dashboard_data.get('squad_value', 0) or 0), 'trophies': state.get('profile_trophies', []) if state.get('profile_trophies_visible', True) else [], 'trophies_visible': state.get('profile_trophies_visible', True)}
 
 @app.before_request
 def update_presence():
@@ -770,7 +863,8 @@ def friend_profile(user_id):
         return redirect(url_for('friends'))
     profile = get_user_profile(target)
     state = profile['state']
-    squad = state.get('starting', []) + state.get('bench', []) + state.get('extras', [])
+    # Friend profile is read-only and intentionally shows only the starting XI.
+    squad = (state.get('starting', []) or [])[:11]
     return render_template('friend_profile.html', profile=profile, squad=squad)
 
 @app.post('/friends/request/<int:user_id>')
