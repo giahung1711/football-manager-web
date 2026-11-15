@@ -1,0 +1,11 @@
+FOOTBALL MANAGER — Server update (2026-11-15)
+
+1. Player-to-player market purchases now allow buying a player even when the buyer already owns another copy.
+2. Reserve players are shown in a compact, scrollable panel (about three rows on desktop) with live name search.
+3. The in-game Transfer Market now supports selecting and selling multiple players from Reserves / Other Players in one action. A separate bulk-list option is also available in the player-to-player market. Bulk actions validate the complete selection before changing the squad.
+4. Ballon D'or and Christmas 2026 pack info buttons are positioned in the upper-right corner of their pack cards. The current source did not contain a separate magnifier beside the logout button.
+5. Added server-wide leaderboard tabs for team average OVR (>97 only), squad value, and win rate (>100 matches only).
+6. Added squad_value to dashboard data so the Finance page reads the correct team value instead of an undefined field.
+
+Validation performed: Python syntax compilation passed; all Jinja templates compiled; game-engine smoke check returned a non-zero squad value (1,228M PC for a fresh Real Madrid save).
+A full Flask test-client run was not possible in this local environment because Flask dependencies are not installed here. No deployment was performed. Existing user accounts and production database are not modified by this source update.

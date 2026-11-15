@@ -47,71 +47,41 @@
   </p>
 
   {% if own_players %}
-    {% for item in own_players %}
-
-      <div class="section-head market-own-player">
-        <div>
-          <strong>{{ item.player.name }}</strong>
-
-          <p class="muted">
-            {{ item.player.position }}
-            · OVR {{ item.ovr }}
-            · +{{ item.player.level|default(0) }}
-            · Giá trị {{ item.value|money }}
-          </p>
-
-          <p class="muted">
-            Giá được phép:
-            {{ item.minimum|money }} – {{ item.maximum|money }}
-            · {{ item.requirement }}
-          </p>
-        </div>
-
-        {% if item.eligible %}
-
-          <form method="post"
-                action="{{ url_for('player_market.player_market_list') }}"
-                class="market-list-form">
-
-            <input type="hidden"
-                   name="group"
-                   value="{{ item.group }}">
-
-            <input type="hidden"
-                   name="index"
-                   value="{{ item.index }}">
-
-            <label>Giá bán (M€)</label>
-
-            <input type="number"
-                   name="asking_price"
-                   min="{{ '%.2f'|format(item.minimum) }}"
-                   max="{{ '%.2f'|format(item.maximum) }}"
-                   step="0.01"
-                   value="{{ '%.2f'|format(item.value) }}"
-                   required>
-
-            <button class="button" type="submit">
-              Đăng bán
-            </button>
-          </form>
-
-        {% else %}
-
-          <span class="muted">
-            Chưa đủ điều kiện đăng bán
-          </span>
-
-        {% endif %}
+    <form method="post" action="{{ url_for('player_market.player_market_list_bulk') }}" id="bulkMarketForm">
+      <div class="bulk-market-toolbar">
+        <label><input type="checkbox" id="selectAllMarketPlayers"> Chọn tất cả đủ điều kiện</label>
+        <span class="muted" id="selectedMarketCount">0 cầu thủ được chọn</span>
+        <button class="button primary" type="submit">Đăng bán các cầu thủ đã chọn</button>
       </div>
-
-    {% endfor %}
+      {% for item in own_players %}
+        <div class="section-head market-own-player">
+          <div class="market-player-select">
+            {% if item.eligible %}
+              <input type="checkbox" name="selected_player" value="{{item.group}}:{{item.index}}" class="market-player-checkbox" aria-label="Chọn {{item.player.name}}">
+            {% else %}
+              <span class="market-player-checkbox-placeholder"></span>
+            {% endif %}
+            <div>
+              <strong>{{ item.player.name }}</strong>
+              <p class="muted">{{ item.player.position }} · OVR {{ item.ovr }} · +{{ item.player.level|default(0) }} · Giá trị {{ item.value|money }}</p>
+              <p class="muted">Giá được phép: {{ item.minimum|money }} – {{ item.maximum|money }} · {{ item.requirement }}</p>
+            </div>
+          </div>
+          {% if item.eligible %}
+            <label class="market-price-field">Giá bán (M PC)
+              <input type="number" name="price_{{item.group}}_{{item.index}}" min="{{ '%.2f'|format(item.minimum) }}" max="{{ '%.2f'|format(item.maximum) }}" step="0.01" value="{{ '%.2f'|format(item.value) }}" required>
+            </label>
+          {% else %}
+            <span class="muted">Chưa đủ điều kiện đăng bán</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </form>
+    <script>
+    (()=>{const form=document.getElementById('bulkMarketForm');if(!form)return;const boxes=[...form.querySelectorAll('.market-player-checkbox')];const all=document.getElementById('selectAllMarketPlayers');const count=document.getElementById('selectedMarketCount');const update=()=>{const n=boxes.filter(x=>x.checked).length;count.textContent=n+' cầu thủ được chọn';all.checked=boxes.length>0&&n===boxes.length;};boxes.forEach(x=>x.addEventListener('change',update));all.addEventListener('change',()=>{boxes.forEach(x=>x.checked=all.checked);update();});form.addEventListener('submit',e=>{if(!boxes.some(x=>x.checked)){e.preventDefault();alert('Hãy chọn ít nhất một cầu thủ để đăng bán.');}});update();})();
+    </script>
   {% else %}
-
-    <p class="muted">
-      Bạn chưa có cầu thủ trong mục Dự bị hoặc Cầu thủ khác để đăng bán.
-    </p>
-
+    <p class="muted">Bạn chưa có cầu thủ trong mục Dự bị hoặc Cầu thủ khác để đăng bán.</p>
   {% endif %}
 </section>
 

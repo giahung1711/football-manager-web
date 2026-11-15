@@ -780,7 +780,10 @@ def get_dashboard(st):
         "total_value": round(
             sum(value(p) for p in all_players(st)),
             2
-        )
+        ),
+        "squad_value": round(sum(value(p) for p in all_players(st)), 2),
+        "matches_played": int(st.get("wins", 0) or 0) + int(st.get("draws", 0) or 0) + int(st.get("losses", 0) or 0),
+        "win_rate": round(100 * int(st.get("wins", 0) or 0) / max(1, int(st.get("wins", 0) or 0) + int(st.get("draws", 0) or 0) + int(st.get("losses", 0) or 0)), 1)
     }
 
 

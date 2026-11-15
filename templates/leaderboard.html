@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}BXH toàn server · FOOTBALL MANAGER{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <p class="eyebrow">GLOBAL RANKINGS</p>
+  <h1>BXH <span>TOÀN SERVER</span></h1>
+  <p class="muted">Xếp hạng các CLB của người chơi trên toàn máy chủ.</p>
+</section>
+<section class="panel">
+  <div class="leaderboard-tabs">
+    <a class="button {% if category=='ovr' %}primary{% endif %}" href="{{url_for('leaderboard',category='ovr')}}">OVR</a>
+    <a class="button {% if category=='value' %}primary{% endif %}" href="{{url_for('leaderboard',category='value')}}">Giá trị đội hình</a>
+    <a class="button {% if category=='win_rate' %}primary{% endif %}" href="{{url_for('leaderboard',category='win_rate')}}">Tỉ lệ thắng</a>
+  </div>
+  {% if category=='ovr' %}<p class="muted">Chỉ tài khoản có OVR đội hình trung bình trên 97 mới được xếp hạng.</p>{% elif category=='win_rate' %}<p class="muted">Chỉ tài khoản đã thi đấu trên 100 trận mới được xếp hạng.</p>{% else %}<p class="muted">Xếp theo tổng giá trị hiện tại của toàn bộ cầu thủ trong đội hình.</p>{% endif %}
+  {% if entries %}
+  <div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Tài khoản</th><th>CLB</th><th>{% if category=='ovr' %}OVR TB{% elif category=='value' %}Giá trị đội hình{% else %}Tỉ lệ thắng{% endif %}</th><th>Số trận</th></tr></thead><tbody>
+  {% for item in entries %}<tr><td><strong>#{{loop.index}}</strong></td><td>{{item.username}}</td><td>{{item.club}}</td><td>{% if category=='ovr' %}{{'%.1f'|format(item.ovr)}}{% elif category=='value' %}{{item.value|money}}{% else %}{{'%.1f'|format(item.win_rate)}}%{% endif %}</td><td>{{item.matches}}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="leaderboard-empty"><h3>Chưa có dữ liệu xếp hạng</h3><p class="muted">Khi có tài khoản đủ điều kiện, bảng xếp hạng sẽ hiển thị tại đây.</p></div>{% endif %}
+</section>
+{% endblock %}

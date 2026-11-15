@@ -165,6 +165,40 @@ def choose_club():
 def dashboard():
     save=current_save()
     return redirect(url_for('choose_club')) if not save else page(save)
+@app.route('/leaderboard')
+@login_required
+def leaderboard():
+    category = request.args.get('category', 'ovr')
+    if category not in {'ovr', 'value', 'win_rate'}:
+        category = 'ovr'
+    entries = []
+    for account in User.query.filter_by(is_admin=False).order_by(User.id.asc()).all():
+        save = GameSave.query.filter_by(user_id=account.id).first()
+        if not save:
+            continue
+        state = load_state(save)
+        data = get_dashboard(state)
+        matches = int(data.get('matches_played', 0) or 0)
+        entry = {
+            'username': account.username,
+            'club': data.get('club', 'Chưa chọn CLB'),
+            'ovr': float(data.get('average_rating', 0) or 0),
+            'value': float(data.get('squad_value', data.get('total_value', 0)) or 0),
+            'matches': matches,
+            'wins': int(data.get('wins', 0) or 0),
+            'win_rate': float(data.get('win_rate', 0) or 0),
+        }
+        if category == 'ovr' and entry['ovr'] > 97:
+            entries.append(entry)
+        elif category == 'value':
+            entries.append(entry)
+        elif category == 'win_rate' and matches > 100:
+            entries.append(entry)
+    sort_key = {'ovr': 'ovr', 'value': 'value', 'win_rate': 'win_rate'}[category]
+    entries.sort(key=lambda item: (item[sort_key], item['matches'], item['username'].casefold()), reverse=True)
+    return render_template('leaderboard.html', entries=entries, category=category)
+
+
 @app.route('/<tab>')
 @login_required
 def game_tab(tab):
@@ -926,6 +960,28 @@ def action():
             quest_event='sell'; quest_data={'sale_value': amount}
             if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']: st['market'].append(p['name'])
             flash(f'Đã bán {p["name"]}, cộng {format_money(amount)}. Ngân sách: {format_money(st["budget"])}.')
+
+        elif act=='sell_bulk':
+            selected=request.form.getlist('sell_player')
+            if not selected: raise ValueError('Hãy chọn ít nhất một cầu thủ để bán.')
+            parsed=[]; seen=set()
+            for token in selected:
+                group, raw_idx=token.split(':',1); idx=int(raw_idx)
+                if group not in {'bench','extras'} or idx<0 or idx>=len(st.get(group,[])):
+                    raise ValueError('Danh sách cầu thủ được chọn không hợp lệ. Hãy tải lại trang.')
+                if (group,idx) in seen: continue
+                seen.add((group,idx)); parsed.append((group,idx,st[group][idx]))
+            total=0.0; sold_names=[]
+            for group,idx,p in parsed:
+                amount=float(value(p)); total+=amount; sold_names.append(p.get('name','Cầu thủ'))
+                if p['name'] not in st['market'] and p['name'] not in PACKS['4']['players']:
+                    st['market'].append(p['name'])
+            for group in ('bench','extras'):
+                for idx in sorted((i for g,i,_ in parsed if g==group),reverse=True):
+                    st[group].pop(idx)
+            st['budget']=round(float(st['budget'])+total,2)
+            quest_event='sell'; quest_data={'sale_value': total}
+            flash(f'Đã bán {len(parsed)} cầu thủ, cộng {format_money(total)} vào ngân sách.')
 
         elif act=='ballon_pack':
             # Server-side one-time token prevents a browser double-submit from charging twice.

@@ -1509,7 +1509,7 @@
 }
 
 /* Ballon D'or event pack */
-.ballon-pack-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:26px;padding:24px;border:1px solid rgba(220,180,85,.55);border-radius:20px;background:radial-gradient(circle at 85% 15%,rgba(224,180,74,.2),transparent 36%),linear-gradient(135deg,#171717,#292116);box-shadow:0 16px 44px rgba(0,0,0,.22)}
+.ballon-pack-card{position:relative;padding-right:68px;display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:26px;padding:24px;border:1px solid rgba(220,180,85,.55);border-radius:20px;background:radial-gradient(circle at 85% 15%,rgba(224,180,74,.2),transparent 36%),linear-gradient(135deg,#171717,#292116);box-shadow:0 16px 44px rgba(0,0,0,.22)}
 .ballon-pack-card h2{margin:4px 0 8px;color:#f5d98b}.ballon-price{display:inline-block;color:#c7a7ff;font-size:1.2rem;margin:8px 0}
 .ballon-reveal-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:18px;background:radial-gradient(circle,rgba(110,77,22,.84),rgba(4,5,10,.97));backdrop-filter:blur(10px)}
 .ballon-reveal-stage{position:relative;width:min(520px,100%);min-height:470px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;border:1px solid rgba(255,220,130,.4);border-radius:26px;padding:30px;background:linear-gradient(145deg,#17130b,#090a10);box-shadow:0 0 70px rgba(234,190,86,.22);overflow:hidden}
@@ -1521,7 +1521,7 @@
 .ballon-reveal-card.shown{display:block}.ballon-reveal-card h2{color:#ffe5a1;margin:12px 0}.ballon-reveal-card strong{display:block;font-size:2rem;color:#f6d47d}.ballon-reveal-card span{display:block;margin-top:8px;color:#d5d0c3}
 .ballon-card-orb{font-size:58px;filter:drop-shadow(0 0 14px #d9ac46)}#revealStatus{margin-top:18px;color:#f4e4b8}
 @keyframes ballonSpin{to{transform:rotate(360deg)}}@keyframes ballonPulse{50%{transform:scale(1.12);filter:drop-shadow(0 0 22px #eac15d)}}@keyframes ballonCardIn{from{opacity:0;transform:rotateY(90deg) scale(.65)}to{opacity:1;transform:rotateY(0) scale(1)}}
-@media(max-width:600px){.ballon-pack-card{align-items:flex-start;flex-direction:column}.ballon-pack-card form,.ballon-pack-card button{width:100%}.ballon-reveal-stage{min-height:420px;padding:20px}}
+@media(max-width:600px){.ballon-pack-card{align-items:flex-start;flex-direction:column;padding-right:58px}.ballon-pack-card form,.ballon-pack-card button{width:100%}.ballon-reveal-stage{min-height:420px;padding:20px}}
 
 .ballon-reveal-club img{width:78px;height:78px;object-fit:contain;background:transparent;border:0;box-shadow:none}
 .special-emblem{display:inline-flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:24px;font-size:.85rem;font-weight:950;letter-spacing:1px;border:2px solid #d6b45f;background:linear-gradient(145deg,#f7df9a,#6c4d19 55%,#17130b);color:#241a08;box-shadow:0 0 25px #d5ad4a66}
@@ -1592,7 +1592,7 @@
 
 
 /* Christmas 2026 seasonal card frame — icy blue winter treatment. */
-.christmas-pack-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:18px;padding:24px;border:1px solid rgba(113,190,255,.58);border-radius:20px;background:radial-gradient(circle at 85% 15%,rgba(85,174,255,.22),transparent 38%),linear-gradient(135deg,#071a31,#102e50 55%,#0a1426);box-shadow:0 16px 44px rgba(0,0,0,.25)}
+.christmas-pack-card{position:relative;padding-right:68px;display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:18px;padding:24px;border:1px solid rgba(113,190,255,.58);border-radius:20px;background:radial-gradient(circle at 85% 15%,rgba(85,174,255,.22),transparent 38%),linear-gradient(135deg,#071a31,#102e50 55%,#0a1426);box-shadow:0 16px 44px rgba(0,0,0,.25)}
 .christmas-pack-card h2{margin:4px 0 8px;color:#c9eaff}.christmas-price{display:inline-block;color:#8bd2ff;font-size:1.2rem;margin:8px 0}
 .pitch-positioned .pitch-player-card.ornate-card.card-christmas-2026{isolation:isolate;background:radial-gradient(ellipse at 50% 12%,rgba(225,247,255,.78),transparent 34%),linear-gradient(150deg,#f1fbff 0%,#8ed5ff 13%,#287bb5 30%,#123d68 60%,#071a31 86%,#9bdcff 100%);border:0;filter:drop-shadow(0 0 8px rgba(104,195,255,.7)) drop-shadow(0 8px 9px #000c);animation:christmasFrameGlow 3.8s ease-in-out infinite}
 .pitch-positioned .pitch-player-card.ornate-card.card-christmas-2026:before{inset:2px 3px 4px;border:3px double #d8f4ff;box-shadow:inset 0 0 13px #bceaff99,0 0 10px #65c7ff99;background:linear-gradient(135deg,#e8faff33,transparent 42%,#06172b66)}
@@ -1604,7 +1604,7 @@
 .ballon-reveal-christmas:before{content:"";position:absolute;inset:8px;border:1px solid #dff6ff;border-radius:17px;pointer-events:none;box-shadow:inset 0 0 20px #9cddff55}
 .ballon-reveal-christmas .ballon-card-orb{color:#d8f5ff;text-shadow:0 0 15px #65caff}.ballon-reveal-christmas p,.ballon-reveal-christmas h2,.ballon-reveal-christmas strong,.ballon-reveal-christmas span{position:relative;z-index:1}
 @keyframes christmasFrameGlow{0%,100%{filter:drop-shadow(0 0 6px #55b8ed88) drop-shadow(0 8px 9px #000c)}50%{filter:drop-shadow(0 0 14px #a5e5ffdd) drop-shadow(0 8px 9px #000c)}}
-@media(max-width:700px){.christmas-pack-card{align-items:flex-start;flex-direction:column}.christmas-pack-card form,.christmas-pack-card button{width:100%}.pitch-positioned .card-christmas-2026 .event-card-label{top:37px;font-size:5px;padding:1px 4px}}
+@media(max-width:700px){.christmas-pack-card{align-items:flex-start;flex-direction:column;padding-right:58px}.christmas-pack-card form,.christmas-pack-card button{width:100%}.pitch-positioned .card-christmas-2026 .event-card-label{top:37px;font-size:5px;padding:1px 4px}}
 @media(prefers-reduced-motion:reduce){.pitch-positioned .pitch-player-card.ornate-card.card-christmas-2026{animation:none}}
 
 .christmas-reveal-overlay{background:radial-gradient(circle,rgba(27,104,157,.86),rgba(3,10,22,.98))!important}
@@ -1654,3 +1654,12 @@
 @keyframes sweetCandyGlow{50%{filter:drop-shadow(0 0 15px #ff9de8) drop-shadow(0 8px 9px #000c)}}
 @media(max-width:700px){.sweet-candy-pack-card{align-items:flex-start;flex-direction:column;padding-right:58px}.sweet-candy-pack-card form,.sweet-candy-pack-card button{width:100%}.pack-info-button{right:14px;top:14px}}
 @media(prefers-reduced-motion:reduce){.pitch-positioned .pitch-player-card.ornate-card.card-sweet-candy{animation:none}}
+
+
+/* Compact searchable reserve list */
+.bench-search-row{display:flex;align-items:center;gap:12px;margin:0 0 12px}.bench-search-row input{max-width:420px;margin:0}.bench-grid-compact{grid-template-columns:repeat(3,minmax(0,1fr));max-height:315px;overflow-y:auto;align-content:start;padding:2px 5px 8px 0}.bench-grid-compact .bench-player[hidden]{display:none!important}@media(max-width:900px){.bench-grid-compact{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.bench-search-row{align-items:stretch;flex-direction:column}.bench-search-row input{max-width:none}.bench-grid-compact{grid-template-columns:1fr;max-height:420px}}
+
+/* Bulk transfer listings and global leaderboard */
+.bulk-market-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0 18px;border-bottom:1px solid var(--line)}.bulk-market-toolbar label{display:flex;align-items:center;gap:8px}.bulk-market-toolbar input,.market-player-select input{width:18px;height:18px;margin:0;accent-color:var(--green)}.market-player-select{display:flex;align-items:center;gap:12px;min-width:0}.market-player-select>div{min-width:0}.market-price-field{display:grid;gap:5px;min-width:180px;font-size:12px;color:var(--muted)}.market-price-field input{margin:0}.market-player-checkbox-placeholder{width:18px;flex:0 0 18px}.leaderboard-tabs{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.leaderboard-empty{text-align:center;padding:35px 12px}.leaderboard-empty h3{font-size:24px}@media(max-width:650px){.market-own-player{align-items:flex-start;flex-direction:column}.market-price-field{width:100%}.bulk-market-toolbar{align-items:flex-start;flex-direction:column}.bulk-market-toolbar button{width:100%}}
+
+.sell-player-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}.sell-player-row input{width:18px;height:18px;margin:0;accent-color:var(--green);flex:0 0 18px}.sell-player-row span{display:grid;gap:3px}.sell-player-row small{font-size:11px;color:var(--muted)}

@@ -181,15 +181,6 @@ def player_market_list():
                 f"{minimum:.2f}–{maximum:.2f} M PC (90%–110% giá trị hiện tại)."
             )
 
-        already_listed = PlayerMarketListing.query.filter_by(
-            seller_id=current_user.id,
-            player_name=p.get("name", ""),
-            status="active",
-        ).first()
-
-        if already_listed:
-            raise ValueError("Cầu thủ này đã được đăng bán.")
-
         listing = PlayerMarketListing(
             seller_id=current_user.id,
             player_name=p["name"],
@@ -219,6 +210,73 @@ def player_market_list():
         db.session.rollback()
         flash("Không thể đăng bán lúc này. Dữ liệu chưa được thay đổi.")
 
+    return redirect(url_for("player_market.player_market"))
+
+
+@player_market_bp.post("/player-market/list-bulk")
+@login_required
+def player_market_list_bulk():
+    save = _get_save(current_user.id, lock=True)
+    if not save:
+        return redirect(url_for("choose_club"))
+    try:
+        state = _read_state(save)
+        selected = request.form.getlist("selected_player")
+        if not selected:
+            raise ValueError("Hãy chọn ít nhất một cầu thủ để đăng bán.")
+
+        parsed = []
+        seen = set()
+        for token in selected:
+            group, raw_index = token.split(":", 1)
+            index = int(raw_index)
+            if group not in {"bench", "extras"} or index < 0 or index >= len(state.get(group, [])):
+                raise ValueError("Danh sách cầu thủ được chọn không hợp lệ. Hãy tải lại trang.")
+            key = (group, index)
+            if key in seen:
+                continue
+            seen.add(key)
+            player_record = state[group][index]
+            level = int(player_record.get("level", 0) or 0)
+            current_ovr = player_upgrade_ovr(player_record)
+            current_value = value(player_record)
+            if current_value <= 0:
+                raise ValueError(f"Giá trị của {player_record.get('name', 'cầu thủ')} không hợp lệ.")
+            if current_ovr <= 89 and level < 5:
+                raise ValueError(f"{player_record['name']} cần đạt +5 trở lên mới được đăng bán.")
+            if 90 <= current_ovr <= 95 and level < 3:
+                raise ValueError(f"{player_record['name']} cần đạt +3 trở lên mới được đăng bán.")
+            try:
+                asking_price = float(request.form.get(f"price_{group}_{index}", current_value))
+            except (TypeError, ValueError):
+                raise ValueError(f"Giá bán của {player_record['name']} không hợp lệ.")
+            if not math.isfinite(asking_price) or asking_price < current_value * .90 - 1e-8 or asking_price > current_value * 1.10 + 1e-8:
+                raise ValueError(f"Giá bán {player_record['name']} phải nằm trong khoảng 90%–110% giá trị hiện tại.")
+            parsed.append((group, index, copy.deepcopy(player_record), round(asking_price, 2)))
+
+        # Validate everything first, then remove in descending index order to keep indexes stable.
+        for group, index, player_record, asking_price in parsed:
+            db.session.add(PlayerMarketListing(
+                seller_id=current_user.id, player_name=player_record["name"],
+                player_data=player_record, player_group=group,
+                asking_price=asking_price, status="active"
+            ))
+        by_group = {"bench": [], "extras": []}
+        for group, index, _, _ in parsed:
+            by_group[group].append(index)
+        for group, indexes in by_group.items():
+            for index in sorted(indexes, reverse=True):
+                player_record = state[group].pop(index)
+                _mark_market_removed(state, player_record["name"])
+        _write_state(save, state)
+        db.session.commit()
+        flash(f"Đã đăng bán thành công {len(parsed)} cầu thủ.")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc))
+    except Exception:
+        db.session.rollback()
+        flash("Không thể đăng bán hàng loạt. Dữ liệu đội hình và tin đăng được giữ nguyên.")
     return redirect(url_for("player_market.player_market"))
 
 
@@ -273,14 +331,6 @@ def player_market_buy(listing_id):
 
         if buyer_state["budget"] + 1e-9 < price:
             raise ValueError("Bạn không đủ ngân sách để mua cầu thủ này.")
-
-        if any(
-            str(item.get("name", "")).casefold()
-            == listing.player_name.casefold()
-            for group in ("starting", "bench", "extras")
-            for item in buyer_state.get(group, [])
-        ):
-            raise ValueError("Bạn đã sở hữu cầu thủ này rồi.")
 
         # Chỉ một giao dịch được phép chuyển tin đăng sang sold.
         from sqlalchemy import update
