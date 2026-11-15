@@ -30,8 +30,46 @@ try {
   const circle=new THREE.Mesh(new THREE.RingGeometry(9.05,9.22,80),white);circle.rotation.x=-Math.PI/2;circle.position.y=.05;scene.add(circle);
   function boxMark(x,z,w,d){line(x-w/2,z-d/2,x+w/2,z-d/2);line(x-w/2,z+d/2,x+w/2,z+d/2);line(x-w/2,z-d/2,x-w/2,z+d/2);line(x+w/2,z-d/2,x+w/2,z+d/2);}
   boxMark(-74,0,32,64);boxMark(74,0,32,64);boxMark(-84,0,12,30);boxMark(84,0,12,30);
-  const goalMat=new THREE.MeshStandardMaterial({color:0xf0f2ed,metalness:.2,roughness:.45});
-  function makeGoal(x){const g=new THREE.Group();g.position.x=x;scene.add(g);const width=7.32,height=2.45,depth=3.2;for(const z of [-width/2,width/2]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,height,10),goalMat);p.position.set(0,height/2,z);g.add(p);}const bar=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,width,10),goalMat);bar.rotation.x=Math.PI/2;bar.position.y=height;g.add(bar);const net=new THREE.Mesh(new THREE.BoxGeometry(depth,height,width),new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.18}));net.position.set(x<0?-depth/2:depth/2,height/2,0);g.add(net);}
+  const goalMat=new THREE.MeshStandardMaterial({color:0xf7f8f4,metalness:.08,roughness:.42});
+  const netMat=new THREE.LineBasicMaterial({color:0xe8edf0,transparent:true,opacity:.62});
+  function makeGoal(x){
+    const g=new THREE.Group();g.position.x=x;scene.add(g);
+    const width=7.32,height=2.45,depth=3.2,back=x<0?-depth:depth;
+    // Chỉ dựng bộ khung cầu môn thật: hai cột dọc và một xà ngang.
+    for(const z of [-width/2,width/2]){
+      const post=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,height,12),goalMat);
+      post.position.set(0,height/2,z);post.castShadow=true;g.add(post);
+      const rear=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,height,8),goalMat);
+      rear.position.set(back,height/2,z);g.add(rear);
+      const sideTop=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,depth,8),goalMat);
+      sideTop.rotation.z=Math.PI/2;sideTop.position.set(back/2,height,z);g.add(sideTop);
+      const sideBottom=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,depth,8),goalMat);
+      sideBottom.rotation.z=Math.PI/2;sideBottom.position.set(back/2,.08,z);g.add(sideBottom);
+    }
+    const bar=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,width,12),goalMat);
+    bar.rotation.x=Math.PI/2;bar.position.y=height;bar.castShadow=true;g.add(bar);
+    // Lưới là các sợi mảnh, không dùng BoxGeometry wireframe (dễ tạo cảm giác hai khối xám lồi ra).
+    const pts=[];
+    const add=(a,b)=>{pts.push(a[0],a[1],a[2],b[0],b[1],b[2]);};
+    const cols=18,rows=7;
+    for(let i=0;i<=cols;i++){
+      const z=-width/2+width*i/cols;
+      add([back,0,z],[back,height,z]);
+      add([back,height,z],[0,height,z]);
+    }
+    for(let j=0;j<=rows;j++){
+      const y=height*j/rows;
+      add([back,y,-width/2],[back,y,width/2]);
+      add([back,y,-width/2],[0,y,-width/2]);
+      add([back,y,width/2],[0,y,width/2]);
+    }
+    for(let i=0;i<=8;i++){
+      const z=-width/2+width*i/8;
+      add([0,height,z],[back,height,z]);
+    }
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+    g.add(new THREE.LineSegments(geo,netMat));
+  }
   makeGoal(-90);makeGoal(90);
   // Keep the playable camera view clean: no oversized stands or crowd meshes overlapping the pitch.
 
