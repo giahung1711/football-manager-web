@@ -1,0 +1,10 @@
+FOOTBALL MANAGER - 3D TACTICAL CAMERA UPDATE
+
+- Expanded pitch dimensions from 105 x 68 to 140 x 90 world units, with larger field markings, goals and stands.
+- Increased match viewport height to make the expanded pitch easier to read.
+- Replaced orbit/follow camera with a fixed broadcast angle. Camera no longer rotates; it only slides horizontally along the pitch following the ball.
+- Added automatic player switching to the nearest outfield home player whenever the away team controls the ball.
+- Added loose-ball pickup logic for either team.
+- Reworked teammate/opponent movement around role-based positioning: goalkeeper, defenders, midfielders and forwards have different target behavior. Only the two nearest away outfield players press when the home team has possession; the rest maintain shape.
+
+Validation: app.py compiles with py_compile; match3d/main.js passes node --check. Not live-browser tested; Three.js still loads from jsDelivr CDN.
