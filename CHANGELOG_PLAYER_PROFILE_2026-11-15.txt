@@ -1,0 +1,17 @@
+FOOTBALL MANAGER — PLAYER PROFILE UPDATE (2026-11-15)
+
+- Added the profile modal opened by the standalone football/avatar button on the game overview header.
+- Profile shows username, display club name, starting XI average OVR, squad value, win rate, and total matches exactly once.
+- Replaced the former club-rename status slot with total matches; no duplicate match count appears beneath win rate.
+- Added custom club display name stored in the player's existing GameSave JSON state. Original club selection remains intact for game simulation. Dashboard and leaderboard use the custom display name; friend list/profile also show it.
+- Club rename costs 20,000 PG per actual name change. Insufficient balance rejects the change; submitting the same name does not charge.
+- Added freeform profile note (up to 500 characters).
+- Added avatar upload (PNG/JPG/WEBP, max 2 MB); displayed cropped inside a circular avatar and used in the game header and friend list/profile.
+- Added reserved trophy display area for future title implementation.
+- No database schema migration required; profile fields are stored in the existing JSON game save.
+
+Validation performed:
+- Python syntax compilation passed for app.py, game_engine.py, marketplace.py, daily_quests.py.
+- All Jinja templates parsed successfully using Jinja2 with the app's custom money filter stubbed.
+- Flask integration/test-client could not run in this environment because Flask is not installed.
+- Not deployed to production.

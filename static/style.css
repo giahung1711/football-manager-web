@@ -1663,3 +1663,34 @@
 .bulk-market-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0 18px;border-bottom:1px solid var(--line)}.bulk-market-toolbar label{display:flex;align-items:center;gap:8px}.bulk-market-toolbar input,.market-player-select input{width:18px;height:18px;margin:0;accent-color:var(--green)}.market-player-select{display:flex;align-items:center;gap:12px;min-width:0}.market-player-select>div{min-width:0}.market-price-field{display:grid;gap:5px;min-width:180px;font-size:12px;color:var(--muted)}.market-price-field input{margin:0}.market-player-checkbox-placeholder{width:18px;flex:0 0 18px}.leaderboard-tabs{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.leaderboard-empty{text-align:center;padding:35px 12px}.leaderboard-empty h3{font-size:24px}@media(max-width:650px){.market-own-player{align-items:flex-start;flex-direction:column}.market-price-field{width:100%}.bulk-market-toolbar{align-items:flex-start;flex-direction:column}.bulk-market-toolbar button{width:100%}}
 
 .sell-player-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}.sell-player-row input{width:18px;height:18px;margin:0;accent-color:var(--green);flex:0 0 18px}.sell-player-row span{display:grid;gap:3px}.sell-player-row small{font-size:11px;color:var(--muted)}
+
+/* Player profile modal and circular account avatar */
+.profile-avatar-trigger{padding:0;overflow:hidden;flex:0 0 auto;cursor:pointer;box-shadow:0 0 24px #a5d98a33}
+.profile-avatar-trigger img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profile-modal{z-index:10050;overflow-y:auto;align-items:flex-start}
+.profile-dialog{position:relative;width:min(680px,100%);max-height:calc(100vh - 32px);overflow:auto;margin:auto;padding:28px;border:1px solid #789dce66;border-radius:22px;background:radial-gradient(circle at 90% 0%,#33316c 0,transparent 36%),linear-gradient(145deg,#151d38,#0c1224 75%);color:#f4f6ff;box-shadow:0 22px 80px #000a}
+.profile-close{position:absolute;right:16px;top:14px;width:36px;height:36px;border:1px solid #ffffff30;border-radius:50%;background:#ffffff12;color:white;font-size:25px;cursor:pointer}
+.profile-identity{display:flex;align-items:center;gap:16px;margin:12px 0 22px}
+.profile-identity h2{font-size:30px;margin:0 0 4px}
+.profile-identity p{margin:0}
+.profile-avatar{width:82px;height:82px;flex:0 0 82px;display:grid;place-items:center;overflow:hidden;border-radius:50%;border:2px solid #a8c8ff;background:linear-gradient(145deg,#414b82,#202b50);font-size:42px;box-shadow:0 0 24px #8baaff55}
+.profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0 22px}
+.profile-stats>div{min-width:0;padding:14px;border:1px solid #8baaff30;border-radius:12px;background:#ffffff08}
+.profile-stats span{display:block;margin-bottom:7px;color:#aebde5;font-size:10px;font-weight:800;letter-spacing:1px}
+.profile-stats strong{display:block;overflow-wrap:anywhere;color:#e8edff;font:700 21px 'Barlow Condensed',sans-serif}
+.profile-section{padding:16px 0;border-top:1px solid #ffffff18}
+.profile-section h3{margin:0 0 9px;color:#c8d6ff;font-size:21px}
+.profile-section p{margin:4px 0 12px}
+.profile-section form{display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap}
+.profile-section input:not([type=file]),.profile-section textarea{width:100%;max-width:100%;background:#090f20;border:1px solid #52628c;color:#fff;border-radius:9px;padding:12px}
+.profile-section input[type=file]{max-width:100%;font-size:12px}
+.profile-section textarea{resize:vertical}
+.profile-section small{display:block;width:100%;color:#9eacd0;font-size:11px;margin-top:-5px}
+.profile-section .button{flex:0 0 auto}
+.trophy-placeholder{min-height:95px}
+@media(max-width:520px){.profile-dialog{padding:22px 17px}.profile-stats{grid-template-columns:1fr 1fr}.profile-stats>div{padding:11px}.profile-stats strong{font-size:18px}.profile-identity h2{font-size:25px}}
+
+.friend-avatar{overflow:hidden}.friend-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+.friend-profile-heading{display:flex;align-items:center;gap:14px}.friend-profile-avatar{width:62px;height:62px;flex:0 0 62px;font-size:24px}.friend-profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}

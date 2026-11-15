@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}{{ state.club }} · FOOTBALL MANAGER{% endblock %}
+{% block title %}{{ data.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
-<div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{state.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><div class="club-mark large">⚽</div></div>
+<div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{data.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><button type="button" class="club-mark large profile-avatar-trigger" id="openPlayerProfile" aria-label="Mở hồ sơ người chơi">{% if state.get('profile_avatar') %}<img src="{{state.profile_avatar}}" alt="Ảnh đại diện">{% else %}⚽{% endif %}</button></div>
 <div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong data-budget-balance>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
 <nav class="game-nav">
 {% for key,label in [('overview','Tổng quan'),('daily','Nhiệm vụ ngày'),('squad','Đội hình'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
@@ -562,4 +562,28 @@ timers.push(setTimeout(()=>{club.classList.add('shown');status.textContent='Huy 
 timers.push(setTimeout(()=>{flag.classList.add('hidden');pos.classList.add('hidden');club.classList.add('hidden');card.classList.add('shown');status.textContent='Cầu thủ đã xuất hiện!';},6000));
 skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();});})();
 </script>{% endif %}
+<div class="fm-modal profile-modal" id="playerProfileModal" hidden>
+  <section class="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="playerProfileTitle">
+    <button type="button" class="profile-close" id="closePlayerProfile" aria-label="Đóng">×</button>
+    <p class="eyebrow">MANAGER ID · PLAYER PROFILE</p>
+    <div class="profile-identity">
+      <div class="profile-avatar">{% if state.get('profile_avatar') %}<img src="{{state.profile_avatar}}" alt="Avatar">{% else %}⚽{% endif %}</div>
+      <div><h2 id="playerProfileTitle">{{current_user.username}}</h2><p class="muted">Hồ sơ người chơi</p></div>
+    </div>
+    <div class="profile-stats">
+      <div><span>TÊN CLB</span><strong>{{data.club}}</strong></div>
+      <div><span>OVR ĐỘI HÌNH</span><strong>{{data.average_rating}}</strong></div>
+      <div><span>GIÁ TRỊ ĐỘI HÌNH</span><strong>{{data.squad_value|money}}</strong></div>
+      <div><span>TỈ LỆ THẮNG</span><strong>{{profile_win_rate}}%</strong></div>
+      <div><span>SỐ TRẬN ĐÃ THI ĐẤU</span><strong>{{profile_matches}}</strong></div>
+    </div>
+    <div class="profile-section"><h3>Ảnh đại diện</h3><form method="post" action="{{url_for('profile_upload_avatar')}}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{admin_csrf_token}}"><input type="file" name="avatar" accept="image/png,image/jpeg,image/webp" required><small>PNG, JPG hoặc WEBP · tối đa 2 MB · ảnh được hiển thị trong khung tròn</small><button class="button" type="submit">Cập nhật avatar</button></form></div>
+    <div class="profile-section"><h3>Đổi tên CLB</h3><p class="muted">Mỗi lần đổi tên tốn <b>20.000 PG</b>. Số dư hiện tại: {{state.get('pg_balance',0)|int}} PG.</p><form method="post" action="{{url_for('profile_change_club_name')}}"><input type="hidden" name="csrf_token" value="{{admin_csrf_token}}"><input name="club_name" maxlength="28" value="{{state.get('custom_club_name') or state.club}}" placeholder="Nhập tên CLB mới" required><button class="button primary" type="submit">Đổi tên · 20.000 PG</button></form></div>
+    <div class="profile-section"><h3>Ghi chú</h3><form method="post" action="{{url_for('profile_update_note')}}"><input type="hidden" name="csrf_token" value="{{admin_csrf_token}}"><textarea name="note" maxlength="500" rows="3" placeholder="Viết điều bạn muốn mọi người biết...">{{state.get('profile_note','')}}</textarea><button class="button" type="submit">Lưu ghi chú</button></form></div>
+    <div class="profile-section trophy-placeholder"><h3>🏆 Danh hiệu</h3><p class="muted">Khu vực treo danh hiệu sẽ được cập nhật sau.</p></div>
+  </section>
+</div>
+<script>
+(()=>{const modal=document.getElementById('playerProfileModal'),open=document.getElementById('openPlayerProfile'),close=document.getElementById('closePlayerProfile');if(!modal||!open||!close)return;open.addEventListener('click',()=>modal.hidden=false);close.addEventListener('click',()=>modal.hidden=true);modal.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});document.addEventListener('keydown',e=>{if(e.key==='Escape')modal.hidden=true;});})();
+</script>
 {% endblock %}

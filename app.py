@@ -15,6 +15,7 @@ app.register_blueprint(player_market_bp)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deploying')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///football_manager.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 3 * 1024 * 1024
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 db.init_app(app)
@@ -116,7 +117,7 @@ def page(save, tab='overview', extra=None):
     ballon_reveal_meta = enrich_player(ballon_reveal) if ballon_reveal else None
     if ballon_reveal:
         persist(save, st)
-    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
+    return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, profile_matches=int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0), profile_win_rate=round(100*int(st.get('wins', 0) or 0)/max(1,int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0)),1), daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
                            prices={p['name']:value(p) for p in all_players(st)}, player_value=value, packs=PACKS,
                            market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
 
@@ -165,6 +166,92 @@ def choose_club():
 def dashboard():
     save=current_save()
     return redirect(url_for('choose_club')) if not save else page(save)
+@app.post('/profile/club-name')
+@login_required
+def profile_change_club_name():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('dashboard'))
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    new_name = request.form.get('club_name', '').strip()
+    if not new_name or len(new_name) > 28:
+        flash('Tên CLB phải có từ 1 đến 28 ký tự.')
+        return redirect(url_for('dashboard'))
+    state = load_state(save)
+    if new_name == (state.get('custom_club_name') or state.get('club')):
+        flash('Tên CLB không thay đổi, bạn chưa bị trừ PG.')
+        return redirect(url_for('dashboard'))
+    balance = int(state.get('pg_balance', 0) or 0)
+    if balance < 20000:
+        flash('Không đủ PG. Đổi tên CLB cần 20.000 PG.')
+        return redirect(url_for('dashboard'))
+    state['pg_balance'] = balance - 20000
+    state['custom_club_name'] = new_name
+    persist(save, state)
+    flash(f'Đổi tên CLB thành công: {new_name}. Đã trừ 20.000 PG.')
+    return redirect(url_for('dashboard'))
+
+@app.post('/profile/note')
+@login_required
+def profile_update_note():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('dashboard'))
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    state['profile_note'] = request.form.get('note', '').strip()[:500]
+    persist(save, state)
+    flash('Đã cập nhật ghi chú hồ sơ.')
+    return redirect(url_for('dashboard'))
+
+@app.post('/profile/avatar')
+@login_required
+def profile_upload_avatar():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('dashboard'))
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    upload = request.files.get('avatar')
+    if not upload or not upload.filename:
+        flash('Anh chưa chọn ảnh đại diện.')
+        return redirect(url_for('dashboard'))
+    ext = upload.filename.rsplit('.', 1)[-1].lower() if '.' in upload.filename else ''
+    if ext not in {'png', 'jpg', 'jpeg', 'webp'}:
+        flash('Ảnh đại diện chỉ hỗ trợ PNG, JPG hoặc WEBP.')
+        return redirect(url_for('dashboard'))
+    upload.stream.seek(0, os.SEEK_END)
+    size = upload.stream.tell()
+    upload.stream.seek(0)
+    if size <= 0 or size > 2 * 1024 * 1024:
+        flash('Ảnh đại diện phải nhỏ hơn hoặc bằng 2 MB.')
+        return redirect(url_for('dashboard'))
+    upload_dir = os.path.join(app.static_folder, 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = f'profile_{current_user.id}.{ext}'
+    # Remove an older avatar extension for this account.
+    for old_ext in ('png', 'jpg', 'jpeg', 'webp'):
+        old_path = os.path.join(upload_dir, f'profile_{current_user.id}.{old_ext}')
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    upload.save(os.path.join(upload_dir, filename))
+    state = load_state(save)
+    state['profile_avatar'] = url_for('static', filename=f'uploads/{filename}')
+    persist(save, state)
+    flash('Đã cập nhật ảnh đại diện.')
+    return redirect(url_for('dashboard'))
+
 @app.route('/leaderboard')
 @login_required
 def leaderboard():
@@ -614,11 +701,14 @@ def get_user_profile(user):
     wins = sum(1 for m in history if m.get('result') == 'Thắng')
     draws = sum(1 for m in history if m.get('result') == 'Hòa')
     losses = sum(1 for m in history if m.get('result') == 'Thua')
-    starters = state.get('starting', [])
-    ovr_values = [float(x.get('rating', 0)) + float(x.get('level', 0)) for x in starters]
+    dashboard_data = get_dashboard(state) if state else {}
+    ovr_average = float(dashboard_data.get('average_rating', 0) or 0)
     online = bool(user.last_seen_at and user.last_seen_at >= datetime.utcnow() - timedelta(seconds=90))
     return {'user': user, 'state': state, 'history': history, 'wins': wins, 'draws': draws, 'losses': losses,
-            'ovr': round(sum(ovr_values)/len(ovr_values), 1) if ovr_values else 0, 'online': online}
+            'club_name': state.get('custom_club_name') or state.get('club', 'Chưa chọn'),
+            'matches': int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0),
+            'win_rate': round(100*int(state.get('wins', 0) or 0)/max(1,int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0)),1),
+            'ovr': ovr_average, 'online': online}
 
 @app.before_request
 def update_presence():

@@ -763,7 +763,7 @@ def get_dashboard(st):
     arr = st['starting']
 
     return {
-        "club": st['club'],
+        "club": st.get('custom_club_name') or st['club'],
         "budget": st['budget'],
         "season": st['season'],
         "week": st['week'],
