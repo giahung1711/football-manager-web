@@ -6,7 +6,7 @@
   <div class="friend-profile-layout">
     <div>
       <div class="stats friend-profile-stats"><div class="stat"><span>TÊN CLB</span><strong>{{ profile.club_name }}</strong></div><div class="stat"><span>OVR ĐỘI HÌNH</span><strong>{{ profile.ovr }}</strong></div><div class="stat"><span>GIÁ TRỊ ĐỘI HÌNH</span><strong>{{ profile.squad_value|money }} PC</strong></div><div class="stat"><span>TỈ LỆ THẮNG</span><strong>{{ profile.win_rate }}%</strong></div><div class="stat"><span>SỐ TRẬN ĐÃ ĐẤU</span><strong>{{ profile.matches }}</strong></div></div>
-      {% if profile.state.get('profile_note') %}<section class="panel friends-section"><h2>Ghi chú</h2><p class="friend-readonly-note">{{ profile.state.profile_note }}</p></section>{% endif %}
+      {% if profile.state.get('profile_note') %}<section class="panel friends-section"><h2>Ghi chú</h2><p class="friend-readonly-note">{{ profile.state.profile_note[:100] }}</p></section>{% endif %}
       <section class="panel friends-section friend-profile-trophies"><h2>🏆 Danh hiệu</h2>{% if profile.trophies %}<div class="profile-trophies">{% for trophy in profile.trophies %}<div class="profile-trophy {{ trophy.frame_class or 'trophy-gold' }}"><strong>🏆 {{ trophy.name }}</strong>{% if trophy.description %}<small>{{ trophy.description }}</small>{% endif %}<small>{{ trophy.frame_label or 'Danh hiệu' }} · {{ trophy.awarded_at or '' }}</small></div>{% endfor %}</div>{% else %}<p class="muted">{% if not profile.trophies_visible %}Người chơi đang ẩn danh hiệu trên hồ sơ.{% else %}Người chơi chưa có danh hiệu được treo.{% endif %}</p>{% endif %}</section>
     </div>
     <div>

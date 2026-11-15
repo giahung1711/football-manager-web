@@ -207,7 +207,7 @@ def profile_update_note():
     if not save:
         return redirect(url_for('choose_club'))
     state = load_state(save)
-    state['profile_note'] = request.form.get('note', '').strip()[:500]
+    state['profile_note'] = request.form.get('note', '').strip()[:100]
     persist(save, state)
     flash('Đã cập nhật ghi chú hồ sơ.')
     return redirect(url_for('dashboard'))
@@ -773,10 +773,15 @@ def profile_trophies_visibility():
         flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
         return redirect(url_for('dashboard'))
     state = load_state(save)
-    visible = request.form.get('visible') == '1'
-    state['profile_trophies_visible'] = visible
+    selected_ids = set(request.form.getlist('visible_trophy_ids'))
+    trophies = state.setdefault('profile_trophies', [])
+    for trophy in trophies:
+        # Old trophies default to visible until the player changes their selection.
+        trophy['visible'] = str(trophy.get('id')) in selected_ids
+    state['profile_trophies_visible'] = True
     persist(save, state)
-    flash('Đã bật hiển thị danh hiệu trên hồ sơ.' if visible else 'Đã ẩn danh hiệu khỏi hồ sơ. Danh hiệu vẫn được giữ trong kho.')
+    visible_count = sum(1 for trophy in trophies if trophy.get('visible', True))
+    flash(f'Đã lưu lựa chọn hiển thị: {visible_count}/{len(trophies)} danh hiệu. Danh hiệu bị ẩn vẫn được giữ trong kho.')
     return redirect(url_for('dashboard'))
 
 
@@ -801,7 +806,7 @@ def get_user_profile(user):
             'club_name': state.get('custom_club_name') or state.get('club', 'Chưa chọn'),
             'matches': int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0),
             'win_rate': round(100*int(state.get('wins', 0) or 0)/max(1,int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0)),1),
-            'ovr': ovr_average, 'online': online, 'squad_value': float(dashboard_data.get('squad_value', 0) or 0), 'trophies': state.get('profile_trophies', []) if state.get('profile_trophies_visible', True) else [], 'trophies_visible': state.get('profile_trophies_visible', True)}
+            'ovr': ovr_average, 'online': online, 'squad_value': float(dashboard_data.get('squad_value', 0) or 0), 'trophies': [t for t in state.get('profile_trophies', []) if t.get('visible', True)] if state.get('profile_trophies_visible', True) else [], 'trophies_visible': state.get('profile_trophies_visible', True)}
 
 @app.before_request
 def update_presence():
