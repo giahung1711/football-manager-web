@@ -1,0 +1,11 @@
+ACADEMIC LEAGUE (A1 CUP)
+- Added a new Giải đấu navigation item between Trận đấu 3D and BXH.
+- Added the A1 Cup tournament bracket page with quarter-finals, semi-finals, third-place match and final.
+- Season 1 is scheduled for Sunday 22/11/2026 at 18:00 Vietnam time; its top-8 draw is frozen in the database as soon as the deployed server has at least eight eligible OVR leaderboard clubs.
+- Later seasons are drawn automatically every Sunday at 18:00 Vietnam time using the then-current top eight OVR leaderboard clubs.
+- Added automatic weekly schedule: Sun 18:15/18:30; Mon-Fri 19:45/20:00; Sat 10:50/19:00.
+- Added server-side APScheduler processing with persistent database results and catch-up handling for overdue fixtures.
+- Added automatic match simulation, two-leg aggregate progression, penalty shoot-outs for tied aggregate scores, and extra time + penalties for one-match third-place/final fixtures.
+- Added prizes: champion 5,000,000,000 PC + 20,000 PG; runner-up 3,000,000,000 PC + 10,000 PG; third place 1,000,000,000 PC + 5,000 PG.
+- The first season draw is frozen; later OVR changes do not alter the bracket. Future seasons draw a fresh top eight and fresh pairings.
+- PC prize values are credited using the game's existing budget unit (millions of PC); PG is credited to pg_balance.

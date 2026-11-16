@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}FOOTBALL MANAGER{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261109-player-market1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261116-a1cup">
 </head>
 <body>
 <header class="topbar">
@@ -15,6 +15,7 @@
     <a href="{{ url_for('dashboard') }}">Tổng quan</a>
     <a href="{{ url_for('match_3d') }}">Trận đấu 3D</a>
     {% if not current_user.is_admin %}
+    <a href="{{ url_for('tournament') }}">Giải đấu</a>
     <a href="{{ url_for('leaderboard') }}">BXH toàn server</a>
     <a href="{{ url_for('friends') }}">Bạn bè</a>
     <a href="{{ url_for('mailbox') }}">Hòm thư</a>

@@ -2,7 +2,7 @@ import os, random, copy, math, secrets, hmac
 from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge
+from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge, A1CupSeason
 from marketplace import player_market_bp
 from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
@@ -51,6 +51,7 @@ with app.app_context():
         User.query.filter(User.id != admin.id).update({User.is_admin: False})
         db.session.commit()
 
+# Start the persistent server-side A1 Cup clock after database tables/migrations are ready.
 def admin_required(view):
     from functools import wraps
     @wraps(view)
@@ -1435,9 +1436,299 @@ def action():
         return jsonify({'ok': True, **upgrade_response})
     return redirect(request.referrer or url_for('dashboard'))
 def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
+# ---------------- Academic League (A1 Cup) ----------------
+from zoneinfo import ZoneInfo
+A1_TZ = ZoneInfo('Asia/Ho_Chi_Minh')
+A1_FIRST_START = datetime(2026, 11, 22, 18, 0)
+A1_CUP_NAME = 'Academic League (A1 Cup)'
+
+
+def a1_now():
+    return datetime.now(A1_TZ).replace(tzinfo=None)
+
+
+def a1_ranked_teams():
+    ranked = []
+    for account in User.query.filter_by(is_admin=False).order_by(User.id.asc()).all():
+        save = GameSave.query.filter_by(user_id=account.id).first()
+        if not save:
+            continue
+        state = load_state(save)
+        if not state.get('starting'):
+            continue
+        data = get_dashboard(state)
+        if float(data.get('average_rating', 0) or 0) <= 97:
+            continue  # Match the eligibility rule of the server OVR leaderboard.
+        ranked.append({
+            'user_id': account.id, 'username': account.username,
+            'club': state.get('custom_club_name') or state.get('club') or 'CLB',
+            'ovr': float(data.get('average_rating', 0) or 0),
+            'matches': int(data.get('matches_played', 0) or 0),
+            'players': [str(x.get('name', 'Cầu thủ')) for x in state.get('starting', [])[:11]],
+        })
+    ranked.sort(key=lambda x: (x['ovr'], x['matches'], x['username'].casefold()), reverse=True)
+    return ranked[:8]
+
+
+def a1_schedule_for(start_at):
+    # Fixed 14-match weekly calendar, all times are Vietnam local time.
+    # start_at is Sunday 18:00; build fixtures from that Sunday's midnight.
+    week_start = start_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    slots = [
+        (0,18,15,'Tứ kết','A',1), (0,18,30,'Tứ kết','B',1),
+        (1,19,45,'Tứ kết','C',1), (1,20,0,'Tứ kết','D',1),
+        (2,19,45,'Tứ kết','A',2), (2,20,0,'Tứ kết','B',2),
+        (3,19,45,'Tứ kết','C',2), (3,20,0,'Tứ kết','D',2),
+        (4,19,45,'Bán kết','SF1',1), (4,20,0,'Bán kết','SF2',1),
+        (5,19,45,'Bán kết','SF1',2), (5,20,0,'Bán kết','SF2',2),
+        (6,10,50,'Tranh hạng 3','THIRD',1), (6,19,0,'Chung kết','FINAL',1),
+    ]
+    matches=[]
+    for idx,(day,hour,minute,stage,pair,leg) in enumerate(slots,1):
+        when=week_start + timedelta(days=day, hours=hour, minutes=minute)
+        matches.append({'id':idx,'stage':stage,'pair':pair,'leg':leg,'starts_at':when.isoformat(timespec='minutes'),
+                        'status':'scheduled','home':None,'away':None,'result':None})
+    return matches
+
+
+def a1_create_season(start_at):
+    if A1CupSeason.query.filter_by(start_at=start_at).first():
+        return None
+    teams = a1_ranked_teams()
+    if len(teams) < 8:
+        app.logger.warning('A1 Cup: cần ít nhất 8 CLB có đội hình để bốc thăm; hiện có %s.', len(teams))
+        return None
+    shuffled = copy.deepcopy(teams)
+    random.shuffle(shuffled)
+    pairs = {letter: [shuffled[i], shuffled[i+1]] for letter,i in zip('ABCD', range(0,8,2))}
+    matches = a1_schedule_for(start_at)
+    for match in matches:
+        if match['stage']=='Tứ kết':
+            pair = pairs[match['pair']]
+            match['home'] = copy.deepcopy(pair[0] if match['leg']==1 else pair[1])
+            match['away'] = copy.deepcopy(pair[1] if match['leg']==1 else pair[0])
+    season_no = (db.session.query(db.func.max(A1CupSeason.season_number)).scalar() or 0) + 1
+    season = A1CupSeason(season_number=season_no, name=A1_CUP_NAME, start_at=start_at,
+                         teams=copy.deepcopy(teams), matches=matches)
+    db.session.add(season); db.session.commit()
+    return season
+
+
+def a1_ensure_season():
+    now = a1_now()
+    latest = A1CupSeason.query.order_by(A1CupSeason.season_number.desc()).first()
+    if latest is None:
+        # Draw season 1 in advance for the fixed inaugural kickoff on Sunday 22/11/2026.
+        # If the host wakes late, the scheduler catches up its overdue fixtures in order.
+        a1_create_season(A1_FIRST_START)
+        return
+    next_start = latest.start_at + timedelta(days=7)
+    if now >= next_start:
+        a1_create_season(next_start)
+
+
+def a1_roll_score(home, away):
+    # Lightweight automatic match simulation using the frozen OVR from the draw.
+    def goals(att, deff):
+        lam = max(0.25, min(3.4, 1.35 + (float(att)-float(deff))*0.045 + random.uniform(-0.25,0.25)))
+        p = math.exp(-lam); cumulative=p; r=random.random(); count=0
+        while r>cumulative and count<7:
+            count+=1; p*=lam/count; cumulative+=p
+        return count
+    return goals(home.get('ovr',60), away.get('ovr',60)), goals(away.get('ovr',60), home.get('ovr',60))
+
+
+def a1_penalties(home, away):
+    # Simulated shoot-out winner; no extra score is added to the match score.
+    return home if random.random() < (0.5 + max(-0.12,min(0.12,(float(home.get('ovr',60))-float(away.get('ovr',60)))*0.008))) else away
+
+
+def a1_match_result(home, away, allow_extra=False):
+    gh,ga=a1_roll_score(home,away)
+    extra_h=extra_a=0; penalty_winner=None; went_extra=bool(allow_extra and gh==ga)
+    if went_extra:
+        extra_h,extra_a=a1_roll_score({**home,'ovr':float(home.get('ovr',60))-2},{**away,'ovr':float(away.get('ovr',60))-2})
+        # Extra-time score is intentionally limited to a small increment.
+        extra_h=min(extra_h,2); extra_a=min(extra_a,2)
+        gh+=extra_h; ga+=extra_a
+        if gh==ga:
+            penalty_winner=a1_penalties(home,away)
+    scorer_h=random.sample(home.get('players') or [home['club']], min(gh, len(home.get('players') or [home['club']]))) if gh else []
+    scorer_a=random.sample(away.get('players') or [away['club']], min(ga, len(away.get('players') or [away['club']]))) if ga else []
+    return {'home_goals':gh,'away_goals':ga,'score':f'{gh} - {ga}',
+            'extra_time':went_extra,
+            'extra_time_score':f'{extra_h} - {extra_a}' if went_extra else None,
+            'penalties':bool(penalty_winner), 'penalty_winner_id':penalty_winner.get('user_id') if penalty_winner else None,
+            'winner_id':(home if gh>ga else away if ga>gh else penalty_winner).get('user_id') if (gh!=ga or penalty_winner) else None,
+            'scorers_home':scorer_h,'scorers_away':scorer_a}
+
+
+def a1_pair_winner(season, pair):
+    legs=[m for m in (season.matches or []) if m['stage']=='Tứ kết' and m['pair']==pair and m['status']=='completed']
+    if len(legs)<2: return None
+    totals={}
+    for m in legs:
+        h,a=m['home'],m['away']; r=m['result']
+        totals[h['user_id']]=totals.get(h['user_id'],0)+r['home_goals']
+        totals[a['user_id']]=totals.get(a['user_id'],0)+r['away_goals']
+    if totals[legs[0]['home']['user_id']] == totals[legs[0]['away']['user_id']]:
+        winner_id=legs[1]['result'].get('winner_id')
+        return next((x for x in season.teams if x['user_id']==winner_id),None)
+    winner_id=max(totals,key=totals.get)
+    return next((x for x in season.teams if x['user_id']==winner_id),None)
+
+
+def a1_set_match_teams(season, pair, home, away):
+    for m in season.matches:
+        if m['pair']==pair and m['stage'] in ('Bán kết','Tranh hạng 3','Chung kết'):
+            if m['leg']==1:
+                m['home']=copy.deepcopy(home); m['away']=copy.deepcopy(away)
+            else:
+                m['home']=copy.deepcopy(away); m['away']=copy.deepcopy(home)
+
+
+def a1_refresh_bracket(season):
+    # Fill the two semi-final ties once all quarter-final return legs are complete.
+    qf_done=all(any(m['pair']==p and m['leg']==2 and m['status']=='completed' for m in season.matches) for p in 'ABCD')
+    if qf_done and not next((m for m in season.matches if m['pair']=='SF1' and m['home']),None):
+        winners={p:a1_pair_winner(season,p) for p in 'ABCD'}
+        if all(winners.values()):
+            a1_set_match_teams(season,'SF1',winners['A'],winners['B'])
+            a1_set_match_teams(season,'SF2',winners['C'],winners['D'])
+    sf_done=all(any(m['pair']==p and m['leg']==2 and m['status']=='completed' for m in season.matches) for p in ('SF1','SF2'))
+    if sf_done and not next((m for m in season.matches if m['pair']=='FINAL' and m['home']),None):
+        def winner_of(pair):
+            ms=[m for m in season.matches if m['pair']==pair and m['status']=='completed']
+            if len(ms)<2:return None
+            totals={}
+            for m in ms:
+                totals[m['home']['user_id']]=totals.get(m['home']['user_id'],0)+m['result']['home_goals']
+                totals[m['away']['user_id']]=totals.get(m['away']['user_id'],0)+m['result']['away_goals']
+            if totals[ms[0]['home']['user_id']]==totals[ms[0]['away']['user_id']]:
+                return next((t for t in season.teams if t['user_id']==ms[1]['result'].get('winner_id')),None)
+            return next((t for t in season.teams if t['user_id']==max(totals,key=totals.get)),None)
+        winners=[winner_of('SF1'),winner_of('SF2')]
+        if all(winners):
+            losers=[]
+            for pair,w in zip(('SF1','SF2'),winners):
+                ms=[m for m in season.matches if m['pair']==pair and m['status']=='completed']
+                team_ids={ms[0]['home']['user_id'],ms[0]['away']['user_id']}
+                losers.append(next(t for t in season.teams if t['user_id'] in team_ids and t['user_id']!=w['user_id']))
+            a1_set_match_teams(season,'FINAL',winners[0],winners[1])
+            a1_set_match_teams(season,'THIRD',losers[0],losers[1])
+
+
+def a1_award_prizes(season):
+    if season.prizes_awarded: return
+    final=next((m for m in season.matches if m['pair']=='FINAL' and m['status']=='completed'),None)
+    third=next((m for m in season.matches if m['pair']=='THIRD' and m['status']=='completed'),None)
+    if not final or not third: return
+    champion_id=final['result']['winner_id']
+    runner_id=final['away']['user_id'] if final['home']['user_id']==champion_id else final['home']['user_id']
+    third_id=third['result']['winner_id']
+    season.champion_user_id=champion_id; season.runner_up_user_id=runner_id; season.third_user_id=third_id
+    rewards={champion_id:(5000,20000),runner_id:(3000,10000),third_id:(1000,5000)}
+    for uid,(pc_m,pg) in rewards.items():
+        save=GameSave.query.filter_by(user_id=uid).first()
+        if not save: continue
+        st=normalize_state(copy.deepcopy(save.state or {}))
+        st['budget']=round(float(st.get('budget',0) or 0)+pc_m,2)
+        st['pg_balance']=int(st.get('pg_balance',0) or 0)+pg
+        st.setdefault('activity',[]).insert(0,{'message':f'Nhận thưởng Academic League (A1 Cup): +{pc_m*1000000:,.0f} PC và +{pg:,} PG','week':st.get('week',1)})
+        st['activity']=st['activity'][:15]
+        save.state=copy.deepcopy(st)
+        db.session.add(save)
+    season.prizes_awarded=True
+
+
+def a1_process_due_matches():
+    with app.app_context():
+        try:
+            a1_ensure_season()
+            seasons=A1CupSeason.query.order_by(A1CupSeason.season_number.asc()).with_for_update().all()
+            if not seasons: return
+            now=a1_now(); any_changed=False
+            # Process every season in order. If the host was asleep, overdue fixtures
+            # are simulated chronologically instead of silently abandoning a week.
+            for season in seasons:
+                changed=False
+                for m in sorted(season.matches or [], key=lambda x:(x['starts_at'],x['id'])):
+                    scheduled=datetime.fromisoformat(m['starts_at'])
+                    if m['status']!='scheduled' or scheduled>now: continue
+                    if not m.get('home') or not m.get('away'): continue
+                    allow_extra=m['pair'] in ('FINAL','THIRD')
+                    result=a1_match_result(m['home'],m['away'],allow_extra=allow_extra)
+                    if m['stage'] in ('Tứ kết','Bán kết') and m['leg']==2:
+                        # Penalties decide a tie on aggregate after the second leg.
+                        previous=next((x for x in season.matches if x['pair']==m['pair'] and x['leg']==1 and x['status']=='completed'),None)
+                        if previous:
+                            first_home_total=previous['result']['home_goals'] + result['away_goals']
+                            first_away_total=previous['result']['away_goals'] + result['home_goals']
+                            if first_home_total==first_away_total:
+                                winner=a1_penalties(m['home'],m['away'])
+                                result['penalties']=True; result['penalty_winner_id']=winner['user_id']; result['winner_id']=winner['user_id']
+                            else:
+                                # In the return leg, the first-leg home team is the away team.
+                                result['winner_id']=m['away']['user_id'] if first_home_total>first_away_total else m['home']['user_id']
+                    m['result']=result; m['status']='completed'; m['played_at']=now.isoformat(timespec='minutes')
+                    changed=True
+                    a1_refresh_bracket(season)
+                if changed:
+                    a1_award_prizes(season)
+                    season.matches=copy.deepcopy(season.matches)
+                    db.session.add(season)
+                    any_changed=True
+            if any_changed:
+                db.session.commit()
+        except Exception:
+            db.session.rollback(); app.logger.exception('A1 Cup scheduler failed')
+
+
+def a1_start_scheduler():
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        if getattr(app,'_a1_scheduler',None): return
+        scheduler=BackgroundScheduler(timezone=A1_TZ, daemon=True)
+        scheduler.add_job(a1_process_due_matches,'interval',seconds=15,id='a1_cup_tick',max_instances=1,coalesce=True)
+        scheduler.start(); app._a1_scheduler=scheduler
+        a1_process_due_matches()
+    except Exception:
+        app.logger.exception('Could not start A1 Cup background scheduler')
+
+
+@app.route('/tournament')
+@login_required
+def tournament():
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    season=A1CupSeason.query.order_by(A1CupSeason.season_number.desc()).first()
+    if not season:
+        a1_ensure_season(); season=A1CupSeason.query.order_by(A1CupSeason.season_number.desc()).first()
+    matches=[]
+    podium={}
+    if season:
+        teams_by_id={t['user_id']:t for t in (season.teams or [])}
+        podium={
+            'champion':teams_by_id.get(season.champion_user_id),
+            'runner_up':teams_by_id.get(season.runner_up_user_id),
+            'third':teams_by_id.get(season.third_user_id),
+        }
+        matches=copy.deepcopy(season.matches or [])
+        weekday_vi=['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật']
+        for m in matches:
+            dt=datetime.fromisoformat(m['starts_at'])
+            m['starts_label']=f"{weekday_vi[dt.weekday()]} {dt.strftime('%d/%m · %H:%M')}"
+            for side in ('home','away'):
+                if m.get(side):
+                    m[side]['club_label']=m[side].get('club','CLB')
+    return render_template('tournament.html',season=season,matches=matches,podium=podium,now=a1_now())
+
 @app.route('/match-3d')
 @login_required
 def match_3d():
     return render_template('match_3d.html')
+
+# Scheduler is started once the full module (including A1 Cup functions) has loaded.
+a1_start_scheduler()
 
 if __name__=='__main__': app.run(debug=True)

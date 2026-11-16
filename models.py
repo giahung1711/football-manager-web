@@ -87,3 +87,18 @@ class PlayerMarketListing(db.Model):
         server_default=db.func.now()
     )
     sold_at = db.Column(db.DateTime, nullable=True)
+
+
+class A1CupSeason(db.Model):
+    __tablename__ = "a1_cup_season"
+    id = db.Column(db.Integer, primary_key=True)
+    season_number = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    name = db.Column(db.String(80), nullable=False, default="Academic League (A1 Cup)")
+    start_at = db.Column(db.DateTime, nullable=False, index=True)
+    teams = db.Column(JSON, nullable=False)
+    matches = db.Column(JSON, nullable=False)
+    champion_user_id = db.Column(db.Integer, nullable=True)
+    runner_up_user_id = db.Column(db.Integer, nullable=True)
+    third_user_id = db.Column(db.Integer, nullable=True)
+    prizes_awarded = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
