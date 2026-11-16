@@ -1514,6 +1514,51 @@ def a1_create_season(start_at):
     return season
 
 
+def a1_current_club_name(user_id, fallback='CLB'):
+    """Resolve a tournament participant's current club name from its live save.
+
+    Tournament fixtures intentionally retain participant IDs and frozen sporting
+    data (OVR/players), but the displayed club name must always follow profile renames.
+    """
+    try:
+        save = GameSave.query.filter_by(user_id=int(user_id)).first()
+        if save:
+            state = load_state(save)
+            return state.get('custom_club_name') or state.get('club') or fallback
+    except (TypeError, ValueError):
+        app.logger.warning('A1 Cup: invalid participant user_id %r', user_id)
+    return fallback
+
+
+def a1_refresh_display_names(season, matches, podium):
+    """Refresh names in every historical/current bracket slot by stable user ID."""
+    current_by_id = {}
+    for team in (season.teams or []):
+        uid = team.get('user_id')
+        if uid is None:
+            continue
+        team['club'] = a1_current_club_name(uid, team.get('club', 'CLB'))
+        current_by_id[str(uid)] = team
+
+    for match in matches:
+        for side in ('home', 'away'):
+            team = match.get(side)
+            if not team:
+                continue
+            current = current_by_id.get(str(team.get('user_id')))
+            if current:
+                team['club'] = current['club']
+                team['club_label'] = current['club']
+
+    for place in ('champion', 'runner_up', 'third'):
+        team = podium.get(place)
+        if team:
+            current = current_by_id.get(str(team.get('user_id')))
+            if current:
+                team['club'] = current['club']
+    return matches, podium
+
+
 def a1_ensure_season():
     now = a1_now()
     latest = A1CupSeason.query.order_by(A1CupSeason.season_number.desc()).first()
@@ -1715,6 +1760,7 @@ def tournament():
         }
         matches=copy.deepcopy(season.matches or [])
         weekday_vi=['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật']
+        matches, podium = a1_refresh_display_names(season, matches, podium)
         for m in matches:
             dt=datetime.fromisoformat(m['starts_at'])
             m['starts_label']=f"{weekday_vi[dt.weekday()]} {dt.strftime('%d/%m · %H:%M')}"
