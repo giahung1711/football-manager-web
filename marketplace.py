@@ -6,7 +6,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from models import db, GameSave, PlayerMarketListing, User
-from game_engine import normalize_state, player_upgrade_ovr, value
+from game_engine import normalize_state, player_upgrade_ovr, value, MAX_UPGRADE_LEVEL
 
 player_market_bp = Blueprint("player_market", __name__)
 
@@ -76,6 +76,25 @@ def player_market():
         )
         .all()
     )
+
+    # Build display-safe values for every listing. Never index a fixed-size
+    # OVR bonus array with the raw stored card level: malformed/legacy levels
+    # such as +585 must not crash the entire marketplace page.
+    for listing in active_listings:
+        player_data = listing.player_data if isinstance(listing.player_data, dict) else {}
+        try:
+            raw_level = int(player_data.get("level", 0) or 0)
+        except (TypeError, ValueError, OverflowError):
+            raw_level = 0
+        listing.display_level = raw_level
+        try:
+            listing.display_ovr = player_upgrade_ovr(player_data)
+        except (TypeError, ValueError, OverflowError):
+            try:
+                listing.display_ovr = int(player_data.get("rating", 80) or 80)
+            except (TypeError, ValueError, OverflowError):
+                listing.display_ovr = 80
+        listing.display_position = str(player_data.get("position", "—") or "—")
 
     seller_ids = {item.seller_id for item in active_listings}
 
@@ -459,9 +478,20 @@ def player_market_withdraw(listing_id):
         # Xóa dấu rời CLB trước khi trả cầu thủ về đội.
         _unmark_market_removed(state, listing.player_name)
 
-        state.setdefault(group, []).append(
-            copy.deepcopy(listing.player_data)
-        )
+        restored_player = copy.deepcopy(listing.player_data or {})
+        if not isinstance(restored_player, dict):
+            raise ValueError("Dữ liệu cầu thủ trong tin đăng không hợp lệ.")
+
+        # A card with an impossible level (e.g. +585) would also break other
+        # squad templates that display OVR using the supported +0..+8 table.
+        # Normalize only when returning it to the squad so the game remains usable.
+        try:
+            restored_level = int(restored_player.get("level", 0) or 0)
+        except (TypeError, ValueError, OverflowError):
+            restored_level = 0
+        restored_player["level"] = max(0, min(MAX_UPGRADE_LEVEL, restored_level))
+
+        state.setdefault(group, []).append(restored_player)
 
         _write_state(save, state)
         db.session.commit()

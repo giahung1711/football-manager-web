@@ -112,16 +112,11 @@
                 <strong>{{ listing.player_name }}</strong>
               </td>
 
-              <td>{{ listing.player_data.position }}</td>
+              <td>{{ listing.display_position }}</td>
 
-              <td>
-                {{ listing.player_data.rating
-                   + [0,1,2,3,4,6,8,10,13][listing.player_data.level|int] }}
-              </td>
+              <td>{{ listing.display_ovr }}</td>
 
-              <td>
-                +{{ listing.player_data.level|default(0) }}
-              </td>
+              <td>+{{ listing.display_level }}</td>
 
               <td>
                 {{ sellers.get(listing.seller_id, 'Người chơi') }}

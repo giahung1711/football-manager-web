@@ -1,0 +1,8 @@
+FIX CHỢ CẦU THỦ – CẤP THẺ BẤT THƯỜNG (+585)
+
+- Sửa lỗi trang Chợ cầu thủ bị lỗi khi tin đăng có cấp thẻ vượt +8.
+- Không còn truy cập trực tiếp mảng OVR bonus bằng cấp thẻ thô trong template.
+- OVR hiển thị sử dụng player_upgrade_ovr(), vốn giới hạn phép tính về cấp tối đa mà game hỗ trợ.
+- Cấp thẻ gốc trong tin đăng vẫn được hiển thị nguyên trạng; dữ liệu tin đăng và giá bán không bị tự ý xóa/sửa.
+- Khi người bán thu hồi tin +585, cầu thủ được trả về đội và cấp thẻ được chuẩn hóa về +8 (mức tối đa game hỗ trợ), tránh làm lỗi các màn hình đội hình khác.
+- Chỉ ảnh hưởng cầu thủ được thu hồi; không reset chợ, không xóa tài khoản, ngân sách, PG hoặc dữ liệu đội hình khác.
