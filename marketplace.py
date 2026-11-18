@@ -465,9 +465,9 @@ def player_market_withdraw(listing_id):
             else "bench"
         )
 
-        # Listing ID is the identity of the withdrawn card. Do not reject a
-        # return merely because another owned card has the same display name:
-        # duplicate names are valid (e.g. separate editions/gifts).
+        # Tin đăng lưu nguyên bản dữ liệu của đúng thẻ đã rời CLB.
+        # Không chặn thu hồi chỉ vì CLB có một thẻ khác trùng tên: các thẻ
+        # cùng tên/mùa/cấp có thể là những bản sao hợp lệ trong bộ sưu tập.
         # Xóa dấu rời CLB trước khi trả cầu thủ về đội.
         _unmark_market_removed(state, listing.player_name)
 

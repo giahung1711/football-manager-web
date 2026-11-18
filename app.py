@@ -1085,43 +1085,59 @@ def action():
             if duplicate: raise ValueError(f"Không thể thay: {inn['name']} đã có trong đội hình đá chính.")
             st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
         elif act=='drag_swap':
-            source_group=request.form.get('source_group',''); source_index=int(request.form.get('source_index','-1'))
-            target_index=int(request.form.get('target_index','-1')); target_group=request.form.get('target_group','')
-            allowed={'starting','bench','extras'}
-            if source_group not in allowed or target_group not in allowed: raise ValueError('Danh sách kéo thả không hợp lệ.')
+            source_group=request.form.get('source_group','')
+            source_index=int(request.form.get('source_index','-1'))
+            target_index=int(request.form.get('target_index','-1'))
+            target_group=request.form.get('target_group','starting')
+            valid_groups={'starting','bench','extras'}
+            if source_group not in valid_groups or target_group not in valid_groups:
+                raise ValueError('Danh sách kéo thả không hợp lệ.')
             source=st[source_group]
-            if source_index<0 or source_index>=len(source): raise ValueError('Không tìm thấy cầu thủ được kéo.')
-            if source_group==target_group and target_index==source_index: raise ValueError('Hãy chọn vị trí khác.')
+            target=st[target_group]
+            if source_index<0 or source_index>=len(source):
+                raise ValueError('Không tìm thấy cầu thủ được kéo.')
+            if source_group==target_group and source_index==target_index:
+                raise ValueError('Hãy chọn vị trí khác để đổi cầu thủ.')
             incoming=source[source_index]
-            if target_index == -1:
-                if source_group==target_group: raise ValueError('Không thể di chuyển cầu thủ vào cùng danh sách.')
-                if target_group=='starting':
-                    if len(st['starting'])>=11: raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ; hãy thả lên một thẻ để thay thế.')
-                    if len(st['starting'])==0 and str(incoming.get('position','')).upper()!='GK': raise ValueError('Đội hình cần có thủ môn trước.')
-                    if str(incoming.get('position','')).upper()=='GK' and any(str(x.get('position','')).upper()=='GK' for x in st['starting']): raise ValueError('Đội hình đã có thủ môn.')
-                elif target_group=='bench' and len(st['bench'])>=5:
-                    raise ValueError('Khu vực dự bị đã đủ 5 cầu thủ; hãy thả lên một thẻ dự bị để đổi chỗ.')
-                source.pop(source_index); st[target_group].append(incoming)
-                if target_group=='starting' and str(incoming.get('position','')).upper()=='GK':
-                    st['starting'].remove(incoming); st['starting'].append(incoming)
-                flash(f"Đã chuyển {incoming.get('name','cầu thủ')} sang {'đội hình chính' if target_group=='starting' else 'dự bị' if target_group=='bench' else 'cầu thủ khác'}.")
+            incoming_pos=str(incoming.get('position','')).strip().upper()
+            incoming_assigned=str(incoming.get('assigned_position') or incoming_pos).upper()
+
+            # Thả vào vùng trống của Dự bị/Cầu thủ khác: chuyển thẻ giữa các kho.
+            if target_index == -1 and target_group in {'bench','extras'}:
+                if source_group==target_group:
+                    raise ValueError('Hãy thả cầu thủ vào một khu vực khác.')
+                if target_group=='bench' and len(st['bench'])>=5:
+                    raise ValueError('Khu vực dự bị đã đủ 5 cầu thủ. Hãy thả vào một thẻ dự bị để đổi chỗ.')
+                if source_group=='starting' and incoming_assigned=='GK' and not any(
+                    str(x.get('position','')).upper()=='GK' or str(x.get('assigned_position','')).upper()=='GK'
+                    for x in st['starting'] if x is not incoming
+                ):
+                    raise ValueError('Không thể đưa thủ môn duy nhất khỏi đội hình chính.')
+                moved=source.pop(source_index)
+                if source_group=='starting':
+                    moved['assigned_position']=str(moved.get('position','')).upper()
+                target.append(moved)
             else:
-                target=st[target_group]
-                if target_index<0 or target_index>=len(target): raise ValueError('Vị trí đích không hợp lệ.')
+                if target_index<0 or target_index>=len(target):
+                    raise ValueError('Vị trí đích không hợp lệ.')
                 outgoing=target[target_index]
-                if source_group=='starting' and target_group!='starting' and len(st[target_group])>= (5 if target_group=='bench' else 10): raise ValueError('Khu vực nhận đã đầy.')
-                if target_group=='starting' and source_group!='starting' and len(st['starting'])>11: raise ValueError('Đội hình chính đã đủ cầu thủ.')
-                incoming_gk=str(incoming.get('position','')).upper()=='GK'
-                outgoing_gk=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()=='GK'
-                if target_group=='starting' and incoming_gk != outgoing_gk: raise ValueError('Thủ môn chỉ có thể đổi vị trí với thủ môn.')
-                if source_group=='starting' and target_group=='starting':
-                    st['starting'][source_index],st['starting'][target_index]=outgoing,incoming
-                else:
-                    source[source_index],target[target_index]=outgoing,incoming
-                if target_group=='starting': incoming['assigned_position']=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
-                if source_group=='starting' and target_group!='starting': outgoing['assigned_position']=str(outgoing.get('position','')).upper()
-                if source_group!='starting' and target_group=='starting' and source_group=='bench': incoming['assigned_position']=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
-                flash(f"Đã đổi vị trí {incoming.get('name','cầu thủ')} và {outgoing.get('name','cầu thủ')}.")
+                outgoing_pos=str(outgoing.get('position','')).strip().upper()
+                outgoing_assigned=str(outgoing.get('assigned_position') or outgoing_pos).upper()
+                # GK chỉ đổi với GK, bất kể kéo giữa nhóm nào.
+                if (incoming_pos=='GK') != (outgoing_assigned=='GK'):
+                    raise ValueError('Thủ môn chỉ có thể thay thế thủ môn.')
+                if (outgoing_pos=='GK') != (incoming_assigned=='GK'):
+                    raise ValueError('Thủ môn chỉ có thể thay thế thủ môn.')
+                source[source_index],target[target_index]=outgoing,incoming
+                if target_group=='starting':
+                    incoming['assigned_position']=outgoing_assigned
+                elif source_group=='starting':
+                    outgoing['assigned_position']=str(outgoing.get('position','')).upper()
+                if source_group=='starting' and target_group!='starting':
+                    incoming['assigned_position']=str(incoming.get('position','')).upper()
+                if target_group=='starting' and source_group!='starting':
+                    outgoing['assigned_position']=str(outgoing.get('position','')).upper()
+            flash('Đã cập nhật vị trí cầu thủ bằng kéo thả.')
         elif act=='promote':
             group=request.form.get('group')
             idx=int(request.form.get('index','-1'))

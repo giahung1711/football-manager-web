@@ -1,0 +1,6 @@
+2026-11-18 - Forge confirmation and Ultimate workbench UI
+- Removed the extra confirmation dialog from normal enhancement; submitting after selecting a valid player starts the existing AJAX enhancement animation directly.
+- Moved the selected Ultimate primary-player card preview onto a dedicated Ultimate enhancement workbench above the selection/fodder panels.
+- Improved the Ultimate workbench styling.
+- Reparented the Ultimate confirmation overlay to document.body and enforced viewport-centered fixed positioning so it no longer appears at the bottom of the page.
+- Kept the Ultimate confirmation step and existing no-reload AJAX result flow.
