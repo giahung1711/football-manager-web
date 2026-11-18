@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Academic League (A1 Cup) · FOOTBALL MANAGER{% endblock %}
+{% block title %}Academic League (A1 Cup) · FOOTBALL MANAGER<script>setTimeout(function(){ if (document.visibilityState === 'visible') window.location.reload(); }, 30000);</script>
+{% endblock %}
 {% block content %}
 <section class="page-heading a1-heading">
   <p class="eyebrow">WEEKLY KNOCKOUT COMPETITION</p>
@@ -16,7 +17,7 @@
   <div class="a1-prizes"><span>🥇 5 TỈ PC + 20.000 PG</span><span>🥈 3 TỈ PC + 10.000 PG</span><span>🥉 1 TỈ PC + 5.000 PG</span></div>
 </section>
 <section class="a1-panel">
-  <div class="a1-section-title"><div><p class="eyebrow">TOURNAMENT BRACKET</p><h2>SƠ ĐỒ PHÂN NHÁNH</h2></div><span class="a1-tag">TOP 8 OVR · RANDOM DRAW</span></div>
+  <div class="a1-section-title"><div><p class="eyebrow">TOURNAMENT BRACKET</p><h2>SƠ ĐỒ PHÂN NHÁNH</h2></div><span class="a1-tag">TOP 8 OVR · GIÁ TRỊ · TỈ LỆ THẮNG</span></div>
   <div class="a1-bracket-scroll">
     <div class="a1-bracket">
       <div class="a1-round a1-quarter">
@@ -26,8 +27,8 @@
           <article class="a1-tie">
             <div class="a1-tie-head"><b>CẶP {{ pair }}</b><span>{{ 'CN' if pair in ['A','B'] else 'THỨ 2' }} · LƯỢT ĐI</span></div>
             {% if legs and legs[0].home %}
-              <div class="a1-team"><span>{{ legs[0].home.club }}</span><b>{{ legs[0].home.ovr|round(1) }}</b></div>
-              <div class="a1-team"><span>{{ legs[0].away.club }}</span><b>{{ legs[0].away.ovr|round(1) }}</b></div>
+              <div class="a1-team"><span><strong>{{ legs[0].home.club }}</strong><small>{{ legs[0].home.value|default(0)|money }} · Thắng {{ legs[0].home.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ legs[0].home.ovr|round(1) }}</b></div>
+              <div class="a1-team"><span><strong>{{ legs[0].away.club }}</strong><small>{{ legs[0].away.value|default(0)|money }} · Thắng {{ legs[0].away.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ legs[0].away.ovr|round(1) }}</b></div>
             {% else %}<div class="a1-team"><span>Đang chờ CLB</span><b>—</b></div><div class="a1-team"><span>Đang chờ CLB</span><b>—</b></div>{% endif %}
             {% for leg in legs|sort(attribute='leg') %}
               <div class="a1-leg"><span>{{ 'Lượt đi' if leg.leg==1 else 'Lượt về' }} · {{ leg.starts_label }}</span><b>{% if leg.result %}{{ leg.result.score }}{% else %}{{ 'ĐÃ ĐÁ' if leg.status=='completed' else 'CHƯA ĐÁ' }}{% endif %}</b></div>
@@ -43,8 +44,8 @@
           <article class="a1-tie a1-tie-semi">
             <div class="a1-tie-head"><b>{{ 'NHÁNH A + B' if pair=='SF1' else 'NHÁNH C + D' }}</b><span>{{ 'BÁN KẾT 1' if pair=='SF1' else 'BÁN KẾT 2' }}</span></div>
             {% if legs and legs[0].home %}
-              <div class="a1-team"><span>{{ legs[0].home.club }}</span><b>{{ legs[0].home.ovr|round(1) }}</b></div>
-              <div class="a1-team"><span>{{ legs[0].away.club }}</span><b>{{ legs[0].away.ovr|round(1) }}</b></div>
+              <div class="a1-team"><span><strong>{{ legs[0].home.club }}</strong><small>{{ legs[0].home.value|default(0)|money }} · Thắng {{ legs[0].home.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ legs[0].home.ovr|round(1) }}</b></div>
+              <div class="a1-team"><span><strong>{{ legs[0].away.club }}</strong><small>{{ legs[0].away.value|default(0)|money }} · Thắng {{ legs[0].away.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ legs[0].away.ovr|round(1) }}</b></div>
             {% else %}<div class="a1-team"><span>Thắng cặp {{ 'A' if pair=='SF1' else 'C' }}</span><b>—</b></div><div class="a1-team"><span>Thắng cặp {{ 'B' if pair=='SF1' else 'D' }}</span><b>—</b></div>{% endif %}
             {% for leg in legs|sort(attribute='leg') %}<div class="a1-leg"><span>{{ 'Lượt đi' if leg.leg==1 else 'Lượt về' }} · {{ leg.starts_label }}</span><b>{% if leg.result %}{{ leg.result.score }}{% else %}CHƯA ĐÁ{% endif %}</b></div>{% endfor %}
           </article>
@@ -56,7 +57,7 @@
         {% set final = matches|selectattr('pair','equalto','FINAL')|first %}
         <article class="a1-tie a1-tie-final">
           <div class="a1-tie-head"><b>🏆 A1 CUP FINAL</b><span>THỨ 7 · 19:00</span></div>
-          {% if final and final.home %}<div class="a1-team"><span>{{ final.home.club }}</span><b>{{ final.home.ovr|round(1) }}</b></div><div class="a1-team"><span>{{ final.away.club }}</span><b>{{ final.away.ovr|round(1) }}</b></div>{% else %}<div class="a1-team"><span>Thắng bán kết 1</span><b>—</b></div><div class="a1-team"><span>Thắng bán kết 2</span><b>—</b></div>{% endif %}
+          {% if final and final.home %}<div class="a1-team"><span><strong>{{ final.home.club }}</strong><small>{{ final.home.value|default(0)|money }} · Thắng {{ final.home.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ final.home.ovr|round(1) }}</b></div><div class="a1-team"><span><strong>{{ final.away.club }}</strong><small>{{ final.away.value|default(0)|money }} · Thắng {{ final.away.win_rate|default(0)|round(1) }}%</small></span><b>OVR {{ final.away.ovr|round(1) }}</b></div>{% else %}<div class="a1-team"><span>Thắng bán kết 1</span><b>—</b></div><div class="a1-team"><span>Thắng bán kết 2</span><b>—</b></div>{% endif %}
           <div class="a1-final-score">{% if final and final.result %}{{ final.result.score }}{% else %}VS{% endif %}</div>
           {% if final and final.result and final.result.penalties %}<small class="a1-penalty">Phân định bằng penalty</small>{% elif final and final.result and final.result.extra_time %}<small class="a1-penalty">Có hiệp phụ</small>{% else %}<small class="muted">Hiệp phụ · Penalty nếu cần</small>{% endif %}
         </article>
@@ -70,7 +71,7 @@
       </div>
     </div>
   </div>
-  <p class="a1-hint">Sơ đồ được khóa ngay khi bốc thăm. Thứ hạng OVR thay đổi trong mùa không làm thay đổi 8 CLB hoặc các cặp đã chọn.</p>
+  <p class="a1-hint">8 CLB và lịch thi đấu được khóa khi bốc thăm. OVR, giá trị đội hình và tỉ lệ thắng luôn lấy theo dữ liệu hiện tại; thay đổi BXH không làm đổi đội tham dự hoặc cặp đấu. Xếp hạng vòng tuyển chọn: OVR → giá trị đội hình → tỉ lệ thắng.</p>
 </section>
 <section class="a1-panel a1-schedule-panel">
   <div class="a1-section-title"><div><p class="eyebrow">FIXED WEEKLY TIMETABLE</p><h2>LỊCH THI ĐẤU</h2></div><span class="a1-tag">GIỜ VIỆT NAM · UTC+7</span></div>

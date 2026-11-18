@@ -8,6 +8,22 @@
       <div class="stats friend-profile-stats"><div class="stat"><span>TÊN CLB</span><strong>{{ profile.club_name }}</strong></div><div class="stat"><span>OVR ĐỘI HÌNH</span><strong>{{ profile.ovr }}</strong></div><div class="stat"><span>GIÁ TRỊ ĐỘI HÌNH</span><strong>{{ profile.squad_value|money }} PC</strong></div><div class="stat"><span>TỈ LỆ THẮNG</span><strong>{{ profile.win_rate }}%</strong></div><div class="stat"><span>SỐ TRẬN ĐÃ ĐẤU</span><strong>{{ profile.matches }}</strong></div></div>
       {% if profile.state.get('profile_note') %}<section class="panel friends-section"><h2>Ghi chú</h2><p class="friend-readonly-note">{{ profile.state.profile_note[:100] }}</p></section>{% endif %}
       <section class="panel friends-section friend-profile-trophies"><h2>🏆 Danh hiệu</h2>{% if profile.trophies %}<div class="profile-trophies">{% for trophy in profile.trophies %}<div class="profile-trophy {{ trophy.frame_class or 'trophy-gold' }}"><strong>🏆 {{ trophy.name }}</strong>{% if trophy.description %}<small>{{ trophy.description }}</small>{% endif %}<small>{{ trophy.frame_label or 'Danh hiệu' }} · {{ trophy.awarded_at or '' }}</small></div>{% endfor %}</div>{% else %}<p class="muted">{% if not profile.trophies_visible %}Người chơi đang ẩn danh hiệu trên hồ sơ.{% else %}Người chơi chưa có danh hiệu được treo.{% endif %}</p>{% endif %}</section>
+      <section class="panel friends-section friend-profile-hall">
+        <h2>🏆 Phòng truyền thống</h2>
+        <p class="muted">Cúp và thành tích tại các giải đấu chính thức.</p>
+        {% if profile.cups %}
+          <div class="profile-cups">
+            {% for cup in profile.cups %}
+              <article class="profile-cup {{ cup.frame_class or 'cup-third' }}">
+                <span class="profile-cup-symbol">{{ cup.symbol or '🏆' }}</span>
+                <div><strong>{{ cup.competition or cup.name }}</strong><b>{{ cup.placement }}</b><small>Mùa {{ cup.season_number }}{% if cup.awarded_at %} · {{ cup.awarded_at }}{% endif %}</small></div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">CLB chưa có thành tích cúp nào.</p>
+        {% endif %}
+      </section>
     </div>
     <div>
       <section class="panel friends-section"><h2>Thành tích 5 trận gần nhất</h2>{% if profile.history %}<div class="friend-form profile-form">{% for match in profile.history %}<span class="form-result {% if match.result == 'Thắng' %}form-win{% elif match.result == 'Hòa' %}form-draw{% elif match.result == 'Thua' %}form-loss{% else %}form-empty{% endif %}" title="{{ match.opponent }} · {{ match.score }}">{{ 'T' if match.result == 'Thắng' else ('H' if match.result == 'Hòa' else ('B' if match.result == 'Thua' else '—')) }}</span>{% endfor %}</div><div class="friend-match-list profile-match-list">{% for match in profile.history %}<div class="friend-row"><div><strong>{{ match.club }} {{ match.score }} {{ match.opponent }}</strong><small>{{ match.played_at or '' }}{% if match.friendly %} · Giao hữu{% endif %}</small></div><span class="pill">{{ match.result }}</span></div>{% endfor %}</div>{% else %}<p class="muted">Chưa có dữ liệu trận đấu.</p>{% endif %}</section>

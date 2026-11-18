@@ -102,7 +102,7 @@
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% elif p.get('event_card') == 'custom_season' %} card-custom-season{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
           <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
@@ -112,6 +112,8 @@
             <span class="event-card-label">CHRISTMAS 2026</span>
           {% elif p.get('event_card') == 'sweet_candy' %}
             <span class="event-card-label">SWEET CANDY</span>
+          {% elif p.get('event_card') == 'custom_season' %}
+            <span class="event-card-label">{{ p.get('card_season_label') or p.get('card_season') or 'SPECIAL SEASON' }}</span>
           {% elif p.get('is_icon') or p.get('card_type') == 'ICON' %}
             <span class="special-label">ICON</span>
           {% elif p.get('is_hero') or p.get('card_type') == 'HEROES' %}
@@ -593,7 +595,27 @@ skip.addEventListener('click',()=>{if(done){overlay.remove();return;}finish();})
         <button class="button primary" type="submit">Lưu danh hiệu hiển thị</button>
       </form>
       {% else %}<p class="muted">Chưa có danh hiệu được nhận trong Hòm thư.</p>{% endif %}
-    </div></div>
+    </div>
+    <div class="profile-section hall-of-fame-section">
+      <h3>🏆 Phòng truyền thống</h3>
+      <p class="muted">Cúp và thành tích mà CLB giành được qua các giải đấu chính thức.</p>
+      {% if state.get('profile_cups') %}
+        <div class="profile-cups">
+          {% for cup in state.get('profile_cups', []) %}
+            <article class="profile-cup {{ cup.frame_class or 'cup-third' }}">
+              <span class="profile-cup-symbol">{{ cup.symbol or '🏆' }}</span>
+              <div><strong>{{ cup.competition or cup.name }}</strong>
+                <b>{{ cup.placement }}</b>
+                <small>Mùa {{ cup.season_number }}{% if cup.awarded_at %} · {{ cup.awarded_at }}{% endif %}</small>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">CLB chưa có cúp. Hãy tham gia các giải đấu để ghi dấu trong phòng truyền thống!</p>
+      {% endif %}
+    </div>
+  </div>
 <script>
 (()=>{const modal=document.getElementById('playerProfileModal'),open=document.getElementById('openPlayerProfile'),close=document.getElementById('closePlayerProfile');if(!modal||!open||!close)return;open.addEventListener('click',()=>modal.hidden=false);close.addEventListener('click',()=>modal.hidden=true);modal.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});document.addEventListener('keydown',e=>{if(e.key==='Escape')modal.hidden=true;});})();
 </script>

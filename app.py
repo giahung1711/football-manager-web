@@ -429,17 +429,24 @@ def admin_gift():
 
         state = load_state(save)
         gifted = {
-            'name': name, 'position': position, 'rating': rating, 'level': level,
-            'card_season': card_season, 'market_value': transfer_value,
+            'name': name, 'position': position, 'rating': rating, 'original_rating': rating,
+            'level': level, 'card_season': card_season, 'card_season_label': card_season,
+            'market_value': transfer_value,
             'nationality': '', 'club': '', 'league': '', 'card_type': card_type,
             'metadata_source_url': source_url, 'metadata_admin_verified': True,
             'metadata_complete': False, 'photo_url': photo_url,
             'is_icon': card_type == 'ICON', 'is_hero': card_type == 'HEROES',
         }
-        if card_season.casefold() in {"ballon d’or", "ballon d'or"}:
+        season_key = card_season.casefold().replace('’', "'")
+        if season_key in {"ballon d'or"}:
             gifted['event_card'] = 'ballon_dor'
-        elif card_season.casefold() == 'christmas 2026':
+        elif season_key == 'christmas 2026':
             gifted['event_card'] = 'christmas_2026'
+        elif season_key == 'sweet candy':
+            gifted['event_card'] = 'sweet_candy'
+        elif season_key not in {'thường', 'thuong'}:
+            # Generic seasonal frame keeps future/admin-added seasons visible too.
+            gifted['event_card'] = 'custom_season'
 
         mail = {
             'id': secrets.token_urlsafe(12), 'type': 'player_gift',
@@ -584,6 +591,25 @@ def admin_gift_item():
         flash(str(error))
     return redirect(url_for('admin_panel'))
 
+def ensure_gift_card_season(gifted):
+    """Restore the selected seasonal frame when claiming older pending gifts too."""
+    if not isinstance(gifted, dict):
+        return gifted
+    season = str(gifted.get('card_season') or '').strip()
+    gifted.setdefault('card_season_label', season)
+    season_key = season.casefold().replace('’', "'")
+    if not gifted.get('event_card'):
+        if season_key == "ballon d'or":
+            gifted['event_card'] = 'ballon_dor'
+        elif season_key == 'christmas 2026':
+            gifted['event_card'] = 'christmas_2026'
+        elif season_key == 'sweet candy':
+            gifted['event_card'] = 'sweet_candy'
+        elif season_key not in {'', 'thường', 'thuong'}:
+            gifted['event_card'] = 'custom_season'
+    return gifted
+
+
 @app.route('/mailbox')
 @login_required
 def mailbox():
@@ -624,7 +650,7 @@ def mailbox_open():
             state['activity'] = state['activity'][:15]
             flash(f'Đã nhận danh hiệu “{trophy["name"]}” vào hồ sơ!')
     elif mail.get('type') == 'player_gift':
-        gifted = copy.deepcopy(mail.get('player') or {})
+        gifted = ensure_gift_card_season(copy.deepcopy(mail.get('player') or {}))
         if gifted.get('rating') is None and gifted.get('ovr') is not None:
             gifted['rating'] = gifted.get('ovr')
         if gifted.get('name') == 'Zidane':
@@ -679,7 +705,7 @@ def mailbox_claim_all():
             continue
         if mail.get('type') != 'player_gift':
             continue
-        gifted = copy.deepcopy(mail.get('player') or {})
+        gifted = ensure_gift_card_season(copy.deepcopy(mail.get('player') or {}))
         if gifted.get('rating') is None and gifted.get('ovr') is not None:
             gifted['rating'] = gifted.get('ovr')
         if gifted.get('name') == 'Zidane':
@@ -807,7 +833,10 @@ def get_user_profile(user):
             'club_name': state.get('custom_club_name') or state.get('club', 'Chưa chọn'),
             'matches': int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0),
             'win_rate': round(100*int(state.get('wins', 0) or 0)/max(1,int(state.get('wins', 0) or 0)+int(state.get('draws', 0) or 0)+int(state.get('losses', 0) or 0)),1),
-            'ovr': ovr_average, 'online': online, 'squad_value': float(dashboard_data.get('squad_value', 0) or 0), 'trophies': [t for t in state.get('profile_trophies', []) if t.get('visible', True)] if state.get('profile_trophies_visible', True) else [], 'trophies_visible': state.get('profile_trophies_visible', True)}
+            'ovr': ovr_average, 'online': online, 'squad_value': float(dashboard_data.get('squad_value', 0) or 0),
+            'trophies': [t for t in state.get('profile_trophies', []) if t.get('visible', True)] if state.get('profile_trophies_visible', True) else [],
+            'trophies_visible': state.get('profile_trophies_visible', True),
+            'cups': list(state.get('profile_cups', []) or [])}
 
 @app.before_request
 def update_presence():
@@ -1463,10 +1492,14 @@ def a1_ranked_teams():
             'user_id': account.id, 'username': account.username,
             'club': state.get('custom_club_name') or state.get('club') or 'CLB',
             'ovr': float(data.get('average_rating', 0) or 0),
+            'value': float(data.get('squad_value', data.get('total_value', 0)) or 0),
+            'win_rate': float(data.get('win_rate', 0) or 0),
             'matches': int(data.get('matches_played', 0) or 0),
             'players': [str(x.get('name', 'Cầu thủ')) for x in state.get('starting', [])[:11]],
         })
-    ranked.sort(key=lambda x: (x['ovr'], x['matches'], x['username'].casefold()), reverse=True)
+    # Qualification order: squad OVR, then total squad value, then win rate.
+    # Username is only a deterministic final fallback when all three are equal.
+    ranked.sort(key=lambda x: (x['ovr'], x['value'], x['win_rate'], x['username'].casefold()), reverse=True)
     return ranked[:8]
 
 
@@ -1512,51 +1545,6 @@ def a1_create_season(start_at):
                          teams=copy.deepcopy(teams), matches=matches)
     db.session.add(season); db.session.commit()
     return season
-
-
-def a1_current_club_name(user_id, fallback='CLB'):
-    """Resolve a tournament participant's current club name from its live save.
-
-    Tournament fixtures intentionally retain participant IDs and frozen sporting
-    data (OVR/players), but the displayed club name must always follow profile renames.
-    """
-    try:
-        save = GameSave.query.filter_by(user_id=int(user_id)).first()
-        if save:
-            state = load_state(save)
-            return state.get('custom_club_name') or state.get('club') or fallback
-    except (TypeError, ValueError):
-        app.logger.warning('A1 Cup: invalid participant user_id %r', user_id)
-    return fallback
-
-
-def a1_refresh_display_names(season, matches, podium):
-    """Refresh names in every historical/current bracket slot by stable user ID."""
-    current_by_id = {}
-    for team in (season.teams or []):
-        uid = team.get('user_id')
-        if uid is None:
-            continue
-        team['club'] = a1_current_club_name(uid, team.get('club', 'CLB'))
-        current_by_id[str(uid)] = team
-
-    for match in matches:
-        for side in ('home', 'away'):
-            team = match.get(side)
-            if not team:
-                continue
-            current = current_by_id.get(str(team.get('user_id')))
-            if current:
-                team['club'] = current['club']
-                team['club_label'] = current['club']
-
-    for place in ('champion', 'runner_up', 'third'):
-        team = podium.get(place)
-        if team:
-            current = current_by_id.get(str(team.get('user_id')))
-            if current:
-                team['club'] = current['club']
-    return matches, podium
 
 
 def a1_ensure_season():
@@ -1679,6 +1667,26 @@ def a1_award_prizes(season):
         st=normalize_state(copy.deepcopy(save.state or {}))
         st['budget']=round(float(st.get('budget',0) or 0)+pc_m,2)
         st['pg_balance']=int(st.get('pg_balance',0) or 0)+pg
+        placement_by_id = {
+            champion_id: ('Vô địch', 'cup-champion', '🏆'),
+            runner_id: ('Á quân', 'cup-runner-up', '🥈'),
+            third_id: ('Hạng ba', 'cup-third', '🥉'),
+        }
+        placement, frame_class, symbol = placement_by_id[uid]
+        cup_id = f'a1cup-season-{season.season_number}-user-{uid}'
+        cups = st.setdefault('profile_cups', [])
+        if not any(str(cup.get('id')) == cup_id for cup in cups):
+            cups.insert(0, {
+                'id': cup_id,
+                'competition': A1_CUP_NAME,
+                'name': A1_CUP_NAME,
+                'season_number': season.season_number,
+                'placement': placement,
+                'symbol': symbol,
+                'frame_class': frame_class,
+                'awarded_at': a1_now().strftime('%d/%m/%Y'),
+            })
+            st['profile_cups'] = cups[:100]
         st.setdefault('activity',[]).insert(0,{'message':f'Nhận thưởng Academic League (A1 Cup): +{pc_m*1000000:,.0f} PC và +{pg:,} PG','week':st.get('week',1)})
         st['activity']=st['activity'][:15]
         save.state=copy.deepcopy(st)
@@ -1701,6 +1709,11 @@ def a1_process_due_matches():
                     scheduled=datetime.fromisoformat(m['starts_at'])
                     if m['status']!='scheduled' or scheduled>now: continue
                     if not m.get('home') or not m.get('away'): continue
+                    # Match strength uses each club's latest squad OVR at kickoff,
+                    # while the qualified participant IDs and fixture schedule stay locked.
+                    for side in ('home', 'away'):
+                        live = a1_live_team_data(m[side].get('user_id'), m[side])
+                        m[side].update(live)
                     allow_extra=m['pair'] in ('FINAL','THIRD')
                     result=a1_match_result(m['home'],m['away'],allow_extra=allow_extra)
                     if m['stage'] in ('Tứ kết','Bán kết') and m['leg']==2:
@@ -1741,6 +1754,54 @@ def a1_start_scheduler():
         app.logger.exception('Could not start A1 Cup background scheduler')
 
 
+def a1_live_team_data(user_id, fallback=None):
+    """Read a participant's current club name and squad statistics by stable user ID."""
+    fallback = fallback or {}
+    try:
+        save = GameSave.query.filter_by(user_id=int(user_id)).first()
+        if save:
+            state = load_state(save)
+            data = get_dashboard(state)
+            return {
+                'club': state.get('custom_club_name') or state.get('club') or fallback.get('club', 'CLB'),
+                'ovr': float(data.get('average_rating', 0) or 0),
+                'value': float(data.get('squad_value', data.get('total_value', 0)) or 0),
+                'win_rate': float(data.get('win_rate', 0) or 0),
+            }
+    except (TypeError, ValueError):
+        app.logger.warning('A1 Cup: invalid participant user_id %r', user_id)
+    return {
+        'club': fallback.get('club', 'CLB'),
+        'ovr': float(fallback.get('ovr', 0) or 0),
+        'value': float(fallback.get('value', 0) or 0),
+        'win_rate': float(fallback.get('win_rate', 0) or 0),
+    }
+
+
+def a1_refresh_display_names(season, matches):
+    """Refresh display stats for the fixed eight participants; never requalify or redraw."""
+    teams = copy.deepcopy(season.teams or [])
+    current_by_id = {}
+    for team in teams:
+        uid = team.get('user_id')
+        if uid is None:
+            continue
+        live = a1_live_team_data(uid, team)
+        team.update(live)
+        current_by_id[str(uid)] = live
+
+    for match in matches:
+        for side in ('home', 'away'):
+            participant = match.get(side)
+            if not participant:
+                continue
+            live = current_by_id.get(str(participant.get('user_id')))
+            if live:
+                participant.update(live)
+                participant['club_label'] = live['club']
+    return teams, matches
+
+
 @app.route('/tournament')
 @login_required
 def tournament():
@@ -1752,15 +1813,15 @@ def tournament():
     matches=[]
     podium={}
     if season:
-        teams_by_id={t['user_id']:t for t in (season.teams or [])}
+        matches=copy.deepcopy(season.matches or [])
+        live_teams, matches = a1_refresh_display_names(season, matches)
+        teams_by_id={t['user_id']:t for t in live_teams}
         podium={
             'champion':teams_by_id.get(season.champion_user_id),
             'runner_up':teams_by_id.get(season.runner_up_user_id),
             'third':teams_by_id.get(season.third_user_id),
         }
-        matches=copy.deepcopy(season.matches or [])
         weekday_vi=['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật']
-        matches, podium = a1_refresh_display_names(season, matches, podium)
         for m in matches:
             dt=datetime.fromisoformat(m['starts_at'])
             m['starts_label']=f"{weekday_vi[dt.weekday()]} {dt.strftime('%d/%m · %H:%M')}"
