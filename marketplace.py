@@ -95,6 +95,7 @@ def player_market():
             except (TypeError, ValueError, OverflowError):
                 listing.display_ovr = 80
         listing.display_position = str(player_data.get("position", "—") or "—")
+        listing.display_ultimate = bool(player_data.get("ultimate"))
 
     seller_ids = {item.seller_id for item in active_listings}
 

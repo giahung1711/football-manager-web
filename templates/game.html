@@ -2,7 +2,7 @@
 {% block title %}{{ data.club }} · FOOTBALL MANAGER{% endblock %}
 {% block content %}
 <div class="welcome"><div><p class="eyebrow">MANAGER DESK · MÙA {{state.season}} · TUẦN {{state.week}}</p><h1>{{data.club}}</h1><p class="muted">Tài khoản: {{current_user.username}} · Sơ đồ {{state.formation}}</p></div><button type="button" class="club-mark large profile-avatar-trigger" id="openPlayerProfile" aria-label="Mở hồ sơ người chơi">{% if state.get('profile_avatar') %}<img src="{{state.profile_avatar}}" alt="Ảnh đại diện">{% else %}⚽{% endif %}</button></div>
-<div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong data-budget-balance>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR đá chính</span><strong>{{data.average_rating}}</strong></div></div>
+<div class="stats"><div class="stat"><span>Ngân sách CLB</span><strong data-budget-balance>{{ state.budget|money }}</strong></div><div class="stat"><span>P Gems</span><strong>💎 {{ state.pg_balance|default(0) }} PG</strong></div><div class="stat"><span>Điểm số</span><strong>{{state.points}}</strong></div><div class="stat"><span>Cầu thủ</span><strong>{{data.squad_size}}</strong></div><div class="stat"><span>OVR 16 CẦU THỦ</span><strong>{{data.average_rating}}</strong></div></div>
 <nav class="game-nav">
 {% for key,label in [('overview','Tổng quan'),('daily','Nhiệm vụ ngày'),('squad','Đội hình'),('matches','Trận đấu'),('transfers','Chuyển nhượng'),('shop','Cửa hàng'),('upgrade','Ép thẻ'),('finance','Tài chính')] %}<a class="button {% if tab==key %}primary{% endif %}" href="{{url_for('dashboard') if key=='overview' else url_for('game_tab',tab=key)}}">{{label}}</a>{% endfor %}
 </nav>
@@ -69,9 +69,9 @@
       <div class="record-item"><span class="metric-label">TỈ LỆ THẮNG</span><strong>{% if state.wins + state.draws + state.losses > 0 %}{{((state.wins / (state.wins + state.draws + state.losses)) * 100)|round(1)}}%{% else %}0%{% endif %}</strong></div>
     </div>
   </div>
-  <div class="overview-ovr"><span class="metric-label">OVR ĐỘI HÌNH ĐÁ CHÍNH</span><strong>{{data.average_rating}}</strong><span class="ovr-caption">ĐIỂM SỨC MẠNH ĐỘI HÌNH</span></div>
+  <div class="overview-ovr"><span class="metric-label">OVR ĐỘI HÌNH (16 CẦU THỦ)</span><strong>{{data.average_rating}}</strong><span class="ovr-caption">ĐIỂM SỨC MẠNH ĐỘI HÌNH</span></div>
 </section>
-<section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</td><td>+{{p.level}}</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><div class="section-head"><h2>Đội hình xuất phát</h2><form method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="match"><button class="button primary">Đá trận tiếp theo</button></form></div><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Thẻ</th></tr></thead><tbody>{% for p in state.starting %}<tr><td>{{p.name}}</td><td>{{p.position}}</td><td>{{player_ovr(p)}}</td><td>{% if p.get('ultimate') %}<span class="ultimate-star">✦</span>{% else %}+{{p.level}}{% endif %}</td></tr>{% endfor %}</tbody></table></section>
 {% elif tab=='squad' %}
 {% set formations = {
 '4-3-3 (Tấn công)': [('LW',15,19),('ST',50,13),('RW',85,19),('CM',31,41),('CAM',50,32),('CM',69,41),('LB',12,67),('CB',37,70),('CB',63,70),('RB',88,67),('GK',50,87)],
@@ -81,7 +81,7 @@
 } %}
 {% set slots = formations.get(state.formation, formations['4-3-3 (Tấn công)']) %}
 <section class="pitch-panel">
-  <div class="pitch-toolbar"><div><p class="eyebrow">TACTICAL BOARD</p><h2>Sơ đồ đội hình · {{state.formation}}</h2><span class="muted">{{state.starting|length}}/11 cầu thủ đá chính · OVR trung bình {{data.average_rating}}</span></div>
+  <div class="pitch-toolbar"><div><p class="eyebrow">TACTICAL BOARD</p><h2>Sơ đồ đội hình · {{state.formation}}</h2><span class="muted">{{state.starting|length}}/11 cầu thủ đá chính · OVR trung bình 16 cầu thủ: {{data.average_rating}}</span></div>
   <form method="post" action="{{url_for('action')}}" class="formation-inline"><input type="hidden" name="action" value="formation"><label for="formationSelect">Sơ đồ</label><select id="formationSelect" name="formation">{% for f in ['4-3-3 (Tấn công)','4-3-3 (Phòng thủ)','4-2-4','4-1-2-1-2'] %}<option {% if state.formation==f %}selected{% endif %}>{{f}}</option>{% endfor %}</select><button class="button primary">Áp dụng</button></form></div>
   <div class="football-pitch pitch-positioned" id="footballPitch" aria-label="Sơ đồ cầu thủ trên sân">
     <div class="pitch-line pitch-halfway"></div><div class="pitch-circle"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
@@ -97,15 +97,15 @@
           {% set role = p.get('assigned_position') or slot[0] %}
           {% set pitch_order.outfield = pitch_order.outfield + 1 %}
         {% endif %}
-        {% set raw = p.rating + [0,1,2,3,4,6,8,10,13][p.level|int] %}
-        {% set shown = raw if (p.position|upper == role|upper or p.position|upper == 'GK' and role == 'GK') else ((raw * 0.95 + 0.5)|int) %}
+        {% set raw = p.rating + [0,1,2,3,4,6,8,10,13][p.level|int] + (5 if p.get('ultimate') else 0) %}
+        {% set shown = player_ovr(p) %}
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% elif p.get('event_card') == 'custom_season' %} card-custom-season{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% elif p.get('event_card') == 'custom_season' %} card-custom-season{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
-          <span class="upgrade-badge {{upgrade_tier}}">+{{p.level}}</span>
+          <span class="upgrade-badge {{upgrade_tier}}{% if p.get('ultimate') %} ultimate-level-badge{% endif %}">{% if p.get('ultimate') %}<span class="ultimate-star" title="Ultimate">✦</span>{% else %}+{{p.level}}{% endif %}</span>
           {% if p.get('event_card') == 'ballon_dor' %}
             <span class="event-card-label">BALLON D’OR</span>
           {% elif p.get('event_card') == 'christmas_2026' %}
@@ -143,75 +143,47 @@
   </div>
   <div class="card-legend"><span><i class="legend-frame regular"></i>Thường · 60–75</span><span><i class="legend-frame silver"></i>Bạc · 76–80</span><span><i class="legend-frame gold"></i>Vàng · 81–89</span><span><i class="legend-frame premium"></i>Cao cấp · 90–95</span><span><i class="legend-frame icon"></i>ICON</span><span class="muted">Khung theo OVR gốc · sai vị trí giảm 5% OVR cá nhân</span></div>
 </section>
-<section class="panel">
-  <div class="section-head">
-    <h2>Cầu thủ dự bị ({{state.bench|length}})</h2>
-    <span class="muted">Kéo thẻ để thay người hoặc thêm vào vị trí còn thiếu</span>
-  </div>
-  <div class="bench-search-row"><input id="benchPlayerSearch" type="search" placeholder="⌕ Tìm cầu thủ theo tên..." autocomplete="off"><span id="benchSearchCount" class="muted">{{state.bench|length}} cầu thủ</span></div>
-  <div class="bench-grid bench-grid-compact" id="benchDropZone">
-    {% for p in state.bench %}
-      {% if p.get('rating') is not none and p.get('position') %}
-        <div class="bench-player" draggable="true" data-group="bench" data-index="{{loop.index0}}" data-player-name="{{p.name|lower}}">
-          <span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span>
-          <div>
-            <strong>{{p.name}}</strong>
-            <small>{{p.position}} · {{p.nationality}}{% if p.club %} · {{p.club}}{% elif p.get('card_type') in ['ICON','HEROES'] %} · {{p.card_type}}{% endif %} · +{{p.level}}</small>
-            {% if state.starting|length < 11 %}
-              {% set has_gk = state.starting|selectattr('position','equalto','GK')|list|length > 0 %}
-              {% if (not has_gk and p.position|upper == 'GK') or (has_gk and p.position|upper != 'GK') %}
-                <form method="post" action="{{url_for('action')}}" class="promote-player-form">
-                  <input type="hidden" name="action" value="promote">
-                  <input type="hidden" name="group" value="bench">
-                  <input type="hidden" name="index" value="{{loop.index0}}">
-                  <button class="button" type="submit">＋ Thêm vào đá chính</button>
-                </form>
-              {% endif %}
-            {% endif %}
-          </div>
-          <span class="drag-hint">⠿</span>
-        </div>
-      {% endif %}
+<section class="panel squad-bench-panel">
+  <div class="section-head"><h2>Cầu thủ dự bị ({{state.bench|length}}/5)</h2><span class="muted">5 vị trí dự bị · kéo thẻ lên sân để thay người</span></div>
+  <div class="bench-card-row" id="benchDropZone">
+    {% for p in state.bench[:5] %}
+      {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
+      <article class="bench-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}" draggable="true" data-group="bench" data-index="{{loop.index0}}" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
+        <span class="bench-card-ovr">{{player_ovr(p)}}</span><span class="bench-card-position">{{p.position}}</span>
+        {% if p.get('ultimate') %}<span class="ultimate-star">✦</span>{% else %}<span class="bench-card-level">+{{p.level|default(0)}}</span>{% endif %}
+        <div class="bench-card-art">{% if p.get('photo_url') %}<img src="{{p.photo_url}}" alt="" loading="lazy" onerror="this.hidden=true">{% else %}<span class="portrait-fallback"><span class="portrait-head"></span><span class="portrait-body"></span></span>{% endif %}</div>
+        <strong>{{p.name}}</strong>
+      </article>
     {% endfor %}
-    {% if not state.bench %}<p class="muted">Chưa có cầu thủ dự bị.</p>{% endif %}
+    {% for n in range(5 - (state.bench|length)) %}<div class="bench-card-empty"><span>＋</span><small>Trống</small></div>{% endfor %}
   </div>
 </section>
-{% if state.extras %}
-<section class="panel">
-  <div class="section-head"><h2>Cầu thủ khác ({{state.extras|length}})</h2><span class="muted">Chỉ hiện nút thêm nếu đúng nhóm vị trí còn thiếu</span></div>
-  <div class="bench-grid">
+<section class="panel extras-panel">
+  <div class="section-head"><div><h2>Cầu thủ khác ({{state.extras|length}})</h2><span class="muted">Các thẻ ngoài 11 chính và 5 dự bị</span></div></div>
+  <div class="reserve-toolbar">
+    <input id="extrasPlayerSearch" type="search" placeholder="⌕ Tìm tên cầu thủ..." autocomplete="off">
+    <select id="extrasPositionFilter"><option value="">Tất cả vị trí</option>{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LM','RM','LW','RW','ST'] %}<option value="{{pos}}">{{pos}}</option>{% endfor %}</select>
+    <span class="muted" id="extrasSearchCount">{{state.extras|length}} cầu thủ</span>
+  </div>
+  <div class="extras-player-list" id="extrasPlayerList">
     {% for p in state.extras %}
-      {% if p.get('rating') is not none and p.get('position') %}
-        <div class="bench-player">
-          <span class="bench-ovr">{{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}}</span>
-          <div>
-            <strong>{{p.name}}</strong>
-            <small>{{p.position}} · {{p.nationality}} · +{{p.level}}</small>
-            {% if state.starting|length < 11 %}
-              {% set has_gk = state.starting|selectattr('position','equalto','GK')|list|length > 0 %}
-              {% if (not has_gk and p.position|upper == 'GK') or (has_gk and p.position|upper != 'GK') %}
-                <form method="post" action="{{url_for('action')}}" class="promote-player-form">
-                  <input type="hidden" name="action" value="promote">
-                  <input type="hidden" name="group" value="extras">
-                  <input type="hidden" name="index" value="{{loop.index0}}">
-                  <button class="button" type="submit">＋ Thêm vào đá chính</button>
-                </form>
-              {% endif %}
-            {% endif %}
-          </div>
+      <article class="bench-player extras-player" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
+        <span class="bench-ovr">{{player_ovr(p)}}</span><div class="extras-player-main"><strong>{{p.name}}</strong><small>{{p.position}} · {{p.nationality or ''}}{% if p.club %} · {{p.club}}{% endif %} · {% if p.get('ultimate') %}<span class="ultimate-star">✦ ULTIMATE</span>{% else %}+{{p.level|default(0)}}{% endif %}</small>
+        {% if state.starting|length < 11 %}<form method="post" action="{{url_for('action')}}" class="promote-player-form"><input type="hidden" name="action" value="promote"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button" type="submit">＋ Thêm vào đá chính</button></form>{% endif %}
         </div>
-      {% endif %}
+      </article>
     {% endfor %}
+    {% if not state.extras %}<p class="muted">Chưa có cầu thủ khác.</p>{% endif %}
   </div>
 </section>
-{% endif %}
 <form id="dragSwapForm" method="post" action="{{url_for('action')}}" hidden><input name="action" value="drag_swap"><input name="source_group"><input name="source_index"><input name="target_index"><input name="target_group" value="starting"></form>
 <script>
-(()=>{const search=document.getElementById('benchPlayerSearch');const count=document.getElementById('benchSearchCount');if(search){search.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('vi');let visible=0;document.querySelectorAll('#benchDropZone .bench-player').forEach(card=>{const show=(card.dataset.playerName||'').toLocaleLowerCase('vi').includes(q);card.hidden=!show;if(show)visible++;});if(count)count.textContent=visible+' cầu thủ';});}let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
+(()=>{const search=document.getElementById('extrasPlayerSearch'),filter=document.getElementById('extrasPositionFilter'),count=document.getElementById('extrasSearchCount');const apply=()=>{const q=(search?.value||'').trim().toLocaleLowerCase('vi'),pos=filter?.value||'';let visible=0;document.querySelectorAll('#extrasPlayerList .extras-player').forEach(card=>{const show=(card.dataset.playerName||'').toLocaleLowerCase('vi').includes(q)&&(!pos||card.dataset.playerPosition===pos);card.hidden=!show;if(show)visible++;});if(count)count.textContent=visible+' cầu thủ';};search?.addEventListener('input',apply);filter?.addEventListener('change',apply);let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
 </script>
 {% elif tab=='transfers' %}
-<section class="panel"><h2>Thị trường chuyển nhượng</h2><table><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
-<section class="panel"><h2>Bán cầu thủ trên TTCN</h2><p class="muted">Chọn nhiều cầu thủ ở Dự bị hoặc Cầu thủ khác để bán cùng lúc. Cầu thủ đá chính không thể bán.</p><form method="post" action="{{url_for('action')}}" id="bulkSellForm"><input type="hidden" name="action" value="sell_bulk"><div class="bulk-market-toolbar"><label><input type="checkbox" id="selectAllSellPlayers"> Chọn tất cả</label><span id="selectedSellCount" class="muted">0 cầu thủ được chọn</span><button class="button primary" type="submit">Bán các cầu thủ đã chọn</button></div><h3>Cầu thủ dự bị</h3>{% for p in state.bench %}<label class="sell-player-row"><input type="checkbox" name="sell_player" value="bench:{{loop.index0}}"><span><strong>{{p.name}}</strong><small>{{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</small></span></label>{% endfor %}{% if not state.bench %}<p class="muted">Không có cầu thủ dự bị.</p>{% endif %}<h3>Cầu thủ khác</h3>{% for p in state.extras %}<label class="sell-player-row"><input type="checkbox" name="sell_player" value="extras:{{loop.index0}}"><span><strong>{{p.name}}</strong><small>{{p.position}} · OVR {{p.rating + [0,1,2,3,4,6,8,10,13][p.level|int]}} · Giá {{ player_value(p)|money }}</small></span></label>{% endfor %}{% if not state.extras %}<p class="muted">Không có cầu thủ khác.</p>{% endif %}</form><script>(()=>{const f=document.getElementById('bulkSellForm');if(!f)return;const boxes=[...f.querySelectorAll('input[name="sell_player"]')],all=document.getElementById('selectAllSellPlayers'),count=document.getElementById('selectedSellCount');const update=()=>{const n=boxes.filter(x=>x.checked).length;count.textContent=n+' cầu thủ được chọn';all.checked=boxes.length>0&&n===boxes.length;};boxes.forEach(x=>x.addEventListener('change',update));all.addEventListener('change',()=>{boxes.forEach(x=>x.checked=all.checked);update();});f.addEventListener('submit',e=>{if(!boxes.some(x=>x.checked)){e.preventDefault();alert('Hãy chọn ít nhất một cầu thủ để bán.');}});update();})();</script></section>
+<section class="panel"><h2>Thị trường chuyển nhượng</h2><div class="market-filter-toolbar"><input type="search" id="transferSearch" placeholder="⌕ Tìm tên cầu thủ..."><select id="transferPosition"><option value="">Tất cả vị trí</option>{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LM','RM','LW','RW','ST'] %}<option>{{pos}}</option>{% endfor %}</select><select id="transferSort"><option value="name">Sắp xếp: Tên A–Z</option><option value="position">Sắp xếp: Vị trí</option></select></div><div class="table-wrap"><table id="transferTable"><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr data-name="{{item.name|lower}}" data-position="{{item.position}}"><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table></div><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
+<script>(()=>{const q=document.getElementById('transferSearch'),pos=document.getElementById('transferPosition'),sort=document.getElementById('transferSort'),body=document.querySelector('#transferTable tbody');if(!body)return;const run=()=>{const rows=[...body.rows],term=(q.value||'').toLocaleLowerCase('vi');rows.forEach(r=>r.hidden=!(r.dataset.name.includes(term)&&(!pos.value||r.dataset.position===pos.value)));rows.sort((a,b)=>sort.value==='position'?(a.dataset.position.localeCompare(b.dataset.position)||a.dataset.name.localeCompare(b.dataset.name)):a.dataset.name.localeCompare(b.dataset.name));rows.forEach(r=>body.appendChild(r));};[q,pos,sort].forEach(x=>x.addEventListener(x.tagName==='INPUT'?'input':'change',run));run();})();</script>
+<section class="panel"><h2>Bán cầu thủ trên TTCN</h2><p class="muted">Chọn nhiều cầu thủ ở Dự bị hoặc Cầu thủ khác để bán cùng lúc. Cầu thủ đá chính không thể bán.</p><form method="post" action="{{url_for('action')}}" id="bulkSellForm"><input type="hidden" name="action" value="sell_bulk"><div class="bulk-market-toolbar"><label><input type="checkbox" id="selectAllSellPlayers"> Chọn tất cả</label><span id="selectedSellCount" class="muted">0 cầu thủ được chọn</span><button class="button primary" type="submit">Bán các cầu thủ đã chọn</button></div><h3>Cầu thủ dự bị</h3>{% for p in state.bench %}<label class="sell-player-row"><input type="checkbox" name="sell_player" value="bench:{{loop.index0}}"><span><strong>{{p.name}}</strong><small>{{p.position}} · OVR {{player_ovr(p)}} · {% if p.get('ultimate') %}✦ ULTIMATE{% else %}+{{p.level|default(0)}}{% endif %} · Giá {{ player_value(p)|money }}</small></span></label>{% endfor %}{% if not state.bench %}<p class="muted">Không có cầu thủ dự bị.</p>{% endif %}<h3>Cầu thủ khác</h3>{% for p in state.extras %}<label class="sell-player-row"><input type="checkbox" name="sell_player" value="extras:{{loop.index0}}"><span><strong>{{p.name}}</strong><small>{{p.position}} · OVR {{player_ovr(p)}} · {% if p.get('ultimate') %}✦ ULTIMATE{% else %}+{{p.level|default(0)}}{% endif %} · Giá {{ player_value(p)|money }}</small></span></label>{% endfor %}{% if not state.extras %}<p class="muted">Không có cầu thủ khác.</p>{% endif %}</form><script>(()=>{const f=document.getElementById('bulkSellForm');if(!f)return;const boxes=[...f.querySelectorAll('input[name="sell_player"]')],all=document.getElementById('selectAllSellPlayers'),count=document.getElementById('selectedSellCount');const update=()=>{const n=boxes.filter(x=>x.checked).length;count.textContent=n+' cầu thủ được chọn';all.checked=boxes.length>0&&n===boxes.length;};boxes.forEach(x=>x.addEventListener('change',update));all.addEventListener('change',()=>{boxes.forEach(x=>x.checked=all.checked);update();});f.addEventListener('submit',e=>{if(!boxes.some(x=>x.checked)){e.preventDefault();alert('Hãy chọn ít nhất một cầu thủ để bán.');}});update();})();</script></section>
 {% elif tab=='shop' %}
 <section class="panel"><h2>Cửa hàng gói cầu thủ</h2>
 {% for k,p in packs.items() %}<div class="section-head"><div><h3>{{p.name}}</h3><p>{{p.players|length}} cầu thủ · {{ p.price|money }}</p></div><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Mở {{p.name}} với giá {{ p.price|money }}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="pack"><input type="hidden" name="pack" value="{{k}}"><button class="button primary">Mở gói</button></form></div>{% endfor %}
@@ -254,6 +226,7 @@
 {% set value_multipliers = [1.0,1.50,2.25,3.20,4.10,6.35,9.00,12.50,21.00] %}
 
 
+<div class="forge-mode-switch"><button type="button" class="active" data-forge-mode="normal">Ép thẻ thường</button><button type="button" data-forge-mode="ultimate">✦ Ép thẻ Cấp cao</button></div>
 <section class="panel forge-heading">
   <div>
     <p class="eyebrow">PLAYER DEVELOPMENT · CARD ENHANCEMENT</p>
@@ -279,9 +252,10 @@
     <div class="forge-player-list" id="forgePlayerList">
       {% for group in ['starting','bench','extras'] %}
         {% for p in state[group] %}
+        {% if not p.get('ultimate') %}
           {% set lv = p.get('level',0)|int %}
           {% set base_value = p.get('market_value', prices.get(p.name,0) / value_multipliers[lv])|float %}
-          {% set current_ovr = p.rating + [0,1,2,3,4,6,8,10,13][lv] %}
+          {% set current_ovr = player_ovr(p) %}
           <button type="button"
             class="forge-player-option"
             data-group="{{group}}"
@@ -301,6 +275,7 @@
             </span>
             <span class="forge-option-arrow">›</span>
           </button>
+        {% endif %}
         {% endfor %}
       {% endfor %}
     </div>
@@ -491,7 +466,7 @@
 
       const base = Number(selected.dataset.base || 0);
       selected.dataset.level = String(data.new_level);
-      selected.dataset.rating = String(data.base_rating + ovrBonuses[data.new_level]);
+      selected.dataset.rating = String(data.ovr);
       selected.dataset.value = String(base * multipliers[data.new_level]);
       selected.querySelector('.forge-option-ovr').textContent = selected.dataset.rating;
       selected.querySelector('.forge-option-info small').textContent = selected.dataset.position + ' · +' + data.new_level;
@@ -522,6 +497,35 @@
     }
   });
 })();
+</script>
+<section class="ultimate-forge" id="ultimateForge" hidden>
+  <div class="ultimate-banner"><span class="ultimate-emblem">✦</span><div><p class="eyebrow">RUBY ASCENSION</p><h2>ULTIMATE</h2><p>Cấp thẻ tối thượng · chỉ dành cho cầu thủ +8</p></div></div>
+  <div class="ultimate-grid">
+    <div class="panel ultimate-selector"><h3>1. Chọn cầu thủ chính (+8)</h3><div class="ultimate-main-list">
+      {% for group in ['starting','bench','extras'] %}{% for p in state[group] %}{% if p.get('level',0)|int == 8 and not p.get('ultimate') %}
+      <label class="ultimate-player-choice"><input type="radio" name="ultimate-main-choice" value="{{group}}:{{loop.index0}}" data-name="{{p.name|e}}" data-ovr="{{p.rating}}" data-value="{{player_value(p)}}"><span><b>{{p.name}}</b><small>{{p.position}} · OVR gốc {{p.rating}} · Giá trị hiện tại {{player_value(p)|money}}</small></span><strong>+8</strong></label>
+      {% endif %}{% endfor %}{% endfor %}
+      {% if not (state.starting+state.bench+state.extras)|selectattr('level','equalto',8)|list %}<p class="muted">Chưa có cầu thủ +8 đủ điều kiện.</p>{% endif %}
+    </div></div>
+    <div class="panel ultimate-materials"><h3>2. Thêm phôi (+8 · tối đa 5)</h3><p class="muted">OVR so sánh theo OVR gốc. Phôi chỉ lấy từ Dự bị và Cầu thủ khác để bảo toàn 11 cầu thủ chính.</p><div class="ultimate-fodder-list">
+      {% for group in ['bench','extras'] %}{% for p in state[group] %}{% if p.get('level',0)|int == 8 and not p.get('ultimate') %}
+      <label class="ultimate-fodder-choice"><input type="checkbox" name="ultimate-fodder-choice" value="{{group}}:{{loop.index0}}" data-ovr="{{p.rating}}"><span><b>{{p.name}}</b><small>{{p.position}} · OVR gốc {{p.rating}}</small></span><strong>+8</strong></label>
+      {% endif %}{% endfor %}{% endfor %}
+      {% if not (state.bench+state.extras)|selectattr('level','equalto',8)|list %}<p class="muted">Không có cầu thủ +8 trong kho để làm phôi.</p>{% endif %}
+    </div>
+    <div class="ultimate-protection"><label><input type="checkbox" id="ultimateProtect" {% if state.get('inventory',{}).get('Thẻ bảo vệ',0)|int < 1 %}disabled{% endif %}> Dùng Thẻ bảo vệ (còn {{state.get('inventory',{}).get('Thẻ bảo vệ',0)}})</label><small>Có bảo vệ: thất bại vẫn giữ +8. Không bảo vệ: thất bại tụt xuống +7.</small></div>
+    <div class="ultimate-stats"><div><span>Tỉ lệ thành công</span><strong id="ultimateRate">1.0%</strong></div><div><span>Chi phí ép (10% giá trị hiện tại)</span><strong id="ultimateCost">—</strong></div></div>
+    <p class="ultimate-rule">Thành công: +5 OVR, giá trị bằng 5000% giá trị gốc tại +0. Phôi luôn bị tiêu hao dù thành công hay thất bại.</p>
+    <form id="ultimateForm" method="post" action="{{url_for('action')}}"><input type="hidden" name="action" value="ultimate_upgrade"><input type="hidden" name="group" id="ultimateGroup"><input type="hidden" name="index" id="ultimateIndex"><input type="hidden" name="protection" id="ultimateProtectionValue" value="0"><div id="ultimateFodderInputs"></div><button class="button ultimate-submit" id="ultimateSubmit" type="submit" disabled>✦ ÉP THẺ CẤP CAO</button></form>
+    <p class="muted" id="ultimateStatus" aria-live="polite">Chọn cầu thủ chính để bắt đầu.</p>
+    </div>
+  </div>
+</section>
+<script>
+(()=>{const switchers=[...document.querySelectorAll('[data-forge-mode]')],normal=document.querySelector('.forge-layout'),heading=document.querySelector('.forge-heading'),ultimate=document.getElementById('ultimateForge');switchers.forEach(b=>b.addEventListener('click',()=>{switchers.forEach(x=>x.classList.toggle('active',x===b));const isU=b.dataset.forgeMode==='ultimate';normal.hidden=isU;heading.hidden=isU;ultimate.hidden=!isU;}));
+const mains=[...document.querySelectorAll('[name="ultimate-main-choice"]')],fodders=[...document.querySelectorAll('[name="ultimate-fodder-choice"]')],form=document.getElementById('ultimateForm'),submit=document.getElementById('ultimateSubmit'),protect=document.getElementById('ultimateProtect');if(!form)return;const money=n=>Math.round(n*1000000).toLocaleString('vi-VN')+' PC';const bonus=d=>d>=2?19.8:d===1?15:d===0?10:d===-1?6.5:3;
+function update(){const main=mains.find(x=>x.checked),mainToken=main?main.value:'';fodders.forEach(x=>{const same=x.value===mainToken;x.disabled=same;if(same)x.checked=false;});const chosen=fodders.filter(x=>x.checked);if(chosen.length>5){chosen[chosen.length-1].checked=false;return update();}let rate=1;if(main)chosen.forEach(x=>rate+=bonus(Number(x.dataset.ovr)-Number(main.dataset.ovr)));rate=Math.min(100,rate);document.getElementById('ultimateRate').textContent=rate.toFixed(1)+'%';document.getElementById('ultimateCost').textContent=main?money(Number(main.dataset.value)*.1):'—';document.getElementById('ultimateGroup').value=main?main.value.split(':')[0]:'';document.getElementById('ultimateIndex').value=main?main.value.split(':')[1]:'';document.getElementById('ultimateProtectionValue').value=protect.checked?'1':'0';const box=document.getElementById('ultimateFodderInputs');box.innerHTML='';chosen.forEach(x=>{const i=document.createElement('input');i.type='hidden';i.name='fodder';i.value=x.value;box.appendChild(i)});submit.disabled=!main||!main.checked||chosen.length>5;document.getElementById('ultimateStatus').textContent=main?`${main.dataset.name} · ${chosen.length}/5 phôi · tỉ lệ ${rate.toFixed(1)}%`:'Chọn cầu thủ chính để bắt đầu.';}
+mains.forEach(x=>x.addEventListener('change',update));fodders.forEach(x=>x.addEventListener('change',update));protect?.addEventListener('change',update);form.addEventListener('submit',async e=>{e.preventDefault();if(submit.disabled)return;const selected=mains.find(x=>x.checked);if(!selected)return;const count=fodders.filter(x=>x.checked).length;if(!confirm(`Xác nhận ép ${selected.dataset.name} lên Ultimate? Toàn bộ ${count} phôi sẽ mất dù thành công hay thất bại.`))return;submit.disabled=true;try{const response=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},credentials:'same-origin'});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Không thể ép Ultimate.');alert(data.message+' · '+data.player_name+' · OVR '+data.ovr+' · Tỉ lệ '+data.rate+'%');window.location.reload();}catch(err){alert(err.message);submit.disabled=false;update();}});update();})();
 </script>
 {% elif tab=='finance' %}
 <section class="panel"><h2>Tài chính CLB</h2><div class="stats"><div class="stat"><span>Ngân sách hiện tại</span><strong>{{state.budget|money}}</strong></div><div class="stat"><span>Giá trị đội hình</span><strong>{{data.squad_value|money}}</strong></div></div></section>

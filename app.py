@@ -8,7 +8,7 @@ from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, upgrade_cost, value, player, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, ULTIMATE_VALUE_MULTIPLIER, upgrade_cost, value, player, player_upgrade_ovr, player_base_value, simulate_match)
 
 app = Flask(__name__)
 app.register_blueprint(player_market_bp)
@@ -119,8 +119,8 @@ def page(save, tab='overview', extra=None):
     if ballon_reveal:
         persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, profile_matches=int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0), profile_win_rate=round(100*int(st.get('wins', 0) or 0)/max(1,int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0)),1), daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
-                           prices={p['name']:value(p) for p in all_players(st)}, player_value=value, packs=PACKS,
-                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, extra=extra)
+                           prices={p['name']:value(p) for p in all_players(st)}, player_value=value, player_ovr=player_upgrade_ovr, player_base_value=player_base_value, packs=PACKS,
+                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, ultimate_value_multiplier=ULTIMATE_VALUE_MULTIPLIER, extra=extra)
 
 @app.route('/')
 def home():
@@ -979,7 +979,7 @@ def resolve_friendly_match(challenge):
         raise ValueError('Một trong hai đội bóng không còn tồn tại.')
     sa, sb = load_state(a), load_state(b)
     def team_ovr(st):
-        vals = [float(p.get('rating', 0)) + float(p.get('level', 0)) for p in st.get('starting', [])]
+        vals = [player_upgrade_ovr(p) for p in st.get('starting', [])]
         return sum(vals)/len(vals) if vals else 60
     oa, ob = team_ovr(sa), team_ovr(sb)
     def goals(attack, defence):
@@ -1423,7 +1423,7 @@ def action():
                 'success': bool(success), 'protected': bool(protection_requested),
                 'player_name': p.get('name', 'Unknown'), 'group': group, 'index': idx,
                 'old_level': old_level, 'target_level': target, 'new_level': new_level,
-                'ovr': int(p.get('rating', 0)) + ovr_bonus,
+                'ovr': player_upgrade_ovr(p),
                 'base_rating': int(p.get('rating', 0)),
                 'base_value': float(p.get('market_value', 0) or 0),
                 'value': round(float(p.get('market_value', 0) or 0) * [1.0,1.50,2.25,3.20,4.10,6.35,9.00,12.50,21.00][new_level], 2),
@@ -1431,6 +1431,87 @@ def action():
                 'protection_count': int(inventory.get('Thẻ bảo vệ', 0) or 0),
                 'cost': cost, 'rate': UPGRADE_RATES[level],
                 'message': ('ÉP THẺ THÀNH CÔNG!' if success else ('THẤT BẠI · ĐÃ BẢO VỆ THẺ!' if protection_requested else 'ÉP THẺ THẤT BẠI!'))
+            }
+        elif act=='ultimate_upgrade':
+            group = request.form.get('group', '')
+            idx = int(request.form.get('index', '-1'))
+            if group not in {'starting', 'bench', 'extras'} or idx < 0 or idx >= len(st[group]):
+                raise ValueError('Không tìm thấy cầu thủ chính cần ép Ultimate.')
+            main_player = st[group][idx]
+            if int(main_player.get('level', 0) or 0) != 8 or main_player.get('ultimate'):
+                raise ValueError('Chỉ cầu thủ đang ở +8 mới được ép lên Ultimate.')
+
+            fodder_tokens = request.form.getlist('fodder')
+            if len(fodder_tokens) > 5:
+                raise ValueError('Chỉ được sử dụng tối đa 5 phôi.')
+            if len(set(fodder_tokens)) != len(fodder_tokens):
+                raise ValueError('Phôi bị chọn trùng.')
+            fodders = []
+            for token in fodder_tokens:
+                try:
+                    fg, fi = token.split(':', 1); fi = int(fi)
+                except (ValueError, TypeError):
+                    raise ValueError('Dữ liệu phôi không hợp lệ.')
+                # Phôi chỉ lấy từ kho dự bị/cầu thủ khác để không phá đội hình 11 chính.
+                if fg not in {'bench', 'extras'} or fi < 0 or fi >= len(st[fg]):
+                    raise ValueError('Phôi phải nằm trong Dự bị hoặc Cầu thủ khác.')
+                fodder = st[fg][fi]
+                if fodder is main_player or int(fodder.get('level', 0) or 0) != 8 or fodder.get('ultimate'):
+                    raise ValueError('Mỗi phôi phải là cầu thủ +8 chưa lên Ultimate.')
+                fodders.append((fg, fi, fodder))
+
+            base_ovr = int(main_player.get('rating', 80) or 80)
+            rate = 1.0
+            for _, _, fodder in fodders:
+                diff = int(fodder.get('rating', 80) or 80) - base_ovr
+                if diff >= 2: rate += 19.8
+                elif diff == 1: rate += 15.0
+                elif diff == 0: rate += 10.0
+                elif diff == -1: rate += 6.5
+                else: rate += 3.0
+            rate = min(100.0, rate)
+            cost = round(value(main_player) * 0.10, 2)
+            if st['budget'] + 1e-9 < cost:
+                raise ValueError(f'Không đủ ngân sách ép Ultimate. Cần {format_money(cost)}.')
+
+            protection_requested = request.form.get('protection') in {'1', 'on', 'true', 'yes'}
+            inventory = st.setdefault('inventory', {})
+            protection_count = int(inventory.get('Thẻ bảo vệ', 0) or 0)
+            if protection_requested and protection_count < 1:
+                raise ValueError('Bạn không có Thẻ bảo vệ.')
+            if protection_requested:
+                inventory['Thẻ bảo vệ'] = protection_count - 1
+
+            st['budget'] = round(st['budget'] - cost, 2)
+            success = random.random() * 100 < rate
+            if success:
+                main_player['ultimate'] = True
+                main_player['level'] = 8
+            elif not protection_requested:
+                # Không có bảo vệ: thất bại làm tụt về +7; có bảo vệ thì giữ +8.
+                main_player['level'] = 7
+            # Phôi luôn mất dù thành công hay thất bại.
+            for fg, fi, _ in sorted(fodders, key=lambda item: (item[0], item[1]), reverse=True):
+                st[fg].pop(fi)
+
+            event = {
+                'player': main_player.get('name', 'Unknown'), 'from_level': 8,
+                'target_level': 'ULTIMATE', 'result_level': 'ULTIMATE' if success else ('+8' if protection_requested else '+7'),
+                'success': bool(success), 'protected': bool(protection_requested),
+                'fodder_count': len(fodders), 'cost': cost,
+                'week': st.get('week', 1), 'created_at': datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')
+            }
+            st.setdefault('upgrade_history', []).insert(0, event)
+            st['upgrade_history'] = st['upgrade_history'][:200]
+            upgrade_response = {
+                'success': bool(success), 'protected': bool(protection_requested),
+                'player_name': main_player.get('name', 'Unknown'),
+                'new_level': 'ULTIMATE' if success else (8 if protection_requested else 7),
+                'ovr': player_upgrade_ovr(main_player), 'rate': round(rate, 1),
+                'budget': st.get('budget', 0), 'protection_count': int(inventory.get('Thẻ bảo vệ', 0) or 0),
+                'cost': cost, 'fodder_count': len(fodders),
+                'value': value(main_player),
+                'message': 'ULTIMATE SUCCESS' if success else ('ĐÃ BẢO VỆ +8' if protection_requested else 'THẤT BẠI · GIẢM XUỐNG +7')
             }
         elif act=='match':
             result=simulate_match(st)
@@ -1458,13 +1539,13 @@ def action():
         persist(save,st)
     except (ValueError,KeyError,IndexError,TypeError) as e:
         db.session.rollback()
-        if is_ajax and act == 'upgrade':
+        if is_ajax and act in {'upgrade', 'ultimate_upgrade'}:
             return jsonify({'ok': False, 'error': str(e)}), 400
         flash(str(e))
-    if is_ajax and act == 'upgrade' and upgrade_response:
+    if is_ajax and act in {'upgrade', 'ultimate_upgrade'} and upgrade_response:
         return jsonify({'ok': True, **upgrade_response})
     return redirect(request.referrer or url_for('dashboard'))
-def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
+def flash_message_placeholder(act): return {'swap':'Cập nhật đội hình','promote':'Thêm cầu thủ vào đội hình','buy':'Chuyển nhượng','sell':'Bán cầu thủ','pack':'Mở gói cầu thủ','ballon_pack':'Mở Ballon D’or Pack','upgrade':'Ép thẻ','ultimate_upgrade':'Ép thẻ Cấp cao','match':'Kết quả trận đấu','formation':'Đổi chiến thuật'}.get(act,'Hoạt động')
 # ---------------- Academic League (A1 Cup) ----------------
 from zoneinfo import ZoneInfo
 A1_TZ = ZoneInfo('Asia/Ho_Chi_Minh')

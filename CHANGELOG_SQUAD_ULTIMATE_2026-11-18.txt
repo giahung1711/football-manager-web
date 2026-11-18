@@ -1,0 +1,33 @@
+FOOTBALL MANAGER WEB - SQUAD / ULTIMATE UPDATE
+Date: 2026-11-18
+
+1) Squad organization
+- Keeps up to 11 starters and exactly 5 substitute slots.
+- Any additional owned players are preserved in Extras / Cầu thủ khác.
+- Dashboard squad OVR and squad value now use the active 16-player group (starting XI + five substitutes); Extras are excluded.
+- Substitutes render as a compact five-card row. Extras use a compact list with name search and position filter.
+- Transfer market and player-to-player market now include compact search / position filters and name/position sorting.
+
+2) Positional OVR
+- Starting players receive a 5% OVR penalty when assigned to a position different from their natural position.
+- OVR is calculated with half-up integer rounding. The stored base OVR is unchanged.
+- Goalkeepers remain restricted to GK slots. Reserve cards do not retain a stale starting-position penalty.
+
+3) Ultimate enhancement
+- Added a separate Ultimate enhancement mode; only non-Ultimate +8 players can be selected as the main card.
+- Up to five +8 fodder cards can be selected from substitutes / Extras. Fodder OVR comparisons use each card's original base OVR.
+- Success rate starts at 1%, adds the specified per-fodder rates, and is capped at 100%.
+- Cost is 10% of the main player's current value.
+- All selected fodder cards are consumed on both success and failure.
+- A Protection Card is optional and is consumed when selected. On failure, protection keeps the main card at +8; without protection, failure downgrades it to +7.
+- Success stores a separate `ultimate` flag (not a numeric +9), adds 5 OVR, and sets value to 5000% (50x) of the original +0 base value.
+- Ultimate cards use the ruby diamond-star mark (✦) and ruby frame styling.
+
+4) Data safety
+- Existing user accounts, game saves, Admin, A1 Cup and other features are retained in source.
+- The bundled local SQLite database is intentionally excluded from this update ZIP. Deploy the code without replacing the production database.
+
+Validation performed:
+- Python syntax compilation passed for app.py, game_engine.py and marketplace.py.
+- Jinja template parsing passed.
+- Focused game-engine assertions passed for 11/5/Extras split, 5% positional penalty, Ultimate OVR/value and 16-player dashboard calculations.

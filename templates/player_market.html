@@ -48,13 +48,14 @@
 
   {% if own_players %}
     <form method="post" action="{{ url_for('player_market.player_market_list_bulk') }}" id="bulkMarketForm">
+      <div class="market-filter-toolbar"><input type="search" id="ownMarketSearch" placeholder="⌕ Tìm tên cầu thủ..."><select id="ownMarketPosition"><option value="">Tất cả vị trí</option>{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LM','RM','LW','RW','ST'] %}<option>{{pos}}</option>{% endfor %}</select><select id="ownMarketSort"><option value="name">Tên A–Z</option><option value="position">Vị trí</option></select></div>
       <div class="bulk-market-toolbar">
         <label><input type="checkbox" id="selectAllMarketPlayers"> Chọn tất cả đủ điều kiện</label>
         <span class="muted" id="selectedMarketCount">0 cầu thủ được chọn</span>
         <button class="button primary" type="submit">Đăng bán các cầu thủ đã chọn</button>
       </div>
       {% for item in own_players %}
-        <div class="section-head market-own-player">
+        <div class="section-head market-own-player" data-name="{{item.player.name|lower}}" data-position="{{item.player.position|upper}}">
           <div class="market-player-select">
             {% if item.eligible %}
               <input type="checkbox" name="selected_player" value="{{item.group}}:{{item.index}}" class="market-player-checkbox" aria-label="Chọn {{item.player.name}}">
@@ -63,7 +64,7 @@
             {% endif %}
             <div>
               <strong>{{ item.player.name }}</strong>
-              <p class="muted">{{ item.player.position }} · OVR {{ item.ovr }} · +{{ item.player.level|default(0) }} · Giá trị {{ item.value|money }}</p>
+              <p class="muted">{{ item.player.position }} · OVR {{ item.ovr }} · {% if item.player.get('ultimate') %}✦ ULTIMATE{% else %}+{{ item.player.level|default(0) }}{% endif %} · Giá trị {{ item.value|money }}</p>
               <p class="muted">Giá được phép: {{ item.minimum|money }} – {{ item.maximum|money }} · {{ item.requirement }}</p>
             </div>
           </div>
@@ -89,9 +90,10 @@
   <h2>Cầu thủ đang được rao bán</h2>
 
   {% if listings %}
+    <div class="market-filter-toolbar"><input type="search" id="listingSearch" placeholder="⌕ Tìm tên cầu thủ..."><select id="listingPosition"><option value="">Tất cả vị trí</option>{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LM','RM','LW','RW','ST'] %}<option>{{pos}}</option>{% endfor %}</select><select id="listingSort"><option value="name">Tên A–Z</option><option value="position">Vị trí</option></select></div>
 
     <div class="table-wrap">
-      <table>
+      <table id="listingsTable">
         <thead>
           <tr>
             <th>Cầu thủ</th>
@@ -107,16 +109,16 @@
         <tbody>
           {% for listing in listings %}
 
-            <tr>
+            <tr data-name="{{listing.player_name|lower}}" data-position="{{listing.display_position|upper}}">
               <td>
-                <strong>{{ listing.player_name }}</strong>
+                <strong>{{ listing.player_name }}</strong> {% if listing.display_ultimate %}<span class="ultimate-star" title="Ultimate">✦</span>{% endif %}
               </td>
 
               <td>{{ listing.display_position }}</td>
 
               <td>{{ listing.display_ovr }}</td>
 
-              <td>+{{ listing.display_level }}</td>
+              <td>{% if listing.display_ultimate %}<span class="ultimate-star">✦</span>{% else %}+{{ listing.display_level }}{% endif %}</td>
 
               <td>
                 {{ sellers.get(listing.seller_id, 'Người chơi') }}
@@ -178,4 +180,8 @@
   </p>
 </section>
 
+<script>
+(()=>{function attach(prefix,selector){const q=document.getElementById(prefix+'Search'),pos=document.getElementById(prefix+'Position'),sort=document.getElementById(prefix+'Sort');const root=prefix==='ownMarket'?document.getElementById('bulkMarketForm'):document.querySelector('#listingsTable tbody');if(!q||!pos||!sort)return;const getRows=()=>[...(root||document).querySelectorAll(selector)];const run=()=>{const rows=getRows(),term=q.value.trim().toLocaleLowerCase('vi');rows.forEach(r=>r.hidden=!((r.dataset.name||'').includes(term)&&(!pos.value||r.dataset.position===pos.value)));rows.sort((a,b)=>sort.value==='position'?(a.dataset.position.localeCompare(b.dataset.position)||a.dataset.name.localeCompare(b.dataset.name)):a.dataset.name.localeCompare(b.dataset.name));rows.forEach(r=>r.parentElement.appendChild(r));};[q,pos,sort].forEach(x=>x.addEventListener(x.tagName==='INPUT'?'input':'change',run));run();}
+attach('ownMarket','.market-own-player');const lq=document.getElementById('listingSearch'),lp=document.getElementById('listingPosition'),ls=document.getElementById('listingSort'),tbody=document.querySelector('.table-wrap tbody');if(lq&&tbody){const run=()=>{const rows=[...tbody.rows],term=lq.value.trim().toLocaleLowerCase('vi');rows.forEach(r=>r.hidden=!((r.dataset.name||'').includes(term)&&(!lp.value||r.dataset.position===lp.value)));rows.sort((a,b)=>ls.value==='position'?(a.dataset.position.localeCompare(b.dataset.position)||a.dataset.name.localeCompare(b.dataset.name)):a.dataset.name.localeCompare(b.dataset.name));rows.forEach(r=>tbody.appendChild(r));};[lq,lp,ls].forEach(x=>x.addEventListener(x.tagName==='INPUT'?'input':'change',run));run();}})();
+</script>
 {% endblock %}

@@ -411,6 +411,7 @@ SWEET_CANDY_VALUES = {entry[0]: entry[4] for entry in SWEET_CANDY_PLAYERS}
 CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026', 'Sweet Candy')
 
 MAX_UPGRADE_LEVEL = 8
+ULTIMATE_VALUE_MULTIPLIER = 50.0  # 5000% giá trị gốc
 
 PACKS = {
     '1': {
@@ -540,8 +541,14 @@ def player_upgrade_ovr(p):
         UPGRADE_OVR_BONUS.get(step, 0)
         for step in range(1, level + 1)
     )
-
-    return int(p.get('rating', 80)) + bonus
+    if p.get('ultimate'):
+        bonus += 5
+    raw = int(p.get('rating', 80)) + bonus
+    assigned = str(p.get('assigned_position') or p.get('position') or '').upper()
+    natural = str(p.get('position') or '').upper()
+    if assigned and natural and assigned != natural and natural != 'GK':
+        return int(raw * 0.95 + 0.5)
+    return raw
 
 
 def upgrade_cost(p, target_level):
@@ -562,10 +569,8 @@ def value(p):
         level = 0
 
     level = max(0, min(MAX_UPGRADE_LEVEL, level))
-
-    return round_half_up(
-        player_base_value(p) * CARD_VALUE_RATES[level]
-    )
+    multiplier = ULTIMATE_VALUE_MULTIPLIER if p.get('ultimate') else CARD_VALUE_RATES[level]
+    return round_half_up(player_base_value(p) * multiplier)
 
 
 def create_new_game(club):
@@ -691,7 +696,15 @@ def normalize_state(st):
         )
     )
 
+    # Exactly five substitute slots; every additional owned card is kept in Extras.
     st.setdefault('extras', [])
+    if len(st['bench']) > 5:
+        st['extras'] = st['bench'][5:] + st['extras']
+        st['bench'] = st['bench'][:5]
+    elif len(st['bench']) < 5 and st['extras']:
+        needed = 5 - len(st['bench'])
+        st['bench'].extend(st['extras'][:needed])
+        st['extras'] = st['extras'][needed:]
     st.setdefault('market', copy.deepcopy(TRANSFER_MARKET))
 
     # GOAT players are pack-only, not part of the ordinary transfer market.
@@ -740,6 +753,21 @@ def normalize_state(st):
     if st.get('formation') == '4-3-3':
         st['formation'] = '4-3-3 (Tấn công)'
 
+    # Positional penalty applies only while a card occupies a starting-XI slot.
+    role_sets = {
+        '4-3-3 (Tấn công)': ['LW','ST','RW','CM','CAM','CM','LB','CB','CB','RB','GK'],
+        '4-3-3 (Phòng thủ)': ['LW','ST','RW','CM','CDM','CM','LB','CB','CB','RB','GK'],
+        '4-2-4': ['LW','ST','ST','RW','CM','CM','LB','CB','CB','RB','GK'],
+        '4-1-2-1-2': ['ST','ST','CAM','CM','CM','CDM','LB','CB','CB','RB','GK'],
+    }
+    roles = role_sets.get(st.get('formation'), role_sets['4-3-3 (Tấn công)'])
+    for index, card in enumerate(st.get('starting', [])[:11]):
+        if not card.get('assigned_position') and index < len(roles):
+            card['assigned_position'] = roles[index]
+    for group in ('bench', 'extras'):
+        for card in st.get(group, []):
+            card.pop('assigned_position', None)
+
     st.setdefault('activity', [])
     st.setdefault('match_history', [])
     try:
@@ -760,7 +788,7 @@ def all_players(st):
 
 
 def get_dashboard(st):
-    arr = st['starting']
+    arr = (st.get('starting', []) + st.get('bench', []))[:16]
 
     return {
         "club": st.get('custom_club_name') or st['club'],
@@ -772,16 +800,13 @@ def get_dashboard(st):
         "draws": st['draws'],
         "losses": st['losses'],
         "formation": st['formation'],
-        "squad_size": len(all_players(st)),
+        "squad_size": len(arr),
         "average_rating": round(
             sum(player_upgrade_ovr(p) for p in arr) / max(1, len(arr)),
             1
         ),
-        "total_value": round(
-            sum(value(p) for p in all_players(st)),
-            2
-        ),
-        "squad_value": round(sum(value(p) for p in all_players(st)), 2),
+        "total_value": round(sum(value(p) for p in arr), 2),
+        "squad_value": round(sum(value(p) for p in arr), 2),
         "matches_played": int(st.get("wins", 0) or 0) + int(st.get("draws", 0) or 0) + int(st.get("losses", 0) or 0),
         "win_rate": round(100 * int(st.get("wins", 0) or 0) / max(1, int(st.get("wins", 0) or 0) + int(st.get("draws", 0) or 0) + int(st.get("losses", 0) or 0)), 1)
     }
