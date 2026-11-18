@@ -102,7 +102,7 @@
         {% set is_icon_hero = p.get('is_icon') or p.get('is_hero') or p.get('card_type') in ['ICON', 'HEROES'] %}
         {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
         {% set upgrade_tier = 'bronze' if p.level <= 3 else 'upgrade-silver' if p.level <= 5 else 'upgrade-gold' if p.level <= 7 else 'upgrade-purple' %}
-        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% elif p.get('event_card') == 'custom_season' %} card-custom-season{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
+        <div class="player-card pitch-player-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}{% if p.get('event_card') == 'ballon_dor' %} card-ballon-dor{% elif p.get('event_card') == 'christmas_2026' %} card-christmas-2026{% elif p.get('event_card') == 'sweet_candy' %} card-sweet-candy{% elif p.get('event_card') == 'custom_season' %} card-custom-season{% endif %}" style="left:{{slot[1]}}%;top:{{slot[2]}}%" draggable="true" data-group="starting" data-index="{{loop.index0}}" data-target-group="starting" data-target="{{loop.index0}}" title="Kéo thẻ để đổi vị trí">
           <span class="player-ovr">{{shown}}</span>
           <span class="player-position">{{role}}</span>
           <span class="upgrade-badge {{upgrade_tier}}{% if p.get('ultimate') %} ultimate-level-badge{% endif %}">{% if p.get('ultimate') %}<span class="ultimate-star" title="Ultimate">✦</span>{% else %}+{{p.level}}{% endif %}</span>
@@ -148,7 +148,7 @@
   <div class="bench-card-row" id="benchDropZone">
     {% for p in state.bench[:5] %}
       {% set rarity = 'icon' if p.get('is_icon') or p.get('card_type') == 'ICON' else 'heroes' if p.get('is_hero') or p.get('card_type') == 'HEROES' else 'premium' if p.rating >= 90 else 'gold' if p.rating >= 81 else 'silver' if p.rating >= 76 else 'regular' %}
-      <article class="bench-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}" draggable="true" data-group="bench" data-index="{{loop.index0}}" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
+      <article class="bench-card ornate-card card-{{rarity}}{% if p.get('ultimate') %} card-ultimate{% endif %}" draggable="true" data-group="bench" data-index="{{loop.index0}}" data-target-group="bench" data-target="{{loop.index0}}" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
         <span class="bench-card-ovr">{{player_ovr(p)}}</span><span class="bench-card-position">{{p.position}}</span>
         {% if p.get('ultimate') %}<span class="ultimate-star">✦</span>{% else %}<span class="bench-card-level">+{{p.level|default(0)}}</span>{% endif %}
         <div class="bench-card-art">{% if p.get('photo_url') %}<img src="{{p.photo_url}}" alt="" loading="lazy" onerror="this.hidden=true">{% else %}<span class="portrait-fallback"><span class="portrait-head"></span><span class="portrait-body"></span></span>{% endif %}</div>
@@ -167,7 +167,7 @@
   </div>
   <div class="extras-player-list" id="extrasPlayerList">
     {% for p in state.extras %}
-      <article class="bench-player extras-player" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
+      <article class="bench-player extras-player" draggable="true" data-group="extras" data-index="{{loop.index0}}" data-player-name="{{p.name|lower}}" data-player-position="{{p.position|upper}}">
         <span class="bench-ovr">{{player_ovr(p)}}</span><div class="extras-player-main"><strong>{{p.name}}</strong><small>{{p.position}} · {{p.nationality or ''}}{% if p.club %} · {{p.club}}{% endif %} · {% if p.get('ultimate') %}<span class="ultimate-star">✦ ULTIMATE</span>{% else %}+{{p.level|default(0)}}{% endif %}</small>
         {% if state.starting|length < 11 %}<form method="post" action="{{url_for('action')}}" class="promote-player-form"><input type="hidden" name="action" value="promote"><input type="hidden" name="group" value="extras"><input type="hidden" name="index" value="{{loop.index0}}"><button class="button" type="submit">＋ Thêm vào đá chính</button></form>{% endif %}
         </div>
@@ -176,9 +176,24 @@
     {% if not state.extras %}<p class="muted">Chưa có cầu thủ khác.</p>{% endif %}
   </div>
 </section>
-<form id="dragSwapForm" method="post" action="{{url_for('action')}}" hidden><input name="action" value="drag_swap"><input name="source_group"><input name="source_index"><input name="target_index"><input name="target_group" value="starting"></form>
+<form id="dragSwapForm" method="post" action="{{url_for('action')}}" hidden><input name="action" value="drag_swap"><input name="source_group"><input name="source_index"><input name="target_index"><input name="target_group"></form>
 <script>
-(()=>{const search=document.getElementById('extrasPlayerSearch'),filter=document.getElementById('extrasPositionFilter'),count=document.getElementById('extrasSearchCount');const apply=()=>{const q=(search?.value||'').trim().toLocaleLowerCase('vi'),pos=filter?.value||'';let visible=0;document.querySelectorAll('#extrasPlayerList .extras-player').forEach(card=>{const show=(card.dataset.playerName||'').toLocaleLowerCase('vi').includes(q)&&(!pos||card.dataset.playerPosition===pos);card.hidden=!show;if(show)visible++;});if(count)count.textContent=visible+' cầu thủ';};search?.addEventListener('input',apply);filter?.addEventListener('change',apply);let dragged=null;const form=document.getElementById('dragSwapForm');document.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging')});el.addEventListener('dragend',()=>{el.classList.remove('dragging');dragged=null})});document.querySelectorAll('.pitch-player-card').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drop-target')});target.addEventListener('dragleave',()=>target.classList.remove('drop-target'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drop-target');if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value=target.dataset.target;form.elements.target_group.value='starting';form.submit()})});const bench=document.getElementById('benchDropZone');bench.addEventListener('dragover',e=>e.preventDefault());bench.addEventListener('drop',e=>{e.preventDefault();if(!dragged||dragged.dataset.group!=='starting')return;form.elements.source_group.value='starting';form.elements.source_index.value=dragged.dataset.index;form.elements.target_index.value='-1';form.elements.target_group.value='bench';form.submit()})})();
+(()=>{
+ const search=document.getElementById('extrasPlayerSearch'),filter=document.getElementById('extrasPositionFilter'),count=document.getElementById('extrasSearchCount');
+ const apply=()=>{const q=(search?.value||'').trim().toLocaleLowerCase('vi'),pos=filter?.value||'';let visible=0;document.querySelectorAll('#extrasPlayerList .extras-player').forEach(card=>{const show=(card.dataset.playerName||'').toLocaleLowerCase('vi').includes(q)&&(!pos||card.dataset.playerPosition===pos);card.hidden=!show;if(show)visible++;});if(count)count.textContent=visible+' cầu thủ';};
+ search?.addEventListener('input',apply);filter?.addEventListener('change',apply);
+ let dragged=null;const form=document.getElementById('dragSwapForm');
+ const submit=(targetGroup,targetIndex)=>{if(!dragged)return;form.elements.source_group.value=dragged.dataset.group;form.elements.source_index.value=dragged.dataset.index;form.elements.target_group.value=targetGroup;form.elements.target_index.value=targetIndex;form.submit();};
+ document.querySelectorAll('[draggable="true"]').forEach(el=>{
+  el.addEventListener('dragstart',e=>{dragged=el;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','fm-player');el.classList.add('dragging');});
+  el.addEventListener('dragend',()=>{el.classList.remove('dragging');document.querySelectorAll('.drop-target').forEach(x=>x.classList.remove('drop-target'));dragged=null;});
+  el.addEventListener('dragover',e=>{if(!dragged||dragged===el)return;e.preventDefault();el.classList.add('drop-target');});
+  el.addEventListener('dragleave',()=>el.classList.remove('drop-target'));
+  el.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();el.classList.remove('drop-target');if(!dragged||dragged===el)return;submit(el.dataset.group,el.dataset.index);});
+ });
+ const bindZone=(id,group)=>{const zone=document.getElementById(id);if(!zone)return;zone.addEventListener('dragover',e=>{if(dragged){e.preventDefault();zone.classList.add('drop-target');}});zone.addEventListener('dragleave',()=>zone.classList.remove('drop-target'));zone.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();zone.classList.remove('drop-target');if(!dragged)return;submit(group,'-1');});};
+ bindZone('benchDropZone','bench');bindZone('extrasPlayerList','extras');
+})();
 </script>
 {% elif tab=='transfers' %}
 <section class="panel"><h2>Thị trường chuyển nhượng</h2><div class="market-filter-toolbar"><input type="search" id="transferSearch" placeholder="⌕ Tìm tên cầu thủ..."><select id="transferPosition"><option value="">Tất cả vị trí</option>{% for pos in ['GK','CB','LB','RB','CDM','CM','CAM','LM','RM','LW','RW','ST'] %}<option>{{pos}}</option>{% endfor %}</select><select id="transferSort"><option value="name">Sắp xếp: Tên A–Z</option><option value="position">Sắp xếp: Vị trí</option></select></div><div class="table-wrap"><table id="transferTable"><thead><tr><th>Cầu thủ</th><th>Vị trí</th><th>OVR</th><th>Giá</th><th></th></tr></thead><tbody>{% for item in market_items %}<tr data-name="{{item.name|lower}}" data-position="{{item.position}}"><td>{{item.name}}</td><td>{{item.position}}</td><td>{{item.rating}}</td><td>{{ item.price|money }}</td><td><form method="post" action="{{url_for('action')}}" class="confirm-action" data-confirm="Xác nhận mua {{item.name}} với giá {{item.price|money}}? Ngân sách hiện tại: {{state.budget|money}}."><input type="hidden" name="action" value="buy"><input type="hidden" name="name" value="{{item.name}}"><button class="button">Mua</button></form></td></tr>{% endfor %}</tbody></table></div><p class="muted">Giá cầu thủ được tính theo dữ liệu thị trường trong game.</p></section>
@@ -349,6 +364,7 @@
   </div>
 </section>
 
+<div class="forge-confirm-overlay" id="normalForgeConfirm" hidden><div class="forge-confirm-dialog"><p class="eyebrow">ENHANCEMENT CONFIRMATION</p><h2>Xác nhận ép thẻ</h2><p id="normalForgeConfirmText"></p><div class="forge-confirm-actions"><button type="button" class="button" id="normalForgeCancel">Huỷ</button><button type="button" class="button primary" id="normalForgeAccept">Xác nhận</button></div></div></div>
 <script>
 (() => {
   const options = Array.from(document.querySelectorAll('.forge-player-option'));
@@ -419,14 +435,25 @@
   options.forEach(option => option.addEventListener('click', () => selectPlayer(option)));
   protect.addEventListener('change', updateForge);
 
-  form.addEventListener('submit', async event => {
+  const confirmBox = document.getElementById('normalForgeConfirm');
+  const confirmText = document.getElementById('normalForgeConfirmText');
+  let confirmed = false;
+  document.getElementById('normalForgeCancel').addEventListener('click', () => { confirmBox.hidden = true; });
+  document.getElementById('normalForgeAccept').addEventListener('click', () => { confirmBox.hidden = true; confirmed = true; runNormalForge(); });
+  form.addEventListener('submit', event => {
     event.preventDefault();
     if (busy) return;
-    if (!selected) { alert('Vui lòng chọn cầu thủ trước.'); return; }
+    if (!selected) { document.getElementById('forgeStatus').textContent = 'Vui lòng chọn cầu thủ trước.'; return; }
     const level = Number(selected.dataset.level);
-    if (level >= 8) { alert('Cầu thủ đã đạt cấp ép tối đa +8.'); return; }
-    if (protect.checked && level !== 7) { alert('Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.'); return; }
+    if (level >= 8) { document.getElementById('forgeStatus').textContent = 'Cầu thủ đã đạt cấp ép tối đa +8.'; return; }
+    if (protect.checked && level !== 7) { document.getElementById('forgeStatus').textContent = 'Thẻ bảo vệ chỉ dùng khi ép từ +7 lên +8.'; return; }
+    if (!confirmed) { confirmText.textContent = 'Xác nhận ép ' + selected.dataset.name + ' từ +' + level + ' lên +' + Math.min(8, level + 1) + '?'; confirmBox.hidden = false; return; }
+    confirmed = false;
+  });
 
+  async function runNormalForge() {
+    if (busy || !selected) return;
+    const level = Number(selected.dataset.level);
     busy = true;
     submit.disabled = true;
     protect.disabled = true;
@@ -492,18 +519,17 @@
       card.classList.remove('card-shaking');
       busy = false;
       updateForge();
-      document.getElementById('forgeStatus').textContent = 'SYSTEM READY';
-      alert(error.message || 'Có lỗi khi gửi yêu cầu ép thẻ.');
+      document.getElementById('forgeStatus').textContent = error.message || 'Có lỗi khi gửi yêu cầu ép thẻ.';
     }
-  });
+  }
 })();
 </script>
 <section class="ultimate-forge" id="ultimateForge" hidden>
   <div class="ultimate-banner"><span class="ultimate-emblem">✦</span><div><p class="eyebrow">RUBY ASCENSION</p><h2>ULTIMATE</h2><p>Cấp thẻ tối thượng · chỉ dành cho cầu thủ +8</p></div></div>
   <div class="ultimate-grid">
-    <div class="panel ultimate-selector"><h3>1. Chọn cầu thủ chính (+8)</h3><div class="ultimate-main-list">
+    <div class="panel ultimate-selector"><h3>1. Chọn cầu thủ chính (+8)</h3><div class="ultimate-main-preview"><div class="ultimate-preview-card" id="ultimatePreviewCard"><span class="ultimate-preview-ovr" id="ultimatePreviewOvr">—</span><span class="ultimate-preview-position" id="ultimatePreviewPosition">ST</span><span class="ultimate-star">✦</span><strong id="ultimatePreviewName">CHỌN CẦU THỦ</strong></div><p id="ultimatePreviewMeta">Thẻ cầu thủ đã chọn sẽ xuất hiện tại đây</p></div><div class="ultimate-main-list">
       {% for group in ['starting','bench','extras'] %}{% for p in state[group] %}{% if p.get('level',0)|int == 8 and not p.get('ultimate') %}
-      <label class="ultimate-player-choice"><input type="radio" name="ultimate-main-choice" value="{{group}}:{{loop.index0}}" data-name="{{p.name|e}}" data-ovr="{{p.rating}}" data-value="{{player_value(p)}}"><span><b>{{p.name}}</b><small>{{p.position}} · OVR gốc {{p.rating}} · Giá trị hiện tại {{player_value(p)|money}}</small></span><strong>+8</strong></label>
+      <label class="ultimate-player-choice"><input type="radio" name="ultimate-main-choice" value="{{group}}:{{loop.index0}}" data-name="{{p.name|e}}" data-position="{{p.position|e}}" data-ovr="{{p.rating}}" data-value="{{player_value(p)}}"><span><b>{{p.name}}</b><small>{{p.position}} · OVR gốc {{p.rating}} · Giá trị hiện tại {{player_value(p)|money}}</small></span><strong>+8</strong></label>
       {% endif %}{% endfor %}{% endfor %}
       {% if not (state.starting+state.bench+state.extras)|selectattr('level','equalto',8)|list %}<p class="muted">Chưa có cầu thủ +8 đủ điều kiện.</p>{% endif %}
     </div></div>
@@ -521,11 +547,15 @@
     </div>
   </div>
 </section>
+<div class="forge-confirm-overlay" id="ultimateForgeConfirm" hidden><div class="forge-confirm-dialog"><p class="eyebrow">RUBY ASCENSION</p><h2>Xác nhận ép Ultimate</h2><p id="ultimateForgeConfirmText"></p><div class="forge-confirm-actions"><button type="button" class="button" id="ultimateForgeCancel">Huỷ</button><button type="button" class="button primary" id="ultimateForgeAccept">Xác nhận</button></div></div></div>
 <script>
 (()=>{const switchers=[...document.querySelectorAll('[data-forge-mode]')],normal=document.querySelector('.forge-layout'),heading=document.querySelector('.forge-heading'),ultimate=document.getElementById('ultimateForge');switchers.forEach(b=>b.addEventListener('click',()=>{switchers.forEach(x=>x.classList.toggle('active',x===b));const isU=b.dataset.forgeMode==='ultimate';normal.hidden=isU;heading.hidden=isU;ultimate.hidden=!isU;}));
 const mains=[...document.querySelectorAll('[name="ultimate-main-choice"]')],fodders=[...document.querySelectorAll('[name="ultimate-fodder-choice"]')],form=document.getElementById('ultimateForm'),submit=document.getElementById('ultimateSubmit'),protect=document.getElementById('ultimateProtect');if(!form)return;const money=n=>Math.round(n*1000000).toLocaleString('vi-VN')+' PC';const bonus=d=>d>=2?19.8:d===1?15:d===0?10:d===-1?6.5:3;
-function update(){const main=mains.find(x=>x.checked),mainToken=main?main.value:'';fodders.forEach(x=>{const same=x.value===mainToken;x.disabled=same;if(same)x.checked=false;});const chosen=fodders.filter(x=>x.checked);if(chosen.length>5){chosen[chosen.length-1].checked=false;return update();}let rate=1;if(main)chosen.forEach(x=>rate+=bonus(Number(x.dataset.ovr)-Number(main.dataset.ovr)));rate=Math.min(100,rate);document.getElementById('ultimateRate').textContent=rate.toFixed(1)+'%';document.getElementById('ultimateCost').textContent=main?money(Number(main.dataset.value)*.1):'—';document.getElementById('ultimateGroup').value=main?main.value.split(':')[0]:'';document.getElementById('ultimateIndex').value=main?main.value.split(':')[1]:'';document.getElementById('ultimateProtectionValue').value=protect.checked?'1':'0';const box=document.getElementById('ultimateFodderInputs');box.innerHTML='';chosen.forEach(x=>{const i=document.createElement('input');i.type='hidden';i.name='fodder';i.value=x.value;box.appendChild(i)});submit.disabled=!main||!main.checked||chosen.length>5;document.getElementById('ultimateStatus').textContent=main?`${main.dataset.name} · ${chosen.length}/5 phôi · tỉ lệ ${rate.toFixed(1)}%`:'Chọn cầu thủ chính để bắt đầu.';}
-mains.forEach(x=>x.addEventListener('change',update));fodders.forEach(x=>x.addEventListener('change',update));protect?.addEventListener('change',update);form.addEventListener('submit',async e=>{e.preventDefault();if(submit.disabled)return;const selected=mains.find(x=>x.checked);if(!selected)return;const count=fodders.filter(x=>x.checked).length;if(!confirm(`Xác nhận ép ${selected.dataset.name} lên Ultimate? Toàn bộ ${count} phôi sẽ mất dù thành công hay thất bại.`))return;submit.disabled=true;try{const response=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},credentials:'same-origin'});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Không thể ép Ultimate.');alert(data.message+' · '+data.player_name+' · OVR '+data.ovr+' · Tỉ lệ '+data.rate+'%');window.location.reload();}catch(err){alert(err.message);submit.disabled=false;update();}});update();})();
+function update(){const main=mains.find(x=>x.checked),mainToken=main?main.value:'';document.getElementById('ultimatePreviewName').textContent=main?main.dataset.name:'CHỌN CẦU THỦ';document.getElementById('ultimatePreviewOvr').textContent=main?main.dataset.ovr:'—';document.getElementById('ultimatePreviewPosition').textContent=main?main.dataset.position:'ST';document.getElementById('ultimatePreviewMeta').textContent=main?'OVR gốc '+main.dataset.ovr+' · Giá trị '+money(Number(main.dataset.value)):'Thẻ cầu thủ đã chọn sẽ xuất hiện tại đây';fodders.forEach(x=>{const same=x.value===mainToken;x.disabled=same;if(same)x.checked=false;});const chosen=fodders.filter(x=>x.checked);if(chosen.length>5){chosen[chosen.length-1].checked=false;return update();}let rate=1;if(main)chosen.forEach(x=>rate+=bonus(Number(x.dataset.ovr)-Number(main.dataset.ovr)));rate=Math.min(100,rate);document.getElementById('ultimateRate').textContent=rate.toFixed(1)+'%';document.getElementById('ultimateCost').textContent=main?money(Number(main.dataset.value)*.1):'—';document.getElementById('ultimateGroup').value=main?main.value.split(':')[0]:'';document.getElementById('ultimateIndex').value=main?main.value.split(':')[1]:'';document.getElementById('ultimateProtectionValue').value=protect.checked?'1':'0';const box=document.getElementById('ultimateFodderInputs');box.innerHTML='';chosen.forEach(x=>{const i=document.createElement('input');i.type='hidden';i.name='fodder';i.value=x.value;box.appendChild(i)});submit.disabled=!main||!main.checked||chosen.length>5;document.getElementById('ultimateStatus').textContent=main?`${main.dataset.name} · ${chosen.length}/5 phôi · tỉ lệ ${rate.toFixed(1)}%`:'Chọn cầu thủ chính để bắt đầu.';}
+const confirmBox=document.getElementById('ultimateForgeConfirm');let runAfterConfirm=null;document.getElementById('ultimateForgeCancel').addEventListener('click',()=>{confirmBox.hidden=true;runAfterConfirm=null;});document.getElementById('ultimateForgeAccept').addEventListener('click',()=>{confirmBox.hidden=true;if(runAfterConfirm)runAfterConfirm();runAfterConfirm=null;});
+mains.forEach(x=>x.addEventListener('change',update));fodders.forEach(x=>x.addEventListener('change',update));protect?.addEventListener('change',update);form.addEventListener('submit',e=>{e.preventDefault();if(submit.disabled)return;const selected=mains.find(x=>x.checked);if(!selected)return;const count=fodders.filter(x=>x.checked).length;document.getElementById('ultimateForgeConfirmText').textContent=`Xác nhận ép ${selected.dataset.name} lên Ultimate? Toàn bộ ${count} phôi sẽ mất dù thành công hay thất bại.`;runAfterConfirm=runUltimate;confirmBox.hidden=false;});
+async function runUltimate(){const selected=mains.find(x=>x.checked);if(!selected)return;submit.disabled=true;const preview=document.getElementById('ultimatePreviewCard');preview.classList.remove('ultimate-forging','ultimate-success','ultimate-failure');preview.classList.add('ultimate-forging');document.getElementById('ultimateStatus').textContent='Đang truyền năng lượng Ruby...';try{const response=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},credentials:'same-origin'});const raw=await response.text();let data;try{data=JSON.parse(raw)}catch(_){throw new Error('Máy chủ không trả dữ liệu hợp lệ (HTTP '+response.status+').')}if(!response.ok||!data.ok)throw new Error(data.error||'Không thể ép Ultimate.');await new Promise(r=>setTimeout(r,1100));preview.classList.remove('ultimate-forging');preview.classList.add(data.success?'ultimate-success':'ultimate-failure');document.getElementById('ultimatePreviewOvr').textContent=data.ovr;document.getElementById('ultimatePreviewMeta').textContent=data.message+' · '+data.rate+'%';document.getElementById('ultimateStatus').textContent=data.message+' · '+data.player_name+' · OVR '+data.ovr+' · '+data.fodder_count+' phôi đã tiêu hao.';const budget=document.querySelector('[data-budget-balance]');if(budget)budget.textContent=money(data.budget);const protection=document.querySelector('.forge-protection-count strong');if(protection)protection.textContent=data.protection_count;const consumed=fodders.filter(x=>x.checked).map(x=>x.value.split(':').map((v,i)=>i?Number(v):v));const removedMain=data.success?selected.value.split(':').map((v,i)=>i?Number(v):v):null;const removedByGroup={};consumed.forEach(([g,i])=>(removedByGroup[g]??=[]).push(i));if(removedMain)(removedByGroup[removedMain[0]]??=[]).push(removedMain[1]);function reindexToken(input){const parts=input.value.split(':'),g=parts[0],idx=Number(parts[1]);const removed=(removedByGroup[g]||[]).filter(n=>n<idx).length;input.value=g+':'+(idx-removed);}fodders.filter(x=>x.checked).forEach(x=>x.closest('.ultimate-fodder-choice').remove());mains.forEach(x=>{if(x===selected&&data.success){x.checked=false;x.disabled=true;x.closest('.ultimate-player-choice').remove();}else reindexToken(x);});fodders.filter(x=>x.isConnected).forEach(reindexToken);if(data.success){document.getElementById('ultimatePreviewName').textContent=data.player_name+' · ULTIMATE';preview.classList.add('is-ultimate');}else{const row=selected.closest('.ultimate-player-choice');row.querySelector('strong').textContent=data.new_level===8?'+8':'+7';selected.checked=false;}update();}catch(err){preview.classList.remove('ultimate-forging');document.getElementById('ultimateStatus').textContent=err.message;submit.disabled=false;update();}}
+update();})();
 </script>
 {% elif tab=='finance' %}
 <section class="panel"><h2>Tài chính CLB</h2><div class="stats"><div class="stat"><span>Ngân sách hiện tại</span><strong>{{state.budget|money}}</strong></div><div class="stat"><span>Giá trị đội hình</span><strong>{{data.squad_value|money}}</strong></div></div></section>

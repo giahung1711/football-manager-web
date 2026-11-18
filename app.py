@@ -1086,29 +1086,42 @@ def action():
             st['starting'][a],st['bench'][b]=inn,out; flash(f"Đã thay {out['name']} bằng {inn['name']}.")
         elif act=='drag_swap':
             source_group=request.form.get('source_group',''); source_index=int(request.form.get('source_index','-1'))
-            target_index=int(request.form.get('target_index','-1')); target_group=request.form.get('target_group','starting')
-            if source_group not in {'starting','bench'} or target_group not in {'starting','bench'}: raise ValueError('Danh sách kéo thả không hợp lệ.')
+            target_index=int(request.form.get('target_index','-1')); target_group=request.form.get('target_group','')
+            allowed={'starting','bench','extras'}
+            if source_group not in allowed or target_group not in allowed: raise ValueError('Danh sách kéo thả không hợp lệ.')
             source=st[source_group]
             if source_index<0 or source_index>=len(source): raise ValueError('Không tìm thấy cầu thủ được kéo.')
+            if source_group==target_group and target_index==source_index: raise ValueError('Hãy chọn vị trí khác.')
             incoming=source[source_index]
-            if target_group=='bench':
-                if source_group!='starting' or target_index!=-1: raise ValueError('Chỉ kéo cầu thủ đá chính xuống khu vực dự bị.')
-                if str(incoming.get('assigned_position') or incoming.get('position','')).upper()=='GK' and not any(str(x.get('position','')).upper()=='GK' for x in st['bench']): raise ValueError('Cần có thủ môn dự bị trước khi đưa thủ môn ra ngoài.')
-                st['bench'].append(incoming); st['starting'].pop(source_index)
+            if target_index == -1:
+                if source_group==target_group: raise ValueError('Không thể di chuyển cầu thủ vào cùng danh sách.')
+                if target_group=='starting':
+                    if len(st['starting'])>=11: raise ValueError('Đội hình đá chính đã đủ 11 cầu thủ; hãy thả lên một thẻ để thay thế.')
+                    if len(st['starting'])==0 and str(incoming.get('position','')).upper()!='GK': raise ValueError('Đội hình cần có thủ môn trước.')
+                    if str(incoming.get('position','')).upper()=='GK' and any(str(x.get('position','')).upper()=='GK' for x in st['starting']): raise ValueError('Đội hình đã có thủ môn.')
+                elif target_group=='bench' and len(st['bench'])>=5:
+                    raise ValueError('Khu vực dự bị đã đủ 5 cầu thủ; hãy thả lên một thẻ dự bị để đổi chỗ.')
+                source.pop(source_index); st[target_group].append(incoming)
+                if target_group=='starting' and str(incoming.get('position','')).upper()=='GK':
+                    st['starting'].remove(incoming); st['starting'].append(incoming)
+                flash(f"Đã chuyển {incoming.get('name','cầu thủ')} sang {'đội hình chính' if target_group=='starting' else 'dự bị' if target_group=='bench' else 'cầu thủ khác'}.")
             else:
-                if target_index<0 or target_index>=len(st['starting']): raise ValueError('Vị trí đích không hợp lệ.')
-                outgoing=st['starting'][target_index]
-                incoming_pos=str(incoming.get('position','')).upper(); target_pos=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
-                if (incoming_pos=='GK') != (target_pos=='GK'): raise ValueError('Thủ môn chỉ có thể thay thế thủ môn.')
-                if source_group == 'bench' and any(
-                    str(p.get('name', '')).strip().casefold() == str(incoming.get('name', '')).strip().casefold()
-                    for i, p in enumerate(st['starting']) if i != target_index
-                ):
-                    raise ValueError(f"Không thể xếp {incoming.get('name')} vì cầu thủ này đã có trong đội hình đá chính.")
-                if source_group=='bench': st['starting'][target_index],st['bench'][source_index]=incoming,outgoing
-                else: st['starting'][target_index],st['starting'][source_index]=incoming,outgoing
-                st['starting'][target_index]['assigned_position']=target_pos
-                if source_group=='starting': st['starting'][source_index]['assigned_position']=str(st['starting'][source_index].get('position','')).upper()
+                target=st[target_group]
+                if target_index<0 or target_index>=len(target): raise ValueError('Vị trí đích không hợp lệ.')
+                outgoing=target[target_index]
+                if source_group=='starting' and target_group!='starting' and len(st[target_group])>= (5 if target_group=='bench' else 10): raise ValueError('Khu vực nhận đã đầy.')
+                if target_group=='starting' and source_group!='starting' and len(st['starting'])>11: raise ValueError('Đội hình chính đã đủ cầu thủ.')
+                incoming_gk=str(incoming.get('position','')).upper()=='GK'
+                outgoing_gk=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()=='GK'
+                if target_group=='starting' and incoming_gk != outgoing_gk: raise ValueError('Thủ môn chỉ có thể đổi vị trí với thủ môn.')
+                if source_group=='starting' and target_group=='starting':
+                    st['starting'][source_index],st['starting'][target_index]=outgoing,incoming
+                else:
+                    source[source_index],target[target_index]=outgoing,incoming
+                if target_group=='starting': incoming['assigned_position']=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
+                if source_group=='starting' and target_group!='starting': outgoing['assigned_position']=str(outgoing.get('position','')).upper()
+                if source_group!='starting' and target_group=='starting' and source_group=='bench': incoming['assigned_position']=str(outgoing.get('assigned_position') or outgoing.get('position','')).upper()
+                flash(f"Đã đổi vị trí {incoming.get('name','cầu thủ')} và {outgoing.get('name','cầu thủ')}.")
         elif act=='promote':
             group=request.form.get('group')
             idx=int(request.form.get('index','-1'))

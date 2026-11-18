@@ -1,0 +1,12 @@
+FOOTBALL MANAGER WEB - FORGE UX UPDATE
+Date: 2026-11-18
+
+- Normal enhancement now uses an in-game confirmation overlay instead of a browser confirm popup.
+- Ultimate enhancement uses its own in-game confirmation overlay.
+- Added a selected-primary-card preview to the Ultimate workbench.
+- Ultimate submission now uses AJAX, shows a shake/glow animation and an in-page result, and does not reload the page.
+- Normal enhancement continues to use AJAX and its existing shake/glow result animation without a page reload.
+- Removed browser alert from the normal enhancement error path; errors are shown in the workbench status.
+
+Validation: Python modules compile; both enhancement JavaScript blocks pass Node syntax checks.
+Note: Full browser interaction and production-database integration tests were not run here.

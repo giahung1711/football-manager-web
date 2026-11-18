@@ -465,17 +465,9 @@ def player_market_withdraw(listing_id):
             else "bench"
         )
 
-        if any(
-            str(item.get("name", "")).casefold()
-            == listing.player_name.casefold()
-            for bucket in ("starting", "bench", "extras")
-            for item in state.get(bucket, [])
-        ):
-            raise ValueError(
-                "Đội bóng đã có cầu thủ cùng tên; "
-                "không thể hoàn lại để tránh trùng lặp."
-            )
-
+        # Listing ID is the identity of the withdrawn card. Do not reject a
+        # return merely because another owned card has the same display name:
+        # duplicate names are valid (e.g. separate editions/gifts).
         # Xóa dấu rời CLB trước khi trả cầu thủ về đội.
         _unmark_market_removed(state, listing.player_name)
 
