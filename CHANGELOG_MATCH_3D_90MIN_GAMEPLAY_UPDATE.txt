@@ -1,0 +1,15 @@
+FOOTBALL MANAGER - MATCH 3D GAMEPLAY UPDATE
+
+- Match clock now runs from 00:00 to 90:00, split into two 45-minute halves. The in-game clock is accelerated (10 game-seconds per real second) so a match takes about nine real minutes, excluding half-time.
+- Added a half-time overlay with immediate second-half start, a 15-second half-time break, or skip-break action.
+- Replaced the angled/rotating follow camera with a fixed sideline broadcast view that tracks the ball horizontally and never flips orientation when possession changes.
+- Reduced ball scale and enlarged both goals for more balanced proportions.
+- Added visible arms, legs, boots, and simple running limb animation to player models.
+- Added goalkeeper shot collision, catch/parry outcomes based on shot speed and ball position, and direct control of the home goalkeeper after a catch. J/O can be used to pass or launch the ball.
+- Changed L to a directional tackle action. The controlled player remains under manual movement control; tackle no longer auto-chases the nearest opponent.
+- Improved role-based AI movement: fullbacks can advance moderately, centre-backs retain deeper positions, midfielders support possession, forwards make higher runs, and defenders keep a compact shape.
+- Raised AI movement/sprint speeds to narrow the gap with the user-controlled player.
+- Added a power meter and shot types: D normal shot (hold to charge, release to shoot); Z+D curl; D+D low shot; W+D lob; F+D power shot. Special shots are charged with the first D press and confirmed with a second D press.
+- Movement uses arrow keys so D can be reserved for shooting; Shift remains sprint, J short pass, I through ball, O lofted pass, L tackle.
+
+Validation performed: JavaScript syntax check, Python compileall, ZIP integrity. Browser gameplay and live database integration were not available for end-to-end verification in this environment.

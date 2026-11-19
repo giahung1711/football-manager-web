@@ -34,7 +34,7 @@ try {
   const netMat=new THREE.LineBasicMaterial({color:0xe8edf0,transparent:true,opacity:.62});
   function makeGoal(x){
     const g=new THREE.Group();g.position.x=x;scene.add(g);
-    const width=7.32,height=2.45,depth=3.2,back=x<0?-depth:depth;
+    const width=10.0,height=3.5,depth=4.0,back=x<0?-depth:depth;
     // Chỉ dựng bộ khung cầu môn thật: hai cột dọc và một xà ngang.
     for(const z of [-width/2,width/2]){
       const post=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,height,12),goalMat);
@@ -86,51 +86,96 @@ try {
     const torso=new THREE.Mesh(new THREE.CylinderGeometry(.42,.52,.95,10),shirt);torso.position.y=1.25;torso.castShadow=true;group.add(torso);
     const head=new THREE.Mesh(new THREE.SphereGeometry(.27,12,10),skin);head.position.y=2.02;head.castShadow=true;group.add(head);
     const shortsMesh=new THREE.Mesh(new THREE.BoxGeometry(.72,.35,.48),shorts);shortsMesh.position.y=.68;group.add(shortsMesh);
-    for(const side of [-1,1]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(.12,.14,.65,8),shorts);leg.position.set(side*.19,.32,0);group.add(leg);}
+    const limbs=[];
+    for(const side of [-1,1]){
+      const legPivot=new THREE.Group();legPivot.position.set(side*.20,.67,0);group.add(legPivot);
+      const leg=new THREE.Mesh(new THREE.CylinderGeometry(.115,.13,.58,9),shorts);leg.position.y=-.29;leg.castShadow=true;legPivot.add(leg);
+      const boot=new THREE.Mesh(new THREE.BoxGeometry(.18,.13,.32),new THREE.MeshStandardMaterial({color:0x17191d,roughness:.65}));boot.position.set(0,-.57,.07);legPivot.add(boot);limbs.push({pivot:legPivot,kind:'leg',side});
+      const armPivot=new THREE.Group();armPivot.position.set(side*.49,1.58,0);group.add(armPivot);
+      const arm=new THREE.Mesh(new THREE.CylinderGeometry(.105,.12,.62,9),shirt);arm.position.y=-.27;arm.castShadow=true;armPivot.add(arm);
+      const hand=new THREE.Mesh(new THREE.SphereGeometry(.105,8,8),skin);hand.position.y=-.60;armPivot.add(hand);limbs.push({pivot:armPivot,kind:'arm',side});
+    }
     const marker=new THREE.Mesh(new THREE.ConeGeometry(.2,.35,12),new THREE.MeshBasicMaterial({color:0xffe45c}));marker.position.y=2.55;marker.visible=false;group.add(marker);
-    const p={group,team,index,home:new THREE.Vector3(x,0,z),velocity:new THREE.Vector3(),marker,controlled:false,stamina:100};players.push(p);return p;
+    const p={group,team,index,home:new THREE.Vector3(x,0,z),velocity:new THREE.Vector3(),marker,limbs,controlled:false,stamina:100,tackleCooldown:0};players.push(p);return p;
   }
   homeFormation.forEach((p,i)=>makePlayer(0,i,p[0],p[1]));awayFormation.forEach((p,i)=>makePlayer(1,i,p[0],p[1]));
   let controlledPlayer=players[9];controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;
-  const ball=new THREE.Mesh(new THREE.SphereGeometry(.48,20,16),new THREE.MeshStandardMaterial({color:0xf7f7f2,roughness:.5}));ball.position.set(controlledPlayer.group.position.x+.9,.48,controlledPlayer.group.position.z);ball.castShadow=true;scene.add(ball);
-  const ballShadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),new THREE.MeshBasicMaterial({color:0x07130c,transparent:true,opacity:.28}));ballShadow.rotation.x=-Math.PI/2;ballShadow.position.y=.025;scene.add(ballShadow);
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(.30,20,16),new THREE.MeshStandardMaterial({color:0xf7f7f2,roughness:.5}));ball.position.set(controlledPlayer.group.position.x+.9,.48,controlledPlayer.group.position.z);ball.castShadow=true;scene.add(ball);
+  const ballShadow=new THREE.Mesh(new THREE.CircleGeometry(.36,20),new THREE.MeshBasicMaterial({color:0x07130c,transparent:true,opacity:.28}));ballShadow.rotation.x=-Math.PI/2;ballShadow.position.y=.025;scene.add(ballShadow);
 
-  let paused=false,seconds=0,homeGoals=0,awayGoals=0,ballOwner=controlledPlayer,ballVel=new THREE.Vector3(),ballSpin=0,kickTimer=0,gameOver=false,sprintHeld=false,lastTouchTeam=0,ballPickupCooldown=0;
+  let paused=false,seconds=0,homeGoals=0,awayGoals=0,ballOwner=controlledPlayer,ballVel=new THREE.Vector3(),ballSpin=0,kickTimer=0,gameOver=false,sprintHeld=false,lastTouchTeam=0,ballPickupCooldown=0,halfTimeShown=false;
   const keys=new Set();const move=new THREE.Vector2();let lastFrame=performance.now();
+  const halftimeOverlay=document.getElementById('fbm3d-halftime');
+  let halftimeTimer=null;
+  function startSecondHalf(){clearTimeout(halftimeTimer);if(halftimeOverlay)halftimeOverlay.hidden=true;paused=false;halfTimeShown=true;setStatus('HIỆP 2 BẮT ĐẦU');pauseBtn.textContent='TẠM DỪNG';}
+  document.getElementById('fbm3d-half-start')?.addEventListener('click',startSecondHalf);
+  document.getElementById('fbm3d-half-skip')?.addEventListener('click',startSecondHalf);
+  document.getElementById('fbm3d-half-rest')?.addEventListener('click',()=>{setStatus('ĐANG NGHỈ GIỮA HIỆP...');halftimeTimer=setTimeout(startSecondHalf,15000);});
   const camTarget=new THREE.Vector3();
-  function updateCamera(dt){const focus=ballOwner?ballOwner.group.position:(ball.position.y>1?ball.position:controlledPlayer.group.position);const attackDir=(ballOwner?ballOwner.team:lastTouchTeam)===0?1:-1;const tx=THREE.MathUtils.clamp(focus.x,-78,78),tz=THREE.MathUtils.clamp(focus.z,-43,43);const desiredX=THREE.MathUtils.clamp(tx-attackDir*24,-84,84),desiredZ=THREE.MathUtils.clamp(tz+34,-50,50);camera.position.x=THREE.MathUtils.damp(camera.position.x,desiredX,4.5,dt);camera.position.y=THREE.MathUtils.damp(camera.position.y,34,4.5,dt);camera.position.z=THREE.MathUtils.damp(camera.position.z,desiredZ,4.5,dt);camTarget.set(THREE.MathUtils.clamp(tx+attackDir*12,-86,86),0,THREE.MathUtils.clamp(tz,-50,50));camera.lookAt(camTarget);}
-  camera.position.set(-44,34,34);camera.lookAt(-8,0,0);
+  // Fixed broadcast sideline camera: it tracks the ball only along the pitch length.
+  function updateCamera(dt){
+    const targetX=THREE.MathUtils.clamp(ball.position.x,-72,72);
+    camera.position.x=THREE.MathUtils.damp(camera.position.x,targetX,3.2,dt);
+    camera.position.y=46;
+    camera.position.z=94;
+    camTarget.set(camera.position.x,0,0);
+    camera.lookAt(camTarget);
+  }
+  camera.position.set(-20,46,94);camera.lookAt(-20,0,0);
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);}new ResizeObserver(resize).observe(mount);resize();
   function setStatus(s){statusEl.textContent=s;}
   function updateScore(){scoreEl.textContent=`${homeGoals} - ${awayGoals}`;}
   function resetPositions(){players.forEach(p=>{p.group.position.copy(p.home);p.velocity.set(0,0,0);});controlledPlayer=players[9];players.forEach(p=>{p.controlled=false;p.marker.visible=false;});controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;controlledPlayer.group.position.set(-20,0,0);ballOwner=controlledPlayer;ballVel.set(0,0,0);ballPickupCooldown=0;ball.position.set(-19.1,.48,0);}
   function score(team){if(team===0)homeGoals++;else awayGoals++;updateScore();setStatus(team===0?'VÀO!!! BÀN THẮNG CHO HOME':'ĐỐI THỦ GHI BÀN');resetPositions();kickTimer=1.4;}
-  function facing(){const v=new THREE.Vector3(Math.cos(controlledPlayer.group.rotation.y),0,Math.sin(controlledPlayer.group.rotation.y));if(Math.abs(v.x)+Math.abs(v.z)<.01)v.set(1,0,0);return v.normalize();}
-  function kickBall(direction,speed,lift=1.2,spin=0){const dir=direction.clone();dir.y=0;if(dir.lengthSq()<0.001)dir.copy(facing());dir.normalize();ballOwner=null;ball.position.addScaledVector(dir,1.35);ball.position.y=.62;ballVel.copy(dir.multiplyScalar(speed));ballVel.y=lift;ballSpin=spin;lastTouchTeam=0;ballPickupCooldown=.48;}
+  function facing(){const v=new THREE.Vector3(Math.sin(controlledPlayer.group.rotation.y),0,Math.cos(controlledPlayer.group.rotation.y));if(Math.abs(v.x)+Math.abs(v.z)<.01)v.set(1,0,0);return v.normalize();}
+  function kickBall(direction,speed,lift=1.2,spin=0){const dir=direction.clone();dir.y=0;if(dir.lengthSq()<0.001)dir.copy(facing());dir.normalize();ballOwner=null;ball.position.addScaledVector(dir,1.05);ball.position.y=.42;ballVel.copy(dir.multiplyScalar(speed));ballVel.y=lift;ballSpin=spin;lastTouchTeam=0;ballPickupCooldown=.32;}
   function passBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const mates=players.filter(p=>p.team===0&&p!==controlledPlayer&&p.index!==0).map(p=>({p,score:p.group.position.distanceTo(controlledPlayer.group.position)+Math.max(0,controlledPlayer.group.position.x-p.group.position.x)*.8})).sort((a,b)=>a.score-b.score);const mate=mates[0]?.p;if(!mate)return;const dir=mate.group.position.clone().sub(ball.position);dir.y=0;kickBall(dir,20,1.0);setStatus('CHUYỀN NGẮN');}
   function throughBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const forward=facing();const runners=players.filter(p=>p.team===0&&p!==controlledPlayer&&p.index>=8).sort((a,b)=>b.group.position.x-a.group.position.x);const runner=runners[0];let target=runner?runner.group.position.clone().add(new THREE.Vector3(8,0,runner.velocity.z*1.2)):controlledPlayer.group.position.clone().addScaledVector(forward,24);const dir=target.sub(ball.position);dir.y=0;kickBall(dir,27,1.35);setStatus('CHỌC KHE!');}
-  function longBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const dir=facing();dir.z+= (Math.random()-.5)*.18;kickBall(dir,32,8.5,.08);setStatus('CHUYỀN DÀI');}
-  function shootBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const goal=new THREE.Vector3(90,0,0);const dir=goal.sub(ball.position);dir.z+=controlledPlayer.group.position.z*.10;kickBall(dir,42,4.8,.12);setStatus('SÚT!!!');}
-  function tackle(){if(paused||gameOver)return;const rival=players.filter(p=>p.team===1&&p.index!==0).sort((a,b)=>a.group.position.distanceTo(controlledPlayer.group.position)-b.group.position.distanceTo(controlledPlayer.group.position))[0];if(rival&&rival.group.position.distanceTo(controlledPlayer.group.position)<3.8){const chance=THREE.MathUtils.clamp(1-rival.group.position.distanceTo(controlledPlayer.group.position)/5,.18,.82);if(Math.random()<chance){ballOwner=controlledPlayer;ballVel.set(0,0,0);setStatus('TẮC BÓNG THÀNH CÔNG!');}else setStatus('ĐỐI THỦ CHE BÓNG!');}else setStatus('ÁP SÁT ĐỐI THỦ');}
+  function longBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;const dir=facing();dir.z+=(Math.random()-.5)*.18;kickBall(dir,32,8.5,.08);setStatus('CHUYỀN DÀI');}
+  const powerFill=document.getElementById('fbm3d-power-fill'),powerLabel=document.getElementById('fbm3d-power-label');
+  let shotMode='normal',shotCharging=false,shotCharge=0,pendingShot=null,pendingShotTimer=null,lastDPress=0;
+  function showPower(v){if(powerFill)powerFill.style.width=`${Math.round(v*100)}%`;if(powerLabel)powerLabel.textContent=`LỰC SÚT ${Math.round(v*100)}%`;const meter=document.getElementById('fbm3d-power');if(meter)meter.style.visibility=v>0?'visible':'hidden';}
+  function executeShot(mode,power){if(paused||gameOver||ballOwner!==controlledPlayer)return;const goal=new THREE.Vector3(90,0,0),dir=goal.sub(ball.position);dir.z+=controlledPlayer.group.position.z*.10;const p=THREE.MathUtils.clamp(power,.08,1);
+    const specs={normal:{speed:17+p*35,lift:.35+p*4.8,spin:.02},curve:{speed:19+p*31,lift:.6+p*3.6,spin:.72},low:{speed:18+p*34,lift:.12+p*.55,spin:.02},lob:{speed:14+p*26,lift:3+p*10,spin:.05},power:{speed:25+p*43,lift:.5+p*5.5,spin:.12}};
+    const spec=specs[mode]||specs.normal;
+    if(power>.92){spec.lift+= (power-.92)*23;dir.z+=(Math.random()-.5)*(power-.9)*9;}
+    kickBall(dir,spec.speed,spec.lift,spec.spin);setStatus(({normal:'SÚT THƯỜNG',curve:'CỨA LÒNG',low:'SÚT SỆT',lob:'LỐP BÓNG',power:'POWER SHOT'})[mode]);
+    shotCharging=false;pendingShot=null;showPower(0);
+  }
+  function beginShotCharge(mode){if(paused||gameOver||ballOwner!==controlledPlayer)return;clearTimeout(pendingShotTimer);pendingShot=null;shotMode=mode;shotCharging=true;shotCharge=0;showPower(0);}
+  function finishShotCharge(){if(!shotCharging)return;shotCharging=false;shotCharge=THREE.MathUtils.clamp(shotCharge,.08,1);pendingShot={mode:shotMode,power:shotCharge};clearTimeout(pendingShotTimer);pendingShotTimer=setTimeout(()=>{if(pendingShot?.mode==='normal')executeShot('normal',pendingShot.power);pendingShot=null;showPower(0);},180);}
+  function confirmSpecialShot(){if(!pendingShot)return;const shot=pendingShot;clearTimeout(pendingShotTimer);pendingShot=null;executeShot(shot.mode==='normal'?'low':shot.mode,shot.power);}
+  function shootBall(){if(paused||gameOver||ballOwner!==controlledPlayer)return;executeShot('normal',.72);}
+  function tackle(){if(paused||gameOver||controlledPlayer.tackleCooldown>0)return;const dir=facing();const rival=players.filter(p=>p.team===1&&p.index!==0).map(p=>({p,d:p.group.position.clone().sub(controlledPlayer.group.position)})).filter(o=>o.d.length()<3.2&&o.d.normalize().dot(dir)>.15).sort((a,b)=>a.p.group.position.distanceTo(controlledPlayer.group.position)-b.p.group.position.distanceTo(controlledPlayer.group.position))[0];controlledPlayer.tackleCooldown=1.0;controlledPlayer.group.position.addScaledVector(dir,1.15);if(rival&&ballOwner===rival.p){const distance=rival.p.group.position.distanceTo(controlledPlayer.group.position);const chance=THREE.MathUtils.clamp(.9-distance*.12,.35,.82);if(Math.random()<chance){ballOwner=controlledPlayer;ballVel.set(0,0,0);setStatus('TẮC BÓNG THÀNH CÔNG!');}else setStatus('TẮC BÓNG HỤT!');}else setStatus('TẮC BÓNG!');}
   function bindHold(id,axis){const el=document.getElementById(id);if(!el)return;const on=()=>keys.add(axis),off=()=>keys.delete(axis);el.addEventListener('pointerdown',e=>{e.preventDefault();on();});['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,off));}
   bindHold('fbm-up','ArrowUp');bindHold('fbm-down','ArrowDown');bindHold('fbm-left','ArrowLeft');bindHold('fbm-right','ArrowRight');
   document.getElementById('fbm-pass').addEventListener('click',passBall);document.getElementById('fbm-through').addEventListener('click',throughBall);document.getElementById('fbm-long').addEventListener('click',longBall);document.getElementById('fbm-shoot').addEventListener('click',shootBall);document.getElementById('fbm-tackle').addEventListener('click',tackle);const sprintBtn=document.getElementById('fbm-sprint');sprintBtn.addEventListener('pointerdown',e=>{e.preventDefault();sprintHeld=true;});['pointerup','pointerleave','pointercancel'].forEach(ev=>sprintBtn.addEventListener(ev,()=>sprintHeld=false));
-  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys.add(k);if(k==='j')passBall();if(k==='i')throughBall();if(k==='o')longBall();if(k==='k')shootBall();if(k==='l')tackle();if(k==='shift')sprintHeld=true;});window.addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());if(e.key==='Shift')sprintHeld=false;});
+  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(e.repeat)return;keys.add(k);if(k==='j')passBall();if(k==='i')throughBall();if(k==='o')longBall();if(k==='l')tackle();if(k==='shift')sprintHeld=true;
+    if(k==='d'){
+      if(pendingShot){confirmSpecialShot();return;}
+      const mode=keys.has('z')?'curve':keys.has('w')?'lob':keys.has('f')?'power':'normal';
+      if(mode==='normal'&&performance.now()-lastDPress<420&&pendingShot){confirmSpecialShot();return;}
+      lastDPress=performance.now();beginShotCharge(mode);
+    }
+  });window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys.delete(k);if(e.key==='Shift')sprintHeld=false;if(k==='d'&&shotCharging)finishShotCharge();});
   pauseBtn.addEventListener('click',()=>{paused=!paused;pauseBtn.textContent=paused?'TIẾP TỤC':'TẠM DỪNG';setStatus(paused?'ĐÃ TẠM DỪNG':'TRẬN ĐẤU ĐANG DIỄN RA');});
-  restartBtn.addEventListener('click',()=>{homeGoals=0;awayGoals=0;seconds=0;gameOver=false;paused=false;updateScore();clockEl.textContent='00:00';pauseBtn.textContent='TẠM DỪNG';resetPositions();setStatus('TRẬN ĐẤU BẮT ĐẦU');});
+  restartBtn.addEventListener('click',()=>{homeGoals=0;awayGoals=0;seconds=0;gameOver=false;paused=false;halfTimeShown=false;if(halftimeOverlay)halftimeOverlay.hidden=true;clearTimeout(halftimeTimer);updateScore();clockEl.textContent='00:00';pauseBtn.textContent='TẠM DỪNG';resetPositions();setStatus('TRẬN ĐẤU BẮT ĐẦU');});
+  
 
   function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-lastFrame)/1000,.04);lastFrame=now;
-    if(!paused&&!gameOver){seconds+=dt*4;const mm=String(Math.floor(seconds/60)).padStart(2,'0'),ss=String(Math.floor(seconds%60)).padStart(2,'0');clockEl.textContent=`${mm}:${ss}`;if(seconds>=90){gameOver=true;setStatus('HẾT GIỜ');}
+    if(!paused&&!gameOver){seconds+=dt*10;const gameMinutes=Math.min(90,Math.floor(seconds/60));const clockSeconds=Math.floor(seconds%60);const mm=String(gameMinutes).padStart(2,'0'),ss=String(clockSeconds).padStart(2,'0');clockEl.textContent=`${mm}:${ss}`;if(seconds>=2700&&!halfTimeShown){paused=true;if(halftimeOverlay)halftimeOverlay.hidden=false;setStatus('NGHỈ GIỮA HIỆP');}if(seconds>=5400){gameOver=true;setStatus('HẾT GIỜ');}
       if(kickTimer>0)kickTimer-=dt;if(ballPickupCooldown>0)ballPickupCooldown=Math.max(0,ballPickupCooldown-dt);
-      const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);
-      const side=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
+      const forward=(keys.has('arrowup')?1:0)-(keys.has('arrowdown')?1:0);
+      const side=(keys.has('arrowright')?1:0)-(keys.has('arrowleft')?1:0);
       const direction=new THREE.Vector3(side,0,-forward).normalize();
-      const hasInput=direction.lengthSq()>0;const maxSpeed=sprintHeld&&controlledPlayer.stamina>1?19:12.5;
+      const hasInput=direction.lengthSq()>0;const maxSpeed=sprintHeld&&controlledPlayer.stamina>1?15.5:10.8;
       const desired=direction.clone().multiplyScalar(hasInput?maxSpeed:0);const accel=hasInput?8.5:5.5;
       controlledPlayer.velocity.lerp(desired,1-Math.exp(-accel*dt));
       if(hasInput){controlledPlayer.group.rotation.y=THREE.MathUtils.damp(controlledPlayer.group.rotation.y,Math.atan2(direction.x,direction.z),10,dt);}
       controlledPlayer.group.position.addScaledVector(controlledPlayer.velocity,dt);
-      controlledPlayer.stamina=THREE.MathUtils.clamp(controlledPlayer.stamina+(sprintHeld&&hasInput?-14:7)*dt,0,100);
+      controlledPlayer.stamina=THREE.MathUtils.clamp(controlledPlayer.stamina+(sprintHeld&&hasInput?-13:5)*dt,0,100);
+      players.forEach(p=>{p.tackleCooldown=Math.max(0,(p.tackleCooldown||0)-dt);const gait=Math.min(1,p.velocity.length()/10);for(const limb of p.limbs||[]){const phase=now*.012+(limb.side>0?Math.PI:0);limb.pivot.rotation.x=Math.sin(phase)*gait*(limb.kind==='leg'?.62:.32);}});
+      if(shotCharging){shotCharge=Math.min(1,shotCharge+dt*.72);showPower(shotCharge);}
       // Tactical AI v2: role/lane based positioning. Only selected pressers chase the ball.
       const carrierPos = ballOwner ? ballOwner.group.position : ball.position;
       const ballX = carrierPos.x, ballZ = carrierPos.z;
@@ -149,13 +194,14 @@ try {
         const relX=ballX*dir; // positive means ball is advanced into this team's attacking half
         const lateral=THREE.MathUtils.clamp(ballZ*.30,-15,15);
         if(role==='GK'){
-          target.x=dir===1?-78:78;
-          target.z=THREE.MathUtils.clamp(ballZ*.16,-9,9);
+          target.x=dir===1?-87:87;
+          target.z=THREE.MathUtils.clamp(ballZ*.42,-5.2,5.2);
         } else if(ownBall){
           // Team in possession advances in layers, while preserving width and spacing.
           if(role==='DEF'){
-            target.x += THREE.MathUtils.clamp(relX*.10,-5,13);
-            target.z += p.index===1||p.index===4?lateral*.55:ballZ*.10;
+            const fullback=p.index===1||p.index===4;
+            target.x += THREE.MathUtils.clamp(relX*(fullback ? 0.15 : 0.10),-5,fullback?18:13);
+            target.z += fullback?lateral*.72:ballZ*.10;
           } else if(role==='MID'){
             target.x += THREE.MathUtils.clamp(relX*.22,-7,20);
             target.z += (p.index===5||p.index===7)?lateral*.8:ballZ*.22;
@@ -185,18 +231,33 @@ try {
         }
         target.x=clampX(target.x); target.z=clampZ(target.z);
         const delta=target.sub(p.group.position);
-        const speed=role==='GK'?5.0:role==='MID'?7.0:role==='DEF'?5.8:7.4;
-        const desiredAI=delta.length()>.35?delta.clone().normalize().multiplyScalar(Math.min(speed,delta.length()*1.65)):new THREE.Vector3();
-        p.velocity.lerp(desiredAI,1-Math.exp(-3.8*dt));
+        const baseSpeed=role==='GK'?6.2:role==='MID'?9.8:role==='DEF'?8.8:10.4;
+        const urgency=opponentBall&&distToBall(p)<18?1.32:(ownBall&&role==='FWD'?1.18:1);
+        const aiSpeed=baseSpeed*urgency*(p.stamina>12?1:.78);
+        const desiredAI=delta.length()>.35?delta.clone().normalize().multiplyScalar(Math.min(aiSpeed,delta.length()*2.0)):new THREE.Vector3();
+        p.velocity.lerp(desiredAI,1-Math.exp(-5.2*dt));
         p.group.position.addScaledVector(p.velocity,dt);
         if(delta.length()>.5) p.group.rotation.y=THREE.MathUtils.damp(p.group.rotation.y,Math.atan2(delta.x,delta.z),5,dt);
       }
-      if(ballOwner){const bp=ballOwner.group.position;const fwd=new THREE.Vector3(Math.cos(ballOwner.group.rotation.y),0,Math.sin(ballOwner.group.rotation.y));const touchDistance=ballOwner===controlledPlayer&&keys.size?1.05:.78;ball.position.copy(bp).addScaledVector(fwd,touchDistance);ball.position.y=.48;ballVel.copy(ballOwner.velocity).multiplyScalar(.18);}else{
+      if(ballOwner){const bp=ballOwner.group.position;const fwd=new THREE.Vector3(Math.sin(ballOwner.group.rotation.y),0,Math.cos(ballOwner.group.rotation.y));const touchDistance=ballOwner.index===0?0.0:(ballOwner===controlledPlayer&&keys.size?1.05:.78);ball.position.copy(bp).addScaledVector(fwd,touchDistance);ball.position.y=ballOwner.index===0?1.0:.42;ballVel.copy(ballOwner.velocity).multiplyScalar(.18);if(ballOwner.team===1&&ballOwner.index===0){kickTimer+=dt;if(kickTimer>1.1){const clearDir=new THREE.Vector3(-1,0,(Math.random()-.5)*.5);kickBall(clearDir,25,7);kickTimer=0;}}}else{
         // Lightweight arcade football physics: gravity, bounce, rolling friction and spin.
         ballVel.y-=19.5*dt;ball.position.addScaledVector(ballVel,dt);ball.rotation.x+=ballVel.z*dt*.55;ball.rotation.z-=ballVel.x*dt*.55;
         if(ball.position.y<.48){ball.position.y=.48;if(Math.abs(ballVel.y)>2.0)ballVel.y=-ballVel.y*.38;else ballVel.y=0;const rolling=Math.pow(.982,dt*60);ballVel.x*=rolling;ballVel.z*=rolling;ballVel.y*=.25;}
         ballVel.x*=Math.pow(.997,dt*60);ballVel.z*=Math.pow(.997,dt*60);ballVel.x+=-ballVel.z*ballSpin*dt;ballSpin*=Math.pow(.94,dt*60);
-        if(ball.position.x>88.5&&Math.abs(ball.position.z)<3.8&&ball.position.y<2.6)score(0);else if(ball.position.x< -88.5&&Math.abs(ball.position.z)<3.8&&ball.position.y<2.6)score(1);else if(ball.position.x>90||ball.position.x< -90||Math.abs(ball.position.z)>57){ball.position.set(0,.48,0);ballVel.set(0,0,0);setStatus('BÓNG RA NGOÀI');}}
+        // Keeper collision: low/slow shots may be held; stronger or awkward shots are parried.
+        for(const keeper of [players[0],players[11]]){
+          const defendingGoalX=keeper.team===0?-90:90;
+          const approaching=keeper.team===0?ballVel.x<0:ballVel.x>0;
+          if(approaching&&Math.abs(ball.position.x-defendingGoalX)<5.0&&Math.abs(ball.position.z-keeper.group.position.z)<4.8&&ball.position.y<3.6){
+            const shotSpeed=ballVel.length();
+            const canCatch=shotSpeed<24&&ball.position.y<2.35&&Math.random()<.78;
+            if(canCatch){ballOwner=keeper;ballVel.set(0,0,0);ball.position.set(keeper.group.position.x+(keeper.team===0?1:-1),1.0,keeper.group.position.z);setStatus(keeper.team===0?'THỦ MÔN BẮT DÍNH BÓNG':'THỦ MÔN ĐỐI THỦ BẮT BÓNG');
+              if(keeper.team===0){controlledPlayer.controlled=false;controlledPlayer.marker.visible=false;controlledPlayer=keeper;controlledPlayer.controlled=true;controlledPlayer.marker.visible=true;}
+            }else{ball.position.x=keeper.group.position.x+(keeper.team===0?1.2:-1.2);ballVel.x=(keeper.team===0?1:-1)*(7+Math.random()*7);ballVel.z+=(ball.position.z-keeper.group.position.z)*1.2;ballVel.y=Math.max(2,ballVel.y+2.5);ballPickupCooldown=.35;setStatus('THỦ MÔN ĐẨY BÓNG RA!');}
+            break;
+          }
+        }
+        if(ballOwner){}else if(ball.position.x>88.5&&Math.abs(ball.position.z)<5.2&&ball.position.y<3.6)score(0);else if(ball.position.x< -88.5&&Math.abs(ball.position.z)<5.2&&ball.position.y<3.6)score(1);else if(ball.position.x>90||ball.position.x< -90||Math.abs(ball.position.z)>57){ball.position.set(0,.42,0);ballVel.set(0,0,0);setStatus('BÓNG RA NGOÀI');}}
       // Player-to-player body contact prevents players simply passing through one another.
       for(let i=0;i<players.length;i++){for(let j=i+1;j<players.length;j++){const a=players[i],b=players[j];const dx=b.group.position.x-a.group.position.x,dz=b.group.position.z-a.group.position.z,dist=Math.hypot(dx,dz);if(dist>0&&dist<1.25){const push=(1.25-dist)*.5, nx=dx/dist,nz=dz/dist;a.group.position.x-=nx*push;a.group.position.z-=nz*push;b.group.position.x+=nx*push;b.group.position.z+=nz*push;}}}
 
