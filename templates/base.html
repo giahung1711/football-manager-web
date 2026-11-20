@@ -6,30 +6,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}FOOTBALL MANAGER{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261116-a1cup">
+<style>body[data-page-animations="0"] *,body[data-performance-mode="1"] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}</style>
 </head>
-<body>
+<body data-confirm-buy="{{ 1 if user_settings.get('confirm_buy', true) else 0 }}" data-confirm-sell="{{ 1 if user_settings.get('confirm_sell', true) else 0 }}" data-confirm-forge="{{ 1 if user_settings.get('confirm_forge', true) else 0 }}" data-page-animations="{{ 1 if user_settings.get('page_animations', true) else 0 }}" data-performance-mode="{{ 1 if user_settings.get('performance_mode', false) else 0 }}">
 <header class="topbar">
   <a class="brand" href="{{ url_for('home') }}">⚽ FOOTBALL MANAGER</a>
   {% if current_user.is_authenticated %}
-  <nav>
-    <a href="{{ url_for('dashboard') }}">Tổng quan</a>
-    <a href="{{ url_for('match_3d') }}">Trận đấu 3D</a>
+  <nav class="fm-icon-nav" aria-label="Điều hướng chính">
+    <a href="{{ url_for('dashboard') }}" class="fm-nav-item{% if request.endpoint == 'dashboard' %} active{% endif %}" data-tooltip="Tổng quan" aria-label="Tổng quan" title="Tổng quan">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+    </a>
+    <a href="{{ url_for('match_3d') }}" class="fm-nav-item{% if request.endpoint == 'match_3d' %} active{% endif %}" data-tooltip="Trận đấu 3D" aria-label="Trận đấu 3D" title="Trận đấu 3D">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12a4 4 0 0 1 3.8 5.2l-1.2 4a3 3 0 0 1-4.9 1.8l-2.4-2h-2.6l-2.4 2a3 3 0 0 1-4.9-1.8l-1.2-4A4 4 0 0 1 6 8Z"/><path d="M8 11v4M6 13h4M16 12h.01M18 15h.01"/></svg>
+    </a>
     {% if not current_user.is_admin %}
-    <a href="{{ url_for('tournament') }}">Giải đấu</a>
-    <a href="{{ url_for('leaderboard') }}">BXH toàn server</a>
-    <a href="{{ url_for('friends') }}">Bạn bè</a>
-    <a href="{{ url_for('mailbox') }}">Hòm thư</a>
+    <a href="{{ url_for('tournament') }}" class="fm-nav-item{% if request.endpoint == 'tournament' %} active{% endif %}" data-tooltip="Giải đấu" aria-label="Giải đấu" title="Giải đấu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4"/></svg>
+    </a>
+    <a href="{{ url_for('leaderboard') }}" class="fm-nav-item{% if request.endpoint == 'leaderboard' %} active{% endif %}" data-tooltip="BXH toàn server" aria-label="BXH toàn server" title="BXH toàn server">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
+    </a>
+    <a href="{{ url_for('friends') }}" class="fm-nav-item{% if request.endpoint == 'friends' %} active{% endif %}" data-tooltip="Bạn bè" aria-label="Bạn bè" title="Bạn bè">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>
+    </a>
+    <a href="{{ url_for('mailbox') }}" class="fm-nav-item{% if request.endpoint in ['mailbox', 'mailbox_open', 'mailbox_claim_all'] %} active{% endif %}" data-tooltip="Hòm thư" aria-label="Hòm thư" title="Hòm thư">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+    </a>
     {% endif %}
-    <a href="{{ url_for('game_tab', tab='squad') }}">Đội hình</a>
+    <a href="{{ url_for('game_tab', tab='squad') }}" class="fm-nav-item{% if request.endpoint == 'game_tab' and request.view_args and request.view_args.get('tab') == 'squad' %} active{% endif %}" data-tooltip="Đội hình" aria-label="Đội hình" title="Đội hình">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>
+    </a>
     {% if not current_user.is_admin %}
-    <a href="{{ url_for('player_market.player_market') }}">Chợ cầu thủ</a>
+    <a href="{{ url_for('player_market.player_market') }}" class="fm-nav-item{% if request.endpoint == 'player_market.player_market' %} active{% endif %}" data-tooltip="Chợ cầu thủ" aria-label="Chợ cầu thủ" title="Chợ cầu thủ">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M8 21H3v-5M3 16l6-6"/></svg>
+    </a>
     {% endif %}
     {% if current_user.is_admin %}
-    <a href="{{ url_for('admin_panel') }}">Admin</a>
+    <a href="{{ url_for('admin_panel') }}" class="fm-nav-item{% if request.endpoint == 'admin_panel' %} active{% endif %}" data-tooltip="Admin" aria-label="Admin" title="Admin">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg>
+      {% if unread_support_count_global|default(0) %}<i class="notification-dot nav-notification-dot" aria-label="Yêu cầu hỗ trợ mới"></i>{% endif %}
+    </a>
     {% endif %}
-    <form method="post" action="{{ url_for('logout') }}">
-      <button class="link-btn">Đăng xuất</button>
-    </form>
+    <a href="{{ url_for('settings_page') }}" class="fm-nav-item settings-nav-link{% if request.endpoint == 'settings_page' %} active{% endif %}" data-tooltip="Cài đặt" aria-label="Cài đặt" title="Cài đặt">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
+    </a>
   </nav>
   {% endif %}
 </header>
@@ -141,6 +161,11 @@ document.querySelectorAll('form.confirm-action').forEach(form => {
       return;
     }
 
+    const actionField = form.querySelector('input[name="action"]');
+    const actionName = actionField ? actionField.value : (form.getAttribute('action') || '');
+    const body = document.body;
+    const needsConfirm = actionName.includes('sell') ? body.dataset.confirmSell !== '0' : (actionName.includes('upgrade') || actionName.includes('forge')) ? body.dataset.confirmForge !== '0' : body.dataset.confirmBuy !== '0';
+    if (!needsConfirm) return;
     event.preventDefault();
     pendingForm = form;
     confirmMessage.textContent =

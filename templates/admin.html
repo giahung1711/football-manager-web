@@ -284,4 +284,37 @@
   </form>
 </section>
 
+
+<section class="panel admin-panel" id="admin-support">
+  <div class="section-head"><div><p class="eyebrow">PLAYER CARE · SUPPORT INBOX</p><h2>Hỗ trợ {% if unread_support_count %}<span class="notification-dot large-dot" title="Có yêu cầu mới"></span>{% endif %}</h2><p class="muted">Tin nhắn góp ý và báo lỗi do người chơi gửi.</p></div><span class="pill">{{ support_messages|length }} yêu cầu · {{ unread_support_count }} mới</span></div>
+  <div class="admin-support-list">
+    {% for msg in support_messages %}
+    <article class="admin-support-card {% if not msg.admin_seen %}support-unread{% endif %}">
+      <div class="admin-support-top"><div><span class="support-category">{{ msg.category }}</span><strong>{{ msg.subject }}</strong><small>{{ msg.user.username if msg.user else 'Người chơi' }} · {{ msg.created_at.strftime('%d/%m/%Y %H:%M') if msg.created_at else '' }}</small></div><span class="support-status">{{ msg.status }}</span></div>
+      <p class="support-message-body">{{ msg.body }}</p>
+      {% if msg.admin_reply %}<div class="support-reply"><b>Phản hồi đã gửi</b><p>{{ msg.admin_reply }}</p></div>{% endif %}
+      <div class="admin-support-actions">
+        {% if not msg.admin_seen %}<form method="post" action="{{ url_for('admin_support_seen', message_id=msg.id) }}"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button" type="submit">Đánh dấu đã xem</button></form>{% endif %}
+        <form method="post" action="{{ url_for('admin_support_reply', message_id=msg.id) }}" class="support-reply-form"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><textarea name="reply" rows="2" maxlength="3000" required placeholder="Nhập phản hồi cho người chơi...">{{ msg.admin_reply or '' }}</textarea><button class="button primary" type="submit">Gửi phản hồi</button></form>
+      </div>
+    </article>
+    {% else %}<p class="muted">Chưa có yêu cầu hỗ trợ nào.</p>{% endfor %}
+  </div>
+</section>
+
+<section class="panel admin-panel" id="admin-giftcodes">
+  <p class="eyebrow">REWARD MANAGEMENT</p><h2>Quản lý Giftcode</h2>
+  <form method="post" action="{{ url_for('admin_create_giftcode') }}" class="admin-form giftcode-admin-form">
+    <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+    <label>Mã giftcode</label><input name="code" maxlength="40" required placeholder="Ví dụ: WELCOME2026">
+    <div class="admin-fields"><div><label>PC (triệu)</label><input type="number" name="pc_millions" min="0" step="any" value="0"></div><div><label>PG</label><input type="number" name="pg" min="0" step="1" value="0"></div><div><label>Thẻ bảo vệ</label><input type="number" name="protection_cards" min="0" step="1" value="0"></div></div>
+    <label>Giới hạn lượt đổi (0 = không giới hạn)</label><input type="number" name="max_redemptions" min="0" step="1" value="0">
+    <button class="button primary" type="submit">＋ Tạo Giftcode</button>
+  </form>
+  <div class="admin-table-wrap"><table><thead><tr><th>Mã</th><th>Phần thưởng</th><th>Lượt đổi</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+    {% for code in gift_codes %}<tr><td><strong>{{ code.code }}</strong></td><td>{{ code.pc_millions|round(2) }}M PC · {{ '{:,}'.format(code.pg) }} PG · {{ code.protection_cards }} Thẻ bảo vệ</td><td>{{ code.redemption_count }} / {{ code.max_redemptions if code.max_redemptions else '∞' }}</td><td>{{ 'Đang hoạt động' if code.active else 'Đã khóa' }}</td><td><form method="post" action="{{ url_for('admin_toggle_giftcode', code_id=code.id) }}"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button" type="submit">{{ 'Khóa' if code.active else 'Mở khóa' }}</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Chưa có giftcode.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
 {% endblock %}

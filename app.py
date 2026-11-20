@@ -2,13 +2,13 @@ import os, random, copy, math, secrets, hmac
 from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge, A1CupSeason
+from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge, A1CupSeason, SupportMessage, GiftCode, GiftCodeRedemption
 from marketplace import player_market_bp
 from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, ULTIMATE_VALUE_MULTIPLIER, upgrade_cost, value, player, player_upgrade_ovr, player_base_value, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, ULTIMATE_VALUE_MULTIPLIER, upgrade_cost, value, player, player_upgrade_ovr, starting_lineup_player_ovr, player_base_value, simulate_match)
 
 app = Flask(__name__)
 app.register_blueprint(player_market_bp)
@@ -33,6 +33,11 @@ with app.app_context():
     if 'last_seen_at' not in user_columns:
         with db.engine.begin() as connection:
             connection.execute(text('ALTER TABLE \"user\" ADD COLUMN last_seen_at TIMESTAMP NULL'))
+    if 'settings_json' not in user_columns:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE \"user\" ADD COLUMN settings_json JSON'))
+    with db.engine.begin() as connection:
+        connection.execute(text("UPDATE \"user\" SET settings_json = '{}' WHERE settings_json IS NULL"))
     # The sole admin is provisioned from private hosting environment variables.
     # Never expose an in-app admin registration or public first-claim setup page.
     admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
@@ -74,6 +79,15 @@ def inject_admin_csrf():
     if '_admin_csrf' not in session:
         session['_admin_csrf'] = secrets.token_urlsafe(32)
     return {'admin_csrf_token': session['_admin_csrf']}
+
+@app.context_processor
+def inject_support_badge():
+    defaults = dict(DEFAULT_USER_SETTINGS) if 'DEFAULT_USER_SETTINGS' in globals() else {}
+    if current_user.is_authenticated and current_user.is_admin:
+        return {'unread_support_count_global': SupportMessage.query.filter_by(admin_seen=False).count(), 'user_settings': defaults}
+    if current_user.is_authenticated:
+        defaults.update(current_user.settings_json or {})
+    return {'unread_support_count_global': 0, 'user_settings': defaults}
 
 def valid_admin_csrf():
     supplied = request.form.get('csrf_token', '')
@@ -119,7 +133,7 @@ def page(save, tab='overview', extra=None):
     if ballon_reveal:
         persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, profile_matches=int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0), profile_win_rate=round(100*int(st.get('wins', 0) or 0)/max(1,int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0)),1), daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
-                           prices={p['name']:value(p) for p in all_players(st)}, player_value=value, player_ovr=player_upgrade_ovr, player_base_value=player_base_value, packs=PACKS,
+                           prices={p['name']:value(p) for p in all_players(st)}, player_value=value, player_ovr=lambda p: starting_lineup_player_ovr(p, st.get('starting', [])) if any(p is x for x in st.get('starting', [])) else player_upgrade_ovr(p), player_base_value=player_base_value, packs=PACKS,
                            market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, ultimate_value_multiplier=ULTIMATE_VALUE_MULTIPLIER, extra=extra)
 
 @app.route('/')
@@ -352,6 +366,157 @@ def daily_quest_claim_special():
     return redirect(url_for('game_tab', tab='daily'))
 
 
+DEFAULT_USER_SETTINGS = {
+    'confirm_buy': True, 'confirm_sell': True, 'confirm_forge': True, 'auto_save_squad': True,
+    'page_animations': True, 'forge_animation': True, 'gift_animation': True,
+    'mail_notifications': True, 'quest_notifications': True, 'market_notifications': True,
+    'friend_notifications': True, 'sound_effects': True, 'performance_mode': False
+}
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings_page():
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    settings = dict(DEFAULT_USER_SETTINGS)
+    settings.update(current_user.settings_json or {})
+    if request.method == 'POST':
+        if not valid_admin_csrf():
+            flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+            return redirect(url_for('settings_page'))
+        settings = {key: request.form.get(key) == 'on' for key in DEFAULT_USER_SETTINGS}
+        current_user.settings_json = settings
+        db.session.commit()
+        flash('Đã lưu cài đặt của bạn.')
+        return redirect(url_for('settings_page'))
+    my_support_messages = SupportMessage.query.filter_by(user_id=current_user.id).order_by(SupportMessage.created_at.desc()).limit(20).all()
+    return render_template('settings.html', settings=settings, support_messages=my_support_messages)
+
+@app.post('/giftcode/redeem')
+@login_required
+def redeem_giftcode():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('settings_page'))
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    code_text = request.form.get('code', '').strip().upper()
+    code = GiftCode.query.filter(db.func.upper(GiftCode.code) == code_text).first()
+    if not code or not code.active:
+        flash('Giftcode không hợp lệ hoặc đã bị khóa.')
+        return redirect(url_for('settings_page'))
+    if code.max_redemptions and code.redemption_count >= code.max_redemptions:
+        flash('Giftcode đã hết lượt sử dụng.')
+        return redirect(url_for('settings_page'))
+    if GiftCodeRedemption.query.filter_by(gift_code_id=code.id, user_id=current_user.id).first():
+        flash('Bạn đã sử dụng giftcode này rồi.')
+        return redirect(url_for('settings_page'))
+    save = current_save()
+    if not save:
+        flash('Hãy chọn câu lạc bộ trước khi sử dụng giftcode.')
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    state['budget'] = round(float(state.get('budget', 0) or 0) + float(code.pc_millions or 0), 2)
+    state['pg_balance'] = int(state.get('pg_balance', 0) or 0) + int(code.pg or 0)
+    if code.protection_cards:
+        inventory = state.setdefault('inventory', {})
+        inventory['Thẻ bảo vệ'] = int(inventory.get('Thẻ bảo vệ', 0) or 0) + int(code.protection_cards)
+    state.setdefault('activity', []).insert(0, {'message': f'Sử dụng giftcode {code.code} thành công', 'week': state.get('week', 1)})
+    state['activity'] = state['activity'][:15]
+    db.session.add(GiftCodeRedemption(gift_code_id=code.id, user_id=current_user.id))
+    code.redemption_count += 1
+    persist(save, state)
+    flash(f'Đổi giftcode thành công: +{code.pc_millions:g}M PC · +{code.pg:,} PG · +{code.protection_cards} Thẻ bảo vệ.')
+    return redirect(url_for('settings_page'))
+
+@app.post('/support/send')
+@login_required
+def support_send():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('settings_page'))
+    if current_user.is_admin:
+        return redirect(url_for('admin_panel'))
+    category = request.form.get('category', 'Góp ý').strip()
+    subject = request.form.get('subject', '').strip()
+    body = request.form.get('body', '').strip()
+    if category not in {'Góp ý', 'Báo lỗi', 'Khác'} or not subject or not body or len(subject) > 120 or len(body) > 3000:
+        flash('Vui lòng nhập tiêu đề và nội dung hợp lệ (tối đa 3.000 ký tự).')
+    else:
+        db.session.add(SupportMessage(user_id=current_user.id, category=category, subject=subject, body=body))
+        db.session.commit()
+        flash('Đã gửi yêu cầu hỗ trợ đến Admin. Cảm ơn bạn!')
+    return redirect(url_for('settings_page'))
+
+@app.post('/admin/support/<int:message_id>/seen')
+@admin_required
+def admin_support_seen(message_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('admin_panel'))
+    msg = db.session.get(SupportMessage, message_id)
+    if msg:
+        msg.admin_seen = True
+        db.session.commit()
+    return redirect(url_for('admin_panel') + '#admin-support')
+
+@app.post('/admin/support/<int:message_id>/reply')
+@admin_required
+def admin_support_reply(message_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('admin_panel'))
+    msg = db.session.get(SupportMessage, message_id)
+    reply = request.form.get('reply', '').strip()
+    if not msg or not reply or len(reply) > 3000:
+        flash('Không thể gửi phản hồi. Hãy kiểm tra nội dung.')
+    else:
+        msg.admin_reply = reply
+        msg.status = 'Đã phản hồi'
+        msg.admin_seen = True
+        msg.replied_at = datetime.utcnow()
+        db.session.commit()
+        flash(f'Đã phản hồi yêu cầu hỗ trợ của {db.session.get(User, msg.user_id).username}.')
+    return redirect(url_for('admin_panel') + '#admin-support')
+
+@app.post('/admin/giftcode/create')
+@admin_required
+def admin_create_giftcode():
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang Admin.')
+        return redirect(url_for('admin_panel'))
+    code_text = ''.join(request.form.get('code', '').upper().split())
+    try:
+        pc = float(request.form.get('pc_millions', 0) or 0)
+        pg = int(request.form.get('pg', 0) or 0)
+        cards = int(request.form.get('protection_cards', 0) or 0)
+        limit = int(request.form.get('max_redemptions', 0) or 0)
+        if not code_text or len(code_text) > 40 or not code_text.replace('-', '').isalnum():
+            raise ValueError('Mã giftcode chỉ gồm chữ, số và dấu gạch ngang.')
+        if GiftCode.query.filter_by(code=code_text).first():
+            raise ValueError('Giftcode này đã tồn tại.')
+        if not math.isfinite(pc) or pc < 0 or pg < 0 or cards < 0 or limit < 0 or pc + pg + cards <= 0:
+            raise ValueError('Phần thưởng phải không âm và có ít nhất một loại lớn hơn 0.')
+        db.session.add(GiftCode(code=code_text, pc_millions=pc, pg=pg, protection_cards=cards, max_redemptions=limit))
+        db.session.commit()
+        flash(f'Đã tạo giftcode {code_text}.')
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
+        flash(str(error))
+    return redirect(url_for('admin_panel') + '#admin-giftcodes')
+
+@app.post('/admin/giftcode/<int:code_id>/toggle')
+@admin_required
+def admin_toggle_giftcode(code_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('admin_panel'))
+    code = db.session.get(GiftCode, code_id)
+    if code:
+        code.active = not code.active
+        db.session.commit()
+    return redirect(url_for('admin_panel') + '#admin-giftcodes')
+
 @app.route('/admin', methods=['GET'])
 @admin_required
 def admin_panel():
@@ -377,8 +542,13 @@ def admin_panel():
                 card_seasons.add(season)
             if gifted.get('event_card') == 'ballon_dor':
                 card_seasons.add('Ballon D’or')
+    support_messages = SupportMessage.query.order_by(SupportMessage.created_at.desc()).limit(100).all()
+    unread_support_count = SupportMessage.query.filter_by(admin_seen=False).count()
+    gift_codes = GiftCode.query.order_by(GiftCode.created_at.desc()).limit(50).all()
     return render_template('admin.html', users=users, player_names=sorted(player_names),
-                           card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())))
+                           card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())),
+                           support_messages=support_messages, unread_support_count=unread_support_count,
+                           gift_codes=gift_codes)
 
 @app.post('/admin/gift')
 @admin_required
@@ -979,7 +1149,8 @@ def resolve_friendly_match(challenge):
         raise ValueError('Một trong hai đội bóng không còn tồn tại.')
     sa, sb = load_state(a), load_state(b)
     def team_ovr(st):
-        vals = [player_upgrade_ovr(p) for p in st.get('starting', [])]
+        lineup = st.get('starting', [])
+        vals = [starting_lineup_player_ovr(p, lineup) for p in lineup]
         return sum(vals)/len(vals) if vals else 60
     oa, ob = team_ovr(sa), team_ovr(sb)
     def goals(attack, defence):

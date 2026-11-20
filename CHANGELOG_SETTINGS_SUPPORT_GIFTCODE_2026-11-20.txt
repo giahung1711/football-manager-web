@@ -1,0 +1,10 @@
+FOOTBALL MANAGER — SETTINGS, SUPPORT & GIFTCODE UPDATE
+
+- Added a dedicated player Settings page with horizontally arranged sections for gameplay, visual effects, and notifications.
+- Saved settings per user account in the database, with a lightweight migration for existing users.
+- Added player support form for suggestions, bug reports, and other requests.
+- Added Support inbox to the Admin Panel with new-message red indicators, mark-as-seen controls, and admin replies. Players can view replies from Settings.
+- Added Giftcode redemption for PC (million units), PG, and Protection Cards. Each account can redeem each code once; codes can have a global redemption cap and can be disabled by Admin.
+- Added Admin giftcode creation and management.
+- Moved player logout into the bottom of Settings, after Giftcode.
+- Existing game features and the latest +8 OVR / close ball-follow camera update are preserved.

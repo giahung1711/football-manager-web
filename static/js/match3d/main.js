@@ -12,7 +12,7 @@ try {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x8fb1c0);
   scene.fog = new THREE.Fog(0x8fb1c0, 105, 220);
-  const camera = new THREE.PerspectiveCamera(54, 1, .1, 420);
+  const camera = new THREE.PerspectiveCamera(38, 1, .1, 420);
   const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -114,14 +114,16 @@ try {
   const camTarget=new THREE.Vector3();
   // Fixed broadcast sideline camera: it tracks the ball only along the pitch length.
   function updateCamera(dt){
-    const targetX=THREE.MathUtils.clamp(ball.position.x,-72,72);
-    camera.position.x=THREE.MathUtils.damp(camera.position.x,targetX,3.2,dt);
-    camera.position.y=46;
-    camera.position.z=94;
+    // Khung hình hẹp: chỉ theo dõi khu vực quanh bóng, không để lộ toàn sân.
+    // Hướng camera luôn cố định; chỉ trượt theo trục dọc sân (X).
+    const targetX=THREE.MathUtils.clamp(ball.position.x,-70,70);
+    camera.position.x=THREE.MathUtils.damp(camera.position.x,targetX,4.2,dt);
+    camera.position.y=27;
+    camera.position.z=49;
     camTarget.set(camera.position.x,0,0);
     camera.lookAt(camTarget);
   }
-  camera.position.set(-20,46,94);camera.lookAt(-20,0,0);
+  camera.position.set(-20,27,49);camera.lookAt(-20,0,0);
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);}new ResizeObserver(resize).observe(mount);resize();
   function setStatus(s){statusEl.textContent=s;}
   function updateScore(){scoreEl.textContent=`${homeGoals} - ${awayGoals}`;}

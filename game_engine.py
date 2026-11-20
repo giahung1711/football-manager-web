@@ -551,6 +551,32 @@ def player_upgrade_ovr(p):
     return raw
 
 
+def starting_lineup_player_ovr(p, starting):
+    """OVR thi dau: chi cau thu +8 trong 11 da chinh nhan bonus theo moc doi hinh."""
+    base = player_upgrade_ovr(p)
+    try:
+        level = int(p.get('level', 0))
+    except (TypeError, ValueError, AttributeError):
+        level = 0
+    if level < 8:
+        return base
+    lineup = starting if isinstance(starting, list) else []
+    plus8_count = 0
+    for item in lineup[:11]:
+        if not isinstance(item, dict):
+            continue
+        try:
+            if int(item.get('level', 0) or 0) >= 8:
+                plus8_count += 1
+        except (TypeError, ValueError):
+            continue
+    if plus8_count >= 11:
+        return base + 2
+    if plus8_count >= 5:
+        return base + 1
+    return base
+
+
 def upgrade_cost(p, target_level):
     """Chi phí ép cấp đích, tính theo phần trăm giá trị gốc."""
     if target_level not in UPGRADE_COSTS:
@@ -802,7 +828,8 @@ def get_dashboard(st):
         "formation": st['formation'],
         "squad_size": len(arr),
         "average_rating": round(
-            sum(player_upgrade_ovr(p) for p in arr) / max(1, len(arr)),
+            sum(starting_lineup_player_ovr(p, st.get("starting", [])) if i < len(st.get("starting", [])) else player_upgrade_ovr(p)
+                for i, p in enumerate(arr)) / max(1, len(arr)),
             1
         ),
         "total_value": round(sum(value(p) for p in arr), 2),

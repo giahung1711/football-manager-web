@@ -1,0 +1,9 @@
+FOOTBALL MANAGER – ICON NAVIGATION UPDATE
+
+- Replaced text navigation labels with compact, consistent inline SVG icons.
+- Added hover/focus tooltips so each icon reveals its Vietnamese function name.
+- Added active-page highlighting and retained the Admin unread-support notification dot.
+- Preserved navigation destinations and access rules for player/Admin accounts.
+- Replaced the Squad shirt symbol with the selected Network-style squad icon.
+- Kept Settings as the final navigation item, in place of the former Logout location.
+- Logout remains available only at the bottom of the Settings page.

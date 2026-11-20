@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Cài đặt · FOOTBALL MANAGER{% endblock %}
+{% block content %}
+<section class="settings-hero">
+  <div><p class="eyebrow">MANAGER CONTROL CENTER</p><h1>CÀI ĐẶT <span>GAME</span></h1><p class="muted">Tùy chỉnh trải nghiệm FOOTBALL MANAGER theo cách của bạn.</p></div>
+  <div class="settings-hero-mark">⚙</div>
+</section>
+
+<form method="post" action="{{ url_for('settings_page') }}" class="settings-form">
+  <input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+  <section class="settings-horizontal-panel">
+    <div class="settings-panel-heading"><span class="settings-icon">🎮</span><div><p class="eyebrow">01 · GAMEPLAY</p><h2>Trải nghiệm chơi</h2></div></div>
+    <div class="settings-options-grid">
+      {% for key,label,desc in [
+        ('confirm_buy','Xác nhận mua cầu thủ','Hỏi lại trước khi mua'),('confirm_sell','Xác nhận bán cầu thủ','Tránh thao tác nhầm trên chợ'),('confirm_forge','Xác nhận ép thẻ','Hỏi lại trước khi bắt đầu ép'),('auto_save_squad','Tự động lưu đội hình','Lưu thay đổi đội hình ngay khi áp dụng')
+      ] %}
+      <label class="setting-option"><span><b>{{ label }}</b><small>{{ desc }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.get(key, true) %}checked{% endif %}><i></i></label>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="settings-horizontal-panel">
+    <div class="settings-panel-heading"><span class="settings-icon">✨</span><div><p class="eyebrow">02 · VISUAL & EFFECTS</p><h2>Giao diện và hiệu ứng</h2></div></div>
+    <div class="settings-options-grid">
+      {% for key,label,desc in [
+        ('page_animations','Hiệu ứng chuyển trang','Hiển thị chuyển cảnh giữa các mục'),('forge_animation','Hiệu ứng ép thẻ','Bật hoạt ảnh ép thẻ thường và cấp cao'),('gift_animation','Hiệu ứng mở quà','Hiển thị hoạt ảnh khi mở quà')
+      ] %}
+      <label class="setting-option"><span><b>{{ label }}</b><small>{{ desc }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.get(key, true) %}checked{% endif %}><i></i></label>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="settings-horizontal-panel">
+    <div class="settings-panel-heading"><span class="settings-icon">🔔</span><div><p class="eyebrow">03 · NOTIFICATIONS</p><h2>Thông báo</h2></div></div>
+    <div class="settings-options-grid">
+      {% for key,label,desc in [
+        ('mail_notifications','Hòm thư','Thông báo thư và quà mới'),('quest_notifications','Nhiệm vụ ngày','Thông báo nhiệm vụ và phần thưởng'),('market_notifications','Chợ chuyển nhượng','Thông báo liên quan đến tin bán cầu thủ'),('friend_notifications','Bạn bè','Thông báo lời mời và giao hữu'),('sound_effects','Âm thanh thông báo','Bật âm thanh giao diện'),('performance_mode','Chế độ tiết kiệm hiệu năng','Giảm các hiệu ứng không cần thiết')
+      ] %}
+      <label class="setting-option"><span><b>{{ label }}</b><small>{{ desc }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.get(key, false) %}checked{% endif %}><i></i></label>
+      {% endfor %}
+    </div>
+  </section>
+  <div class="settings-save-row"><span class="muted">Cài đặt được lưu riêng theo tài khoản.</span><button class="button primary" type="submit">💾 Lưu cài đặt</button></div>
+</form>
+
+<section class="settings-horizontal-panel support-player-panel" id="support">
+  <div class="settings-panel-heading"><span class="settings-icon">🛟</span><div><p class="eyebrow">04 · PLAYER SUPPORT</p><h2>Hỗ trợ</h2><p class="muted">Gửi góp ý hoặc báo lỗi trực tiếp đến đội ngũ quản trị.</p></div></div>
+  <form method="post" action="{{ url_for('support_send') }}" class="support-form"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}">
+    <div class="support-form-row"><label>Loại yêu cầu<select name="category"><option>Góp ý</option><option>Báo lỗi</option><option>Khác</option></select></label><label>Tiêu đề<input name="subject" maxlength="120" required placeholder="Ví dụ: Lỗi khi ép thẻ cấp cao"></label></div>
+    <label>Nội dung<textarea name="body" rows="4" maxlength="3000" required placeholder="Mô tả góp ý hoặc lỗi bạn gặp phải..."></textarea></label>
+    <button class="button primary" type="submit">📨 Gửi yêu cầu hỗ trợ</button>
+  </form>
+  {% if support_messages %}
+  <div class="my-support-list"><h3>Yêu cầu đã gửi</h3>
+    {% for msg in support_messages %}<article class="my-support-item"><div><b>{{ msg.subject }}</b><span class="support-status">{{ msg.status }}</span></div><small>{{ msg.category }} · {{ msg.created_at.strftime('%d/%m/%Y %H:%M') if msg.created_at else '' }}</small><p>{{ msg.body }}</p>{% if msg.admin_reply %}<div class="support-reply"><b>Phản hồi từ Admin</b><p>{{ msg.admin_reply }}</p></div>{% endif %}</article>{% endfor %}
+  </div>{% endif %}
+</section>
+
+<section class="settings-horizontal-panel giftcode-panel" id="giftcode">
+  <div class="settings-panel-heading"><span class="settings-icon">🎁</span><div><p class="eyebrow">05 · REDEEM REWARD</p><h2>Giftcode</h2><p class="muted">Nhập mã quà tặng để nhận PC, PG hoặc Thẻ bảo vệ.</p></div></div>
+  <form method="post" action="{{ url_for('redeem_giftcode') }}" class="giftcode-form"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><input name="code" maxlength="40" required placeholder="NHẬP MÃ GIFTCODE"><button class="button primary" type="submit">Đổi giftcode</button></form>
+</section>
+
+<div class="settings-logout-row"><div><p class="eyebrow">SESSION</p><b>Đăng xuất khỏi tài khoản</b><small class="muted">Bạn có thể đăng nhập lại bất cứ lúc nào.</small></div><form method="post" action="{{ url_for('logout') }}"><button class="button logout-button" type="submit">↪ Đăng xuất</button></form></div>
+{% endblock %}

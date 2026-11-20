@@ -12,6 +12,7 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     is_admin = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
+    settings_json = db.Column(JSON, nullable=False, default=dict)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -102,3 +103,40 @@ class A1CupSeason(db.Model):
     third_user_id = db.Column(db.Integer, nullable=True)
     prizes_awarded = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class SupportMessage(db.Model):
+    __tablename__ = "support_message"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user = db.relationship("User")
+    category = db.Column(db.String(32), nullable=False, default="Góp ý")
+    subject = db.Column(db.String(120), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="Mới")
+    admin_seen = db.Column(db.Boolean, nullable=False, default=False)
+    admin_reply = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), index=True)
+    replied_at = db.Column(db.DateTime, nullable=True)
+
+
+class GiftCode(db.Model):
+    __tablename__ = "gift_code"
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    pc_millions = db.Column(db.Float, nullable=False, default=0)
+    pg = db.Column(db.Integer, nullable=False, default=0)
+    protection_cards = db.Column(db.Integer, nullable=False, default=0)
+    max_redemptions = db.Column(db.Integer, nullable=False, default=0)  # 0 = unlimited
+    redemption_count = db.Column(db.Integer, nullable=False, default=0)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class GiftCodeRedemption(db.Model):
+    __tablename__ = "gift_code_redemption"
+    id = db.Column(db.Integer, primary_key=True)
+    gift_code_id = db.Column(db.Integer, db.ForeignKey("gift_code.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    redeemed_at = db.Column(db.DateTime, server_default=db.func.now())
+    __table_args__ = (UniqueConstraint("gift_code_id", "user_id", name="uq_gift_code_user"),)
