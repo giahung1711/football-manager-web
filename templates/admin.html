@@ -9,6 +9,15 @@
 </section>
 
 <section class="panel admin-panel">
+  <p class="eyebrow">PLAYER MARKET MAINTENANCE</p>
+  <h2>Reset chợ cầu thủ</h2>
+  <p class="muted">Thu hồi toàn bộ tin đăng đang hoạt động và trả từng thẻ về đúng kho của người bán (Dự bị/Cầu thủ khác). Không đụng đến giao dịch đã bán, PC hoặc PG.</p>
+  <form method="post" action="{{ url_for('player_market.player_market_admin_reset') }}" onsubmit="return confirm('Xác nhận reset toàn bộ chợ cầu thủ? Tất cả thẻ đang rao sẽ được trả về kho người bán. Giao dịch đã bán không bị ảnh hưởng.');">
+    <button class="button" type="submit">Reset chợ & hoàn trả cầu thủ</button>
+  </form>
+</section>
+
+<section class="panel admin-panel">
   <div class="section-head">
     <div>
       <p class="eyebrow">PLAYER DATABASE</p>
@@ -311,9 +320,19 @@
     <label>Giới hạn lượt đổi (0 = không giới hạn)</label><input type="number" name="max_redemptions" min="0" step="1" value="0">
     <button class="button primary" type="submit">＋ Tạo Giftcode</button>
   </form>
-  <div class="admin-table-wrap"><table><thead><tr><th>Mã</th><th>Phần thưởng</th><th>Lượt đổi</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-    {% for code in gift_codes %}<tr><td><strong>{{ code.code }}</strong></td><td>{{ code.pc_millions|round(2) }}M PC · {{ '{:,}'.format(code.pg) }} PG · {{ code.protection_cards }} Thẻ bảo vệ</td><td>{{ code.redemption_count }} / {{ code.max_redemptions if code.max_redemptions else '∞' }}</td><td>{{ 'Đang hoạt động' if code.active else 'Đã khóa' }}</td><td><form method="post" action="{{ url_for('admin_toggle_giftcode', code_id=code.id) }}"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button" type="submit">{{ 'Khóa' if code.active else 'Mở khóa' }}</button></form></td></tr>
-    {% else %}<tr><td colspan="5" class="muted">Chưa có giftcode.</td></tr>{% endfor %}
+  <div class="admin-table-wrap"><table><thead><tr><th>Mã giftcode</th><th>Phần thưởng</th><th>Lượt đổi</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>
+    {% for code in gift_codes %}<tr>
+      <td><strong>{{ code.code }}</strong></td>
+      <td>{{ code.pc_millions|round(2) }}M PC · {{ '{:,}'.format(code.pg) }} PG · {{ code.protection_cards }} Thẻ bảo vệ</td>
+      <td>{{ code.redemption_count }} / {{ code.max_redemptions if code.max_redemptions else '∞' }}</td>
+      <td><span class="support-status">{{ 'Đang hoạt động' if code.active else 'Đã khóa' }}</span></td>
+      <td>{{ code.created_at.strftime('%d/%m/%Y %H:%M') if code.created_at else '—' }}</td>
+      <td><div class="admin-support-actions">
+        <form method="post" action="{{ url_for('admin_toggle_giftcode', code_id=code.id) }}"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button" type="submit">{{ 'Khóa' if code.active else 'Mở khóa' }}</button></form>
+        <form method="post" action="{{ url_for('admin_delete_giftcode', code_id=code.id) }}" onsubmit="return confirm('Xóa giftcode {{ code.code }}? Lịch sử đổi mã sẽ bị xóa; quà người chơi đã nhận vẫn được giữ.');"><input type="hidden" name="csrf_token" value="{{ admin_csrf_token }}"><button class="button giftcode-delete" type="submit">Xóa</button></form>
+      </div></td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="muted">Chưa có giftcode. Tạo mã đầu tiên bằng biểu mẫu phía trên.</td></tr>{% endfor %}
   </tbody></table></div>
 </section>
 

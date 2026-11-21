@@ -1,0 +1,7 @@
+BETRAYAL PACK – 2026-11-21
+
+- Thêm gói mùa BETRAYAL vào Cửa hàng, giá 2.750 PG.
+- Giao diện gói và khung thẻ theo tông xám đen/kim loại, có nút xem danh sách 30 cầu thủ.
+- Thêm cơ chế mở gói ngẫu nhiên, trừ PG, chống gửi lặp request và đưa cầu thủ vào dự bị.
+- Thẻ cầu thủ nhận được mang nhãn mùa BETRAYAL; thêm hiệu ứng reveal riêng.
+- Không thay đổi giá, xác suất hoặc cơ chế của các gói hiện có.

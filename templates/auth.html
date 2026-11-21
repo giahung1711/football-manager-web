@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% block robots_meta %}<meta name="robots" content="noindex,follow">{% endblock %}
 {% block title %}{{ 'Đăng ký' if mode == 'register' else 'Đăng nhập' }}{% endblock %}
 {% block content %}
 <section class="panel auth">
-  <p class="eyebrow">FOOTBALL MANAGER ACCOUNT</p>
+  <p class="eyebrow">PUNNA U-FOOTBALL ACCOUNT</p>
   <h1>{{ 'Tạo tài khoản' if mode == 'register' else 'Chào mừng trở lại' }}</h1>
   <form method="post">
     <label>Tên tài khoản</label><input name="username" minlength="3" maxlength="32" required autocomplete="username">

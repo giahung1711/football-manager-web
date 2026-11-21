@@ -1,0 +1,13 @@
+PUNNA U-FOOTBALL update — 2026-11-21
+
+1. BETRAYAL PACK odds (per player):
+   OVR 99: 7.5% each (2 players; tier total 15%)
+   OVR 100: 5.5% each (8 players; tier total 44%)
+   OVR 101: 2.5% each (11 players; tier total 27.5%)
+   OVR 102: 1.75% each (6 players; tier total 10.5%)
+   OVR 103: 1.0% each (3 players; tier total 3%)
+   Total: 100%. Pack draw now uses weighted random selection.
+
+2. ULTIMATE appearance: only the card frame/border and the upgrade-level badge become ruby, with the diamond star marker. The card's season/event background and season identity remain unchanged.
+
+3. Daily quests: added a “Nhận tất cả” button for all completed, unclaimed regular daily missions. It safely skips incomplete/already claimed missions and grants only eligible rewards. The 10/10 completion bonus and special quest remain separate claims.

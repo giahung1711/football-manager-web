@@ -1,6 +1,6 @@
 import os, random, copy, math, secrets, hmac
 from datetime import datetime, timedelta
-from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify, Response
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, GameSave, FriendRequest, Friendship, FriendlyChallenge, A1CupSeason, SupportMessage, GiftCode, GiftCodeRedemption
 from marketplace import player_market_bp
@@ -8,7 +8,7 @@ from player_metadata import enrich_player
 from daily_quests import DAILY_QUEST_REWARDS, ensure_daily_quests, update_daily_quests, grant_quest_reward
 from game_engine import (CLUBS, create_new_game, get_dashboard, all_players, normalize_state,
                          TRANSFER_MARKET, PLAYER_PRICES, PLAYER_RATINGS, PLAYER_POSITIONS,
-                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, ULTIMATE_VALUE_MULTIPLIER, upgrade_cost, value, player, player_upgrade_ovr, starting_lineup_player_ovr, player_base_value, simulate_match)
+                         PACKS, UPGRADE_RATES, UPGRADE_COSTS, CARD_VALUE_RATES, BALLON_DOR_VALUES, CHRISTMAS_2026_PLAYERS, SWEET_CANDY_PLAYERS, SWEET_CANDY_VALUES, BETRAYAL_PLAYERS, BETRAYAL_VALUES, CARD_SEASON_OPTIONS, UPGRADE_FAILURE_DISTRIBUTION, MAX_UPGRADE_LEVEL, ULTIMATE_VALUE_MULTIPLIER, upgrade_cost, value, player, player_upgrade_ovr, starting_lineup_player_ovr, player_base_value, simulate_match)
 
 app = Flask(__name__)
 app.register_blueprint(player_market_bp)
@@ -134,7 +134,39 @@ def page(save, tab='overview', extra=None):
         persist(save, st)
     return render_template('game.html', state=st, data=get_dashboard(st), tab=tab, players=all_players(st), match_popup=match_popup, profile_matches=int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0), profile_win_rate=round(100*int(st.get('wins', 0) or 0)/max(1,int(st.get('wins', 0) or 0)+int(st.get('draws', 0) or 0)+int(st.get('losses', 0) or 0)),1), daily_quests=st.get('daily_quests', {}), daily_completed_count=sum(1 for q in st.get('daily_quests', {}).get('missions', []) if int(q.get('progress', 0)) >= int(q.get('target', 1))),
                            prices={p['name']:value(p) for p in all_players(st)}, player_value=value, player_ovr=lambda p: starting_lineup_player_ovr(p, st.get('starting', [])) if any(p is x for x in st.get('starting', [])) else player_upgrade_ovr(p), player_base_value=player_base_value, packs=PACKS,
-                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, ultimate_value_multiplier=ULTIMATE_VALUE_MULTIPLIER, extra=extra)
+                           market=st['market'], market_items=market_items, ballon_reveal=ballon_reveal, ballon_reveal_meta=ballon_reveal_meta, sweet_candy_players=SWEET_CANDY_PLAYERS, christmas_players=CHRISTMAS_2026_PLAYERS, betrayal_players=BETRAYAL_PLAYERS, ballon_request_id=secrets.token_urlsafe(18), upgrade_rates=UPGRADE_RATES, upgrade_costs=UPGRADE_COSTS, ultimate_value_multiplier=ULTIMATE_VALUE_MULTIPLIER, extra=extra)
+
+@app.route('/robots.txt')
+def robots_txt():
+    """Allow public landing-page crawling while keeping private app areas out of search."""
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /admin\n"
+        "Disallow: /mailbox\n"
+        "Disallow: /friends\n"
+        "Disallow: /settings\n"
+        "Disallow: /choose-club\n"
+        "Disallow: /match-3d\n"
+        "Disallow: /tournament\n"
+        "Disallow: /register\n"
+        "Disallow: /login\n"
+        f"Sitemap: {request.url_root.rstrip('/')}/sitemap.xml\n"
+    )
+    return Response(body, mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Expose only the public landing page in the initial sitemap."""
+    loc = request.url_root.rstrip('/') + '/'
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f'<url><loc>{loc}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>'
+        '</urlset>'
+    )
+    return Response(body, mimetype='application/xml')
 
 @app.route('/')
 def home():
@@ -323,6 +355,38 @@ def daily_quest_claim():
         grant_quest_reward(state, mission)
         mission['claimed'] = True
         flash(f"Đã nhận thưởng nhiệm vụ: +{mission['pc']}M PC, +{mission['pg']:,} PG, +{mission['cards']} Thẻ bảo vệ.")
+    persist(save, state)
+    return redirect(url_for('game_tab', tab='daily'))
+
+
+@app.post('/daily-quests/claim-all')
+@login_required
+def daily_quest_claim_all():
+    save = current_save()
+    if not save:
+        return redirect(url_for('choose_club'))
+    state = load_state(save)
+    ensure_daily_quests(state)
+    daily = state['daily_quests']
+    claimed_count = 0
+    total_pc = 0.0
+    total_pg = 0
+    total_cards = 0
+    for mission in daily.get('missions', []):
+        if mission.get('claimed'):
+            continue
+        if int(mission.get('progress', 0)) < int(mission.get('target', 1)):
+            continue
+        grant_quest_reward(state, mission)
+        mission['claimed'] = True
+        claimed_count += 1
+        total_pc += float(mission.get('pc', 0) or 0)
+        total_pg += int(mission.get('pg', 0) or 0)
+        total_cards += int(mission.get('cards', 0) or 0)
+    if claimed_count:
+        flash(f'Đã nhận {claimed_count} nhiệm vụ: +{total_pc:g}M PC, +{total_pg:,} PG, +{total_cards} Thẻ bảo vệ!')
+    else:
+        flash('Hiện không có nhiệm vụ thường nào đã hoàn thành mà chưa nhận thưởng.')
     persist(save, state)
     return redirect(url_for('game_tab', tab='daily'))
 
@@ -517,6 +581,25 @@ def admin_toggle_giftcode(code_id):
         db.session.commit()
     return redirect(url_for('admin_panel') + '#admin-giftcodes')
 
+@app.post('/admin/giftcode/<int:code_id>/delete')
+@admin_required
+def admin_delete_giftcode(code_id):
+    if not valid_admin_csrf():
+        flash('Phiên thao tác hết hạn. Hãy tải lại trang.')
+        return redirect(url_for('admin_panel') + '#admin-giftcodes')
+    code = db.session.get(GiftCode, code_id)
+    if not code:
+        flash('Không tìm thấy giftcode cần xóa.')
+        return redirect(url_for('admin_panel') + '#admin-giftcodes')
+    code_text = code.code
+    # Xóa lịch sử đổi gắn với mã trước để tránh lỗi khóa ngoại.
+    GiftCodeRedemption.query.filter_by(gift_code_id=code.id).delete(synchronize_session=False)
+    db.session.delete(code)
+    db.session.commit()
+    flash(f'Đã xóa giftcode {code_text}. Phần thưởng người chơi đã nhận trước đó không bị thu hồi.')
+    return redirect(url_for('admin_panel') + '#admin-giftcodes')
+
+
 @app.route('/admin', methods=['GET'])
 @admin_required
 def admin_panel():
@@ -544,7 +627,7 @@ def admin_panel():
                 card_seasons.add('Ballon D’or')
     support_messages = SupportMessage.query.order_by(SupportMessage.created_at.desc()).limit(100).all()
     unread_support_count = SupportMessage.query.filter_by(admin_seen=False).count()
-    gift_codes = GiftCode.query.order_by(GiftCode.created_at.desc()).limit(50).all()
+    gift_codes = GiftCode.query.order_by(GiftCode.created_at.desc()).all()
     return render_template('admin.html', users=users, player_names=sorted(player_names),
                            card_seasons=sorted(card_seasons, key=lambda x: (x != 'Thường', x.casefold())),
                            support_messages=support_messages, unread_support_count=unread_support_count,
@@ -614,6 +697,8 @@ def admin_gift():
             gifted['event_card'] = 'christmas_2026'
         elif season_key == 'sweet candy':
             gifted['event_card'] = 'sweet_candy'
+        elif season_key == 'betrayal':
+            gifted['event_card'] = 'betrayal'
         elif season_key not in {'thường', 'thuong'}:
             # Generic seasonal frame keeps future/admin-added seasons visible too.
             gifted['event_card'] = 'custom_season'
@@ -775,6 +860,8 @@ def ensure_gift_card_season(gifted):
             gifted['event_card'] = 'christmas_2026'
         elif season_key == 'sweet candy':
             gifted['event_card'] = 'sweet_candy'
+        elif season_key == 'betrayal':
+            gifted['event_card'] = 'betrayal'
         elif season_key not in {'', 'thường', 'thuong'}:
             gifted['event_card'] = 'custom_season'
     return gifted
@@ -1537,6 +1624,42 @@ def action():
             }
             st.setdefault('activity', []).insert(0, {
                 'message': f'Mở Sweet Candy Pack: nhận {name} OVR {rating} (-2.500 PG)',
+                'week': st.get('week', 1)
+            })
+
+        elif act=='betrayal_pack':
+            request_id = request.form.get('request_id', '').strip()
+            if not request_id or len(request_id) > 100:
+                raise ValueError('Yêu cầu mở gói không hợp lệ. Hãy tải lại trang.')
+            processed = st.setdefault('processed_betrayal_requests', [])
+            if request_id in processed:
+                persist(save, st)
+                return redirect(url_for('game_tab', tab='shop'))
+            cost_pg = 2750
+            if int(st.get('pg_balance', 0)) < cost_pg:
+                raise ValueError(f'BETRAYAL Pack giá {cost_pg:,} PG; bạn hiện có {int(st.get("pg_balance", 0)):,} PG.')
+            name, position, rating, _weight, base_value, country_flag, rivalry = random.choices(
+                BETRAYAL_PLAYERS, weights=[entry[3] for entry in BETRAYAL_PLAYERS], k=1
+            )[0]
+            awarded = {
+                'name': name, 'position': position, 'rating': rating, 'level': 0,
+                'event_card': 'betrayal', 'original_rating': rating,
+                'card_season': 'BETRAYAL', 'card_season_label': 'BETRAYAL',
+                'market_value': base_value, 'country_flag': country_flag,
+                'rivalry_clubs': rivalry
+            }
+            st['pg_balance'] = int(st.get('pg_balance', 0)) - cost_pg
+            st.setdefault('bench', []).append(awarded)
+            quest_event='pack'; quest_data={'pg_spent': cost_pg, 'rating': rating}
+            processed.append(request_id)
+            st['processed_betrayal_requests'] = processed[-100:]
+            st['ballon_reveal'] = {
+                'id': request_id, 'name': name, 'position': position, 'rating': rating,
+                'pool': 'BETRAYAL', 'country_flag': country_flag,
+                'event_type': 'betrayal', 'season_label': 'BETRAYAL', 'rivalry_clubs': rivalry
+            }
+            st.setdefault('activity', []).insert(0, {
+                'message': f'Mở BETRAYAL Pack: nhận {name} OVR {rating} (-2.750 PG)',
                 'week': st.get('week', 1)
             })
 

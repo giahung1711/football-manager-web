@@ -4,13 +4,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}FOOTBALL MANAGER{% endblock %}</title>
+  <meta name="description" content="PUNNA U-FOOTBALL – game quản lý bóng đá trực tuyến. Xây dựng đội bóng trong mơ, chiêu mộ cầu thủ, nâng cấp thẻ và tranh tài cùng người chơi khác.">
+  <meta name="application-name" content="PUNNA U-FOOTBALL">
+  <meta name="theme-color" content="#101827">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PUNNA U-FOOTBALL">
+  <meta property="og:title" content="PUNNA ULTIMATE FOOTBALL ONLINE">
+  <meta property="og:description" content="Xây dựng đội bóng trong mơ, chiêu mộ cầu thủ, nâng cấp thẻ và tranh tài cùng người chơi khác.">
+  <meta property="og:url" content="{{ request.url_root.rstrip('/') }}{{ request.path }}">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
+  {% block robots_meta %}{% endblock %}
+  <title>{% block title %}PUNNA ULTIMATE FOOTBALL ONLINE{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261116-a1cup">
 <style>body[data-page-animations="0"] *,body[data-performance-mode="1"] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}</style>
 </head>
 <body data-confirm-buy="{{ 1 if user_settings.get('confirm_buy', true) else 0 }}" data-confirm-sell="{{ 1 if user_settings.get('confirm_sell', true) else 0 }}" data-confirm-forge="{{ 1 if user_settings.get('confirm_forge', true) else 0 }}" data-page-animations="{{ 1 if user_settings.get('page_animations', true) else 0 }}" data-performance-mode="{{ 1 if user_settings.get('performance_mode', false) else 0 }}">
 <header class="topbar">
-  <a class="brand" href="{{ url_for('home') }}">⚽ FOOTBALL MANAGER</a>
+  <a class="brand" href="{{ url_for('home') }}">⚽ PUNNA U-FOOTBALL</a>
   {% if current_user.is_authenticated %}
   <nav class="fm-icon-nav" aria-label="Điều hướng chính">
     <a href="{{ url_for('dashboard') }}" class="fm-nav-item{% if request.endpoint == 'dashboard' %} active{% endif %}" data-tooltip="Tổng quan" aria-label="Tổng quan" title="Tổng quan">
@@ -38,7 +49,7 @@
     </a>
     {% if not current_user.is_admin %}
     <a href="{{ url_for('player_market.player_market') }}" class="fm-nav-item{% if request.endpoint == 'player_market.player_market' %} active{% endif %}" data-tooltip="Chợ cầu thủ" aria-label="Chợ cầu thủ" title="Chợ cầu thủ">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M8 21H3v-5M3 16l6-6"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 5 4h14l2 6.5"/><path d="M4 10.5V20h16v-9.5M3 10.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M9 20v-5h6v5"/></svg>
     </a>
     {% endif %}
     {% if current_user.is_admin %}
@@ -48,7 +59,7 @@
     </a>
     {% endif %}
     <a href="{{ url_for('settings_page') }}" class="fm-nav-item settings-nav-link{% if request.endpoint == 'settings_page' %} active{% endif %}" data-tooltip="Cài đặt" aria-label="Cài đặt" title="Cài đặt">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v4M15 10v4M10 16v4"/></svg>
     </a>
   </nav>
   {% endif %}

@@ -1,0 +1,22 @@
+FOOTBALL MANAGER - MARKET LIMITS, ELIGIBILITY AND RESET
+
+- Replaced the settings navigation sun-like glyph with a clear horizontal sliders icon.
+- Replaced the transfer-market zig-zag glyph with a storefront icon.
+- Each player may have at most five active player-to-player market listings.
+  The limit is enforced in both single and bulk listing endpoints.
+- Eligibility now uses the player's original/base OVR:
+  * Base OVR 100-101 requires upgrade level +7 or higher.
+  * Base OVR 102 or higher requires upgrade level +5 or higher.
+  * Existing lower-OVR eligibility rules are retained.
+- The player's inventory/listing form is displayed as compact searchable and sortable rows.
+- Added an admin-only marketplace reset action in Admin Panel. It marks all active listings
+  as withdrawn and returns each listed card to its original seller's saved inventory group
+  (bench/extras). Already-sold listings and PC/PG balances are not modified.
+- The reset is an explicit admin action after deployment; it is not run automatically at startup.
+
+Validation:
+- Python syntax compilation passed for app.py, models.py, marketplace.py, game_engine.py,
+  and daily_quests.py.
+- All 16 Jinja templates compiled with the application's custom money filter registered.
+- A full Flask/database integration test could not be run in this environment because Flask
+  is not installed in the execution environment.

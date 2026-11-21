@@ -408,7 +408,43 @@ SWEET_CANDY_PLAYERS = [
 
 SWEET_CANDY_VALUES = {entry[0]: entry[4] for entry in SWEET_CANDY_PLAYERS}
 
-CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026', 'Sweet Candy')
+BETRAYAL_PLAYERS = [
+    # name, position, OVR, chance weight, base value (million PC), flag, rivalry
+    ('Peter Schmeichel', 'GK', 102, 1.75, 650, '🇩🇰', 'Manchester United – Manchester City'),
+    ('Pat Jennings', 'GK', 101, 2.5, 590, '🇬🇧', 'Tottenham – Arsenal'),
+    ('Sol Campbell', 'CB', 101, 2.5, 580, '🇬🇧', 'Tottenham – Arsenal'),
+    ('Mikaël Silvestre', 'CB', 101, 2.5, 560, '🇫🇷', 'Manchester United – Arsenal'),
+    ('Christian Panucci', 'RB', 101, 2.5, 555, '🇮🇹', 'Inter – AC Milan'),
+    ('William Gallas', 'CB', 100, 5.5, 545, '🇫🇷', 'Chelsea – Arsenal – Tottenham'),
+    ('Leonardo Bonucci', 'CB', 100, 5.5, 540, '🇮🇹', 'Inter – AC Milan'),
+    ('Francesco Acerbi', 'CB', 100, 5.5, 530, '🇮🇹', 'AC Milan – Inter'),
+    ('Dario Šimić', 'CB', 99, 7.5, 515, '🇭🇷', 'AC Milan – Inter'),
+    ('Andrea Pirlo', 'CM', 103, 1.0, 730, '🇮🇹', 'Inter – AC Milan'),
+    ('Clarence Seedorf', 'CM', 102, 1.75, 640, '🇳🇱', 'Inter – AC Milan'),
+    ('Bernd Schuster', 'CM', 102, 1.75, 625, '🇩🇪', 'Barcelona – Real Madrid'),
+    ('Michael Laudrup', 'CAM', 102, 1.75, 635, '🇩🇰', 'Barcelona – Real Madrid'),
+    ('Roberto Baggio', 'CAM', 102, 1.75, 645, '🇮🇹', 'Inter – AC Milan'),
+    ('Edgar Davids', 'CDM', 101, 2.5, 590, '🇳🇱', 'AC Milan – Inter'),
+    ('Cesc Fàbregas', 'CM', 101, 2.5, 595, '🇪🇸', 'Arsenal – Chelsea'),
+    ('Gheorghe Hagi', 'CAM', 101, 2.5, 585, '🇷🇴', 'Real Madrid – Barcelona'),
+    ('Hakan Çalhanoğlu', 'CAM', 101, 2.5, 570, '🇹🇷', 'AC Milan – Inter'),
+    ('Luis Enrique', 'CM', 100, 5.5, 535, '🇪🇸', 'Real Madrid – Barcelona'),
+    ('Luís Figo', 'RW', 103, 1.0, 745, '🇵🇹', 'Barcelona – Real Madrid'),
+    ('Samuel Eto’o', 'ST', 103, 1.0, 720, '🇨🇲', 'Real Madrid – Barcelona'),
+    ('Javier Saviola', 'ST', 100, 5.5, 530, '🇦🇷', 'Barcelona – Real Madrid'),
+    ('Zlatan Ibrahimović', 'ST', 102, 1.75, 650, '🇸🇪', 'Inter – AC Milan'),
+    ('Christian Vieri', 'ST', 101, 2.5, 590, '🇮🇹', 'Inter – AC Milan'),
+    ('Carlos Tévez', 'ST', 101, 2.5, 600, '🇦🇷', 'Manchester United – Manchester City'),
+    ('Hernán Crespo', 'ST', 101, 2.5, 585, '🇦🇷', 'Inter – AC Milan'),
+    ('Mario Balotelli', 'ST', 99, 7.5, 510, '🇮🇹', 'Inter – AC Milan'),
+    ('Nicolas Anelka', 'ST', 100, 5.5, 525, '🇫🇷', 'Arsenal – Chelsea'),
+    ('Andy Cole', 'ST', 100, 5.5, 535, '🇬🇧', 'Manchester United – Manchester City'),
+    ('Willian', 'RW', 100, 5.5, 520, '🇧🇷', 'Chelsea – Arsenal'),
+]
+
+BETRAYAL_VALUES = {entry[0]: entry[4] for entry in BETRAYAL_PLAYERS}
+
+CARD_SEASON_OPTIONS = ('Thường', 'Ballon D’or', 'Christmas 2026', 'Sweet Candy', 'BETRAYAL')
 
 MAX_UPGRADE_LEVEL = 8
 ULTIMATE_VALUE_MULTIPLIER = 50.0  # 5000% giá trị gốc

@@ -1,0 +1,11 @@
+PUNNA U-FOOTBALL – SEO UPDATE (2026-11-21)
+
+- Updated shared browser title and brand label to PUNNA U-FOOTBALL.
+- Added Vietnamese meta description, application name, canonical URL and Open Graph/Twitter metadata.
+- Improved the public landing page heading and description for the PUNNA U-FOOTBALL brand.
+- Added /robots.txt and /sitemap.xml endpoints. The sitemap contains only the public landing page.
+- Added noindex,follow to login/register pages.
+- No database schema or player/game data was changed.
+
+After deploying, submit https://football-manager-web.ethiodeploy.app/sitemap.xml in Google Search Console.
+Google indexing and ranking are not guaranteed and may take time.

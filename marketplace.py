@@ -57,6 +57,31 @@ def _unmark_market_removed(state, player_name):
     ]
 
 
+def _base_rating(player):
+    try:
+        return int(player.get("rating", player.get("base_rating", 80)) or 80)
+    except (TypeError, ValueError, OverflowError):
+        return 80
+
+
+def _listing_requirement(player):
+    """Return minimum card level and human-readable rule, based on original OVR."""
+    base_ovr = _base_rating(player)
+    if 100 <= base_ovr <= 101:
+        return 7, "OVR gốc 100–101: cần +7 trở lên"
+    if base_ovr >= 102:
+        return 5, "OVR gốc từ 102: cần +5 trở lên"
+    if base_ovr <= 89:
+        return 5, "OVR gốc 89 trở xuống: cần +5 trở lên"
+    if 90 <= base_ovr <= 95:
+        return 3, "OVR gốc 90–95: cần +3 trở lên"
+    return 0, "Không giới hạn cấp thẻ"
+
+
+def _active_listing_count(user_id):
+    return PlayerMarketListing.query.filter_by(seller_id=user_id, status="active").count()
+
+
 @player_market_bp.get("/player-market")
 @login_required
 def player_market():
@@ -105,6 +130,8 @@ def player_market():
     } if seller_ids else {}
 
     own_players = []
+    active_own_count = _active_listing_count(current_user.id)
+    remaining_listing_slots = max(0, 5 - active_own_count)
 
     for group in ("bench", "extras"):
         for index, p in enumerate(state.get(group, [])):
@@ -112,15 +139,8 @@ def player_market():
             current_ovr = player_upgrade_ovr(p)
             current_value = value(p)
 
-            if current_ovr <= 89:
-                eligible = level >= 5
-                requirement = "Thẻ +5 trở lên"
-            elif current_ovr <= 95:
-                eligible = level >= 3
-                requirement = "Thẻ +3 trở lên"
-            else:
-                eligible = True
-                requirement = "Không giới hạn cấp thẻ"
+            minimum_level, requirement = _listing_requirement(p)
+            eligible = level >= minimum_level
 
             own_players.append({
                 "group": group,
@@ -140,6 +160,8 @@ def player_market():
         listings=active_listings,
         sellers=sellers,
         own_players=own_players,
+        active_own_count=active_own_count,
+        remaining_listing_slots=remaining_listing_slots,
     )
 
 
@@ -153,6 +175,9 @@ def player_market_list():
 
     try:
         state = _read_state(save)
+
+        if _active_listing_count(current_user.id) >= 5:
+            raise ValueError("Bạn chỉ được đăng bán tối đa 5 cầu thủ cùng lúc. Hãy thu hồi hoặc chờ bán thành công một tin đăng trước.")
 
         group = request.form.get("group", "")
         index = int(request.form.get("index", "-1"))
@@ -176,15 +201,9 @@ def player_market_list():
         if current_value <= 0:
             raise ValueError("Giá trị cầu thủ không hợp lệ.")
 
-        if current_ovr <= 89 and level < 5:
-            raise ValueError(
-                "Cầu thủ OVR 89 trở xuống phải đạt cấp thẻ +5 trở lên mới được đăng bán."
-            )
-
-        if 90 <= current_ovr <= 95 and level < 3:
-            raise ValueError(
-                "Cầu thủ OVR 90–95 phải đạt cấp thẻ +3 trở lên mới được đăng bán."
-            )
+        minimum_level, requirement = _listing_requirement(p)
+        if level < minimum_level:
+            raise ValueError(f"{p['name']}: {requirement} mới được đăng bán.")
 
         try:
             asking_price = float(
@@ -246,6 +265,11 @@ def player_market_list_bulk():
         if not selected:
             raise ValueError("Hãy chọn ít nhất một cầu thủ để đăng bán.")
 
+        active_count = _active_listing_count(current_user.id)
+        remaining_slots = max(0, 5 - active_count)
+        if len(set(selected)) > remaining_slots:
+            raise ValueError(f"Bạn chỉ còn được đăng thêm {remaining_slots} cầu thủ. Mỗi người chơi tối đa 5 tin đăng đang hoạt động cùng lúc.")
+
         parsed = []
         seen = set()
         for token in selected:
@@ -263,10 +287,9 @@ def player_market_list_bulk():
             current_value = value(player_record)
             if current_value <= 0:
                 raise ValueError(f"Giá trị của {player_record.get('name', 'cầu thủ')} không hợp lệ.")
-            if current_ovr <= 89 and level < 5:
-                raise ValueError(f"{player_record['name']} cần đạt +5 trở lên mới được đăng bán.")
-            if 90 <= current_ovr <= 95 and level < 3:
-                raise ValueError(f"{player_record['name']} cần đạt +3 trở lên mới được đăng bán.")
+            minimum_level, requirement = _listing_requirement(player_record)
+            if level < minimum_level:
+                raise ValueError(f"{player_record['name']}: {requirement} mới được đăng bán.")
             try:
                 asking_price = float(request.form.get(f"price_{group}_{index}", current_value))
             except (TypeError, ValueError):
@@ -505,6 +528,69 @@ def player_market_withdraw(listing_id):
         flash("Không thể thu hồi tin đăng lúc này.")
 
     return redirect(url_for("player_market.player_market"))
+
+
+@player_market_bp.post("/player-market/admin-reset")
+@login_required
+def player_market_admin_reset():
+    """Return every active marketplace card to its original seller's inventory."""
+    if not getattr(current_user, "is_admin", False):
+        flash("Bạn không có quyền thực hiện thao tác này.")
+        return redirect(url_for("dashboard"))
+
+    try:
+        active = (PlayerMarketListing.query
+                  .filter_by(status="active")
+                  .order_by(PlayerMarketListing.seller_id.asc(), PlayerMarketListing.id.asc())
+                  .with_for_update().all())
+        if not active:
+            flash("Chợ cầu thủ hiện không có tin đăng nào cần hoàn trả.")
+            return redirect(url_for("admin_panel"))
+
+        seller_ids = sorted({item.seller_id for item in active})
+        saves = (GameSave.query.filter(GameSave.user_id.in_(seller_ids))
+                 .order_by(GameSave.user_id.asc()).with_for_update().all())
+        saves_by_user = {item.user_id: item for item in saves}
+        states = {uid: _read_state(saves_by_user[uid]) for uid in saves_by_user}
+        missing = sorted(set(seller_ids) - set(states))
+        if missing:
+            raise ValueError("Không tìm thấy dữ liệu đội bóng của một số người bán; không có tin đăng nào bị thay đổi.")
+
+        for listing in active:
+            state = states[listing.seller_id]
+            group = listing.player_group if listing.player_group in {"bench", "extras"} else "bench"
+            restored = copy.deepcopy(listing.player_data or {})
+            if not isinstance(restored, dict):
+                raise ValueError(f"Dữ liệu thẻ {listing.player_name} không hợp lệ; đã hủy reset.")
+            try:
+                raw_level = int(restored.get("level", 0) or 0)
+            except (TypeError, ValueError, OverflowError):
+                raw_level = 0
+            restored["level"] = max(0, min(MAX_UPGRADE_LEVEL, raw_level))
+            state.setdefault(group, []).append(restored)
+
+        from sqlalchemy import update
+        listing_ids = [item.id for item in active]
+        db.session.execute(update(PlayerMarketListing)
+                            .where(PlayerMarketListing.id.in_(listing_ids), PlayerMarketListing.status == "active")
+                            .values(status="withdrawn"))
+
+        for uid, state in states.items():
+            remaining_names = {str(row.player_name).strip().casefold()
+                               for row in PlayerMarketListing.query.filter_by(seller_id=uid, status="active").all()}
+            state["market_removed_players"] = [name for name in _market_removed_names(state)
+                                               if str(name).strip().casefold() in remaining_names]
+            _write_state(saves_by_user[uid], state)
+
+        db.session.commit()
+        flash(f"Đã reset chợ cầu thủ: hoàn trả {len(active)} cầu thủ về kho của {len(seller_ids)} người chơi. Không thay đổi PC/PG hoặc các tin đã bán.")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc))
+    except Exception:
+        db.session.rollback()
+        flash("Không thể reset chợ cầu thủ. Toàn bộ dữ liệu vẫn được giữ nguyên.")
+    return redirect(url_for("admin_panel"))
 
 
 @player_market_bp.post("/player-market/claim")

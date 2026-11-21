@@ -1,0 +1,7 @@
+GIFTCODE ADMIN MANAGEMENT — 21/11/2026
+
+- Giữ biểu mẫu tạo giftcode trong Admin Panel với phần thưởng PC, PG, Thẻ bảo vệ và giới hạn lượt đổi.
+- Danh sách hiển thị toàn bộ giftcode, phần thưởng, số lượt đã đổi/giới hạn, trạng thái và ngày tạo.
+- Có thể khóa/mở khóa hoặc xóa từng giftcode.
+- Xóa giftcode sẽ xóa lịch sử đổi gắn với mã để tránh lỗi khóa ngoại; quà người chơi đã nhận trước đó không bị thu hồi.
+- Các thao tác quản trị đều kiểm tra admin và CSRF token.
